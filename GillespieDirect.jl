@@ -5,8 +5,8 @@ Method
 Author: Joel Trent and Josh Looker
 =#
 
-Pkg.add("Distributions")
-Pkg.add("Plots")
+#Pkg.add("Distributions")
+#Pkg.add("Plots")
 using Distributions
 using Plots
 using Random

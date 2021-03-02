@@ -5,8 +5,8 @@ Method
 Author: Joel Trent and Josh Looker
 =#
 
-# Pkg.add("Distributions")
-# Pkg.add("Plots")
+Pkg.add("Distributions")
+Pkg.add("Plots")
 using Distributions
 using Plots
 using Random
@@ -104,7 +104,7 @@ function plots(t, SIR, N, Display=true, save=true)
     end
 
     if save
-        # Save graph as png
+        # Save graph as pngW
         png("juliaGraphs/SIR_Model_Pop_$N")
     end
 end
@@ -124,7 +124,7 @@ R_total = N .* 0
 
 t_max = 200
 alpha = 0.4
-gamma = 0.4
+gamma = 0.0004
 
 # iterate through populations
 for i in 1:length(N)

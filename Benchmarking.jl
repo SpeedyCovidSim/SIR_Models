@@ -27,6 +27,7 @@ function jlSumArray(a)
 end
 
 
+# Create a reasonably large array to compute the sum of
 a = rand(10^7)
 
 # Py looks in current directory, may be unneccesary
@@ -46,3 +47,7 @@ pySumArray(a)
 pySumMark = @benchmark $pySumArray($a)
 
 jlSumMark = @benchmark $jlSumArray($a)
+
+numpySum = pyimport("numpy")["sum"]
+
+pyNumpySumMark = @benchmark $numpySum($a)

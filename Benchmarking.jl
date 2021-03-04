@@ -44,10 +44,10 @@ pySumArray = py"sumArray"
 # using the function
 pySumArray(a)
 
-pySumMark = @benchmark $pySumArray($a)
+pySumMark = @benchmark pySumArray(a)
 
-jlSumMark = @benchmark $jlSumArray($a)
+jlSumMark = @benchmark jlSumArray(a)
 
-numpySum = pyimport("numpy")["sum"]
+numpySum = pyimport("numpy")."sum"
 
-pyNumpySumMark = @benchmark $numpySum($a)
+pyNumpySumMark = @benchmark numpySum(a)

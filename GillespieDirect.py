@@ -4,9 +4,11 @@ Method
 
 Author: Joel Trent and Josh Looker
 '''
+from matplotlib import pyplot as plt
+import numpy as np
+from random import random
 
-
-def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, gamma, N, t_init=0):
+def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, t_init=0):
     '''
     Inputs
     t_init  : Initial time (default of 0)
@@ -27,101 +29,93 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, gamma, N,
 
 
     # initialise outputs
-    t = [copy(t_init)]
-    S = [copy(S_total)]
-    I = [copy(I_total)]
-    R = [copy(R_total)]
+    t = [t_init]
+    S = [S_total]
+    I = [I_total]
+    R = [R_total]
 
-    while t[end] < t_max && I_total != 0
+    while t[-1] < t_max and I_total != 0:
         # calculate the propensities to transition
         # h1 is propensity for infection, h2 is propensity for recovery
-        h_i = [gamma * I_total * S_total, alpha * I_total]
+        h_i = np.array([beta * I_total * S_total, alpha * I_total])
         h = sum(h_i)
 
         # time to any event occurring
-        delta_t = -log(1-rand())/h
+        delta_t = -np.log(1-random())/h
         #println(delta_t)
 
         # selection probabilities for each transition process. sum(j) = 1
-        j = h_i ./ h
+        j = h_i / h
 
         # coding this way so can include more processes later with additional
         # elseif
         # could be done more efficiently if large number of processes
-        choice = rand()
+        choice = random()
 
-        if choice < j[1] && S_total != 0  # (S->I)
+        if choice < j[0] and S_total != 0:  # (S->I)
             S_total -= 1
             I_total += 1
-        else    # (I->R) (assumes that I is not 0)
+        else:    # (I->R) (assumes that I is not 0)
             I_total -= 1
             R_total += 1
-        end
 
-        push!(t, t[end] + delta_t)
-        push!(S, copy(S_total))
-        push!(I, copy(I_total))
-        push!(R, copy(R_total))
+        t.append(t[-1]+delta_t)
+        S.append(S_total)
+        I.append(I_total)
+        R.append(R_total)
 
     return t, S, I , R
 
 
-#-----------------------------------------------------------------------------
-#=
-Inputs
-t       : Array of times at which events have occured
-SIR     : Array of arrays of Num people susceptible, infected and recovered at
-            each t
-N       : Population size
+def plots(t, SIR, N, Display=True, save=True):
+    '''
+    Inputs
+    t       : Array of times at which events have occured
+    SIR     : Array of arrays of Num people susceptible, infected and recovered at
+                each t
+    N       : Population size
 
-Outputs
-png     : plot of SIR model over time [by default]
-=#
-function plots(t, SIR, N, Display=true, save=true)
-    gr(reuse=true)
+    Outputs
+    png     : plot of SIR model over time [by default]
+    '''
+    fig = plt.figure()
+    plt.plot(t, SIR[0], label="Susceptible", lw = 2, figure=fig)
+    plt.plot(t, SIR[1], label="Infected", lw = 2, figure=fig)
+    plt.plot(t, SIR[2], label="Recovered", lw=2, figure=fig)
 
-    plot(t, SIR, label=["Susceptible" "Infected" "Recovered"], lw = 2)
-    #plot!(t, I, label="Infected", show = true)
-    #display(plot!(t, R, label="Recovered", show = true))
+    plt.xlabel("Time")
+    plt.ylabel("Population Number")
+    plt.title("SIR model over time with a population size of $N")
+    plt.legend()
 
-    xlabel!("Time")
-    ylabel!("Population Number")
-    title!("SIR model over time with a population size of $N")
-    plot!(size=(750,500))
-
-    if Display
+    if Display:
         # required to display graph on plots.
-        display(plot!())
-    end
+        fig.show()
 
-    if save
+    if save:
         # Save graph as pngW
-        png("juliaGraphs/SIR_Model_Pop_$N")
-    end
-end
+        fig.savefig(f"pythonGraphs/SIR_Model_Pop_{N}")
 
 #-----------------------------------------------------------------------------
 # testing the gillespieDirect2Processes function
 
 # Get same thing each time
-Random.seed!(1)
+
 
 # initialise variables
-N = [5, 10, 50, 100,1000,10000]
+N = np.array([5, 10, 50, 100,1000,10000])
 
-S_total = N .- 1
-I_total = N .* 0 .+ 1
-R_total = N .* 0
+S_total = N - 1
+I_total = np.ones(len(N))
+R_total = np.zeros(len(N))
 
 t_max = 200
 alpha = 0.4
-gamma = 0.0004
+beta = 0.0004
 
 # iterate through populations
-for i in 1:length(N)
+for i in range(len(N)):
     t, S, I, R = gillespieDirect2Processes(t_max, S_total[i], I_total[i],
-        R_total[i], alpha, gamma, N)
+        R_total[i], alpha, beta, N)
 
-    plots(t, [S, I, R], N[i])
-
-end
+    plots(t, [S, I, R], N[i],Display=False)

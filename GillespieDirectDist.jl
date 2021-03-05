@@ -23,7 +23,7 @@ I_total : Num people infected
 R_total : Num people recovered
 N       : Population size
 alpha   : probability of infected person recovering [0,1]
-gamma   : probability of susceptible person being infected [0,1]
+beta   : probability of susceptible person being infected [0,1]
 
 Outputs
 t       : Array of times at which events have occured
@@ -32,7 +32,7 @@ I       : Array of Num people infected at each t
 R       : Array of Num people recovered at each t
 =#
 function gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha,
-        gamma, N, t_init = 0.0)
+        beta, N, t_init = 0.0)
 
     # initialise outputs
     t = [copy(t_init)]
@@ -44,7 +44,7 @@ function gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha,
     while t[end] < t_max && I_total != 0
         # calculate the propensities to transition
         # h1 is propensity for infection, h2 is propensity for recovery
-        h_i = [gamma * I_total * S_total, alpha * I_total]
+        h_i = [beta * I_total * S_total, alpha * I_total]
         h = sum(h_i)
 
         et = Exponential(1/h)
@@ -128,12 +128,12 @@ R_total = N .* 0
 
 t_max = 200
 alpha = 0.4
-gamma = 0.0004
+beta = 0.0004
 
 # iterate through populations
 for i in 1:length(N)
     t, S, I, R = gillespieDirect2Processes(t_max, S_total[i], I_total[i],
-        R_total[i], alpha, gamma, N)
+        R_total[i], alpha, beta, N)
 
     plots(t, [S, I, R], N[i])
 

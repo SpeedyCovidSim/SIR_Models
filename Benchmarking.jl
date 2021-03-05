@@ -12,58 +12,111 @@ https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/manual.md#handling-
 #Pkg.add("PyCall")
 #Pkg.build("Pycall") #in case Julia doesn't manage to build the package
 #Pkg.add("Conda")
+Pkg.add("Measures")
 
-using Conda
-using BenchmarkTools
-using PyCall
+using Conda, BenchmarkTools, PyCall, Plots, Measures
 
 
-# Benchmarking Python vs Julia
-if true
+#-----------------------------------------------------------------------------
 
-    # Loading a Julia function (must be within a module). Set path to current
-    # CHANGE WHEN 'MAIN' BRANCH UPDATED
-    push!( LOAD_PATH, "./" )
-    using moduleTest # found this better than doing 'include'
+function plots(tMean,tMedian, N, Display=true, save=true)
+    #=
+    Inputs
+    tMean   : 2D array. Col 1 contains mean times for Julia function, Col 2 for
+              Python to complete simulation.
+    tMedian : 2D array. Col 1 contains median times for Julia function, Col 2 for
+              Python to complete simulation.
+    N       : Array of Population size used.
 
-    # create local function wrapper
-    juliaGillespieDirect = moduleTest.gillespieDirect2Processes
+    Outputs
+    png     : plot of SIR model over time [by default]
+    =#
 
-    # import python function. Uncomment when ready
-    #py"""
-    #from ???? import ???
-    #"""
+    gr(reuse=true)
 
-    # make local function wrapper for benchmark
-    # pythonGillespieDirect = py"???"
+    # MAY NEED TO USE EXP or log time if order of magnitude between times taken
+    # need to use log N
 
-    # Setup the inputs for the test
-    N = [5, 10, 50, 100,1000,10000,100000]
+    # Use margin to give white space around titling
+    plot1 = plot(log10.(N), tMean, label=["Julia" "Python"], lw = 2, margin = 5mm)
+    plot2 = plot(log10.(N), tMedian, label=["Julia" "Python"], lw = 2, margin = 5mm)
+    plot(plot1, plot2, layout = (1, 2), title = ["Mean time to complete the Simulation" "Median time to complete the Simulation"])
+    #plot!(t, I, label="Infected", show = true)
+    #display(plot!(t, R, label="Recovered", show = true))
 
-    S_total = N .- 1
-    I_total = N .* 0 .+ 1
-    R_total = N .* 0
+    plot!(size=(1000,500))
+    xlabel!("Log10 Population size used")
+    ylabel!("Simulation time (s)")
 
-    t_max = 200
-    alpha = 0.4
-    gamma = 0.0004
+    if Display
+        # required to display graph on plots.
+        display(plot!())
+    end
 
-    i = 7
-
-    # setup a loop that benchmarks each function for different N values
-
-    # pyGillespieMark = @benchmark pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, gamma, N[i])
-
-    jlGillespieMark = @benchmark juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, gamma, N[i])
-
-    # graph the benchmark of time as N increases. Recommend two graphs next to
-    # each other with median on one and mean on other.
-
+    if save
+        # Save graph as pngW
+        png("SimulationTimes")
+    end
 end
 
 
+# Benchmarking Python vs Julia -----------------------------------------------
 
-# Test benchmark on summing an array
+# Loading a Julia function (must be within a module). Set path to current
+# CHANGE WHEN 'MAIN' BRANCH UPDATED
+push!( LOAD_PATH, "./" )
+using moduleTest # found this better than doing 'include'
+
+# create local function wrapper
+juliaGillespieDirect = moduleTest.gillespieDirect2Processes
+
+# import python function. Uncomment when ready
+#py"""
+#from GillespieDirect import gillespieDirect2Processes
+#"""
+
+# make local function wrapper for benchmark
+# pythonGillespieDirect = py"gillespieDirect2Processes"
+
+# Setup the inputs for the test
+N = [5, 10, 50, 100,1000]#,10000,100000]
+
+S_total = N .- 1
+I_total = N .* 0 .+ 1
+R_total = N .* 0
+
+t_max = 200
+alpha = 0.4
+beta = 0.0004
+
+tMean = zeros(Float64,length(N),2)
+tMedian = zeros(Float64,length(N),2)
+
+# without this it breaks for some reason
+i = 1
+# setup a loop that benchmarks each function for different N values
+for i in 1:length(N)
+
+    jlGillespieTimes = []
+
+    for j in 1:100
+        push!(jlGillespieTimes, @elapsed juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta, N[i]))
+        # pyGillespieTimes = (@benchmark pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta, N[i])).times
+    end
+    println(mean(jlGillespieTimes))
+
+    tMean[i,:] = [mean(jlGillespieTimes),0]# mean(pyGillespieTimes)]
+    tMedian[i,:] = [median(jlGillespieTimes),0]# median(pyGillespieTimes)]
+end
+
+println(tMean)
+# graph the benchmark of time as N increases. Recommend two graphs next to
+# each other with median on one and mean on other.
+plots(tMean,tMedian,N,true,false)
+
+
+
+# Test benchmark on summing an array -----------------------------------------
 if false
 
     # Julia version of sumArray

@@ -111,7 +111,7 @@ R_total = np.zeros(len(N))
 
 t_max = 200
 alpha = 0.4
-beta = 0.0004
+beta = 0.001
 
 # iterate through populations
 for i in range(len(N)):

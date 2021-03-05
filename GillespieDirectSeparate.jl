@@ -117,7 +117,7 @@ end
 Random.seed!(1)
 
 # initialise variables
-N = [10000]
+N = [5, 10, 50, 100,1000,10000]
 
 S_total = N .- 1
 I_total = N .* 0 .+ 1
@@ -125,7 +125,7 @@ R_total = N .* 0
 
 t_max = 200
 alpha = 0.4
-beta = 0.0004
+beta = 0.001
 
 # iterate through populations
 for i in 1:length(N)

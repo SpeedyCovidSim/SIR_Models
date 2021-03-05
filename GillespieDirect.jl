@@ -124,7 +124,7 @@ R_total = N .* 0
 
 t_max = 200
 alpha = 0.4
-beta = 0.0004
+beta = 0.001
 
 # iterate through populations
 for i in 1:length(N)

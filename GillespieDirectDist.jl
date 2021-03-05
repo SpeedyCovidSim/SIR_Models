@@ -120,7 +120,7 @@ end
 Random.seed!(1)
 
 # initialise variables
-N = [10000]
+N = [5, 10, 50, 100,1000,10000]
 
 S_total = N .- 1
 I_total = N .* 0 .+ 1

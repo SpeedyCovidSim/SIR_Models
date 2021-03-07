@@ -1,10 +1,9 @@
 '''
 This is a code base for a simple SIR simulation using the Gillespie Direct
-Method
+Method. Contains the simulation function.
 
 Author: Joel Trent and Josh Looker
 '''
-from matplotlib import pyplot as plt
 import numpy as np
 from random import random
 
@@ -18,7 +17,7 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, 
     R_total : Num people recovered
     N       : Population size
     alpha   : probability of infected person recovering [0,1]
-    gamma   : probability of susceptible person being infected [0,1]
+    beta    : probability of susceptible person being infected [0,1]
 
     Outputs
     t       : Array of times at which events have occured
@@ -26,7 +25,6 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, 
     I       : Array of Num people infected at each t
     R       : Array of Num people recovered at each t
     '''
-
 
     # initialise outputs
     t = [t_init]
@@ -65,57 +63,3 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, 
         R.append(R_total)
 
     return t, S, I , R
-
-
-def plots(t, SIR, N, Display=True, save=True):
-    '''
-    Inputs
-    t       : Array of times at which events have occured
-    SIR     : Array of arrays of Num people susceptible, infected and recovered at
-                each t
-    N       : Population size
-
-    Outputs
-    png     : plot of SIR model over time [by default]
-    '''
-    fig = plt.figure()
-    plt.plot(t, SIR[0], label="Susceptible", lw = 2, figure=fig)
-    plt.plot(t, SIR[1], label="Infected", lw = 2, figure=fig)
-    plt.plot(t, SIR[2], label="Recovered", lw=2, figure=fig)
-
-    plt.xlabel("Time")
-    plt.ylabel("Population Number")
-    plt.title("SIR model over time with a population size of $N")
-    plt.legend()
-
-    if Display:
-        # required to display graph on plots.
-        fig.show()
-
-    if save:
-        # Save graph as pngW
-        fig.savefig(f"pythonGraphs/SIR_Model_Pop_{N}")
-
-#-----------------------------------------------------------------------------
-# testing the gillespieDirect2Processes function
-
-# Get same thing each time
-
-
-# initialise variables
-N = np.array([5, 10, 50, 100,1000,10000])
-
-S_total = N - 1
-I_total = np.ones(len(N))
-R_total = np.zeros(len(N))
-
-t_max = 200
-alpha = 0.4
-beta = 0.001
-
-# iterate through populations
-for i in range(len(N)):
-    t, S, I, R = gillespieDirect2Processes(t_max, S_total[i], I_total[i],
-        R_total[i], alpha, beta, N)
-
-    plots(t, [S, I, R], N[i],Display=False)

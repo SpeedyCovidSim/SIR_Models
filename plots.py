@@ -1,6 +1,6 @@
 '''
-This is a code base for the plotting function of a simple SIR simulation using the Gillespie Direct
-Method
+This is a code base for the plotting function of a simple SIR simulation
+using the Gillespie Direct Method
 
 Author: Joel Trent and Josh Looker
 '''

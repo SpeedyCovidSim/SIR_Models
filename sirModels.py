@@ -15,7 +15,7 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, 
     S_total : Num people susceptible to infection
     I_total : Num people infected
     R_total : Num people recovered
-    N       : Population size
+    N       : Population size (unused)
     alpha   : probability of infected person recovering [0,1]
     beta    : probability of susceptible person being infected [0,1]
 

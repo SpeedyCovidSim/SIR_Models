@@ -9,7 +9,7 @@ Author: Joel Trent and Josh Looker
 
 module moduleTest
 
-    export gillespieDirect2Processes
+
 
 
     #Pkg.add("Distributions")

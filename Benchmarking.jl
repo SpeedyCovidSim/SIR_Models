@@ -47,12 +47,12 @@ pythonGillespieDirect = py"gillespieDirect2Processes"
 N = [5, 10, 50,100,1000,10000]#,100000]
 
 S_total = N .- 1
-I_total = ones(length(N))
+I_total = ceil.(0.05 .* N)
 R_total = zeros(length(N))
 
 t_max = 200
 alpha = 0.4
-beta = 0.001
+beta = 10 ./ N
 
 tMean = zeros(Float64,length(N),2)
 tMedian = zeros(Float64,length(N),2)
@@ -63,9 +63,9 @@ for i in 1:length(N)
     jlGillespieTimes = []
     pyGillespieTimes = []
 
-    for j in 1:(100/log10(N[i]))
-        push!(jlGillespieTimes, @elapsed juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta, N[i]))
-        push!(pyGillespieTimes, @elapsed pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta, N[i]))
+    for j in 1:(200/log10(N[i]))
+        push!(jlGillespieTimes, @elapsed juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
+        push!(pyGillespieTimes, @elapsed pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
     end
 
     println("Completed iteration #$i")
@@ -85,7 +85,7 @@ println("Median Speedup of: $medianSpeedup")
 
 # graph the benchmark of time as N increases. Recommend two graphs next to
 # each other with median on one and mean on other.
-plotBenchmarks(tMean,tMedian,N,true,false)
+plotBenchmarks(tMean,tMedian,N,true,true)
 
 
 # Test benchmark on summing an array -----------------------------------------

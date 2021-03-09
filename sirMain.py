@@ -6,7 +6,7 @@ Author: Joel Trent and Josh Looker
 '''
 
 from sirModels import gillespieDirect2Processes
-from plots import plot
+from plots import plotSIR
 import numpy as np
 import random
 
@@ -20,21 +20,21 @@ def main():
     N = np.array([5, 10, 50, 100,1000,10000])
 
     S_total = N - 1
-    I_total = np.ones(len(N))
+    I_total = np.ceil(0.05 * N)
     R_total = np.zeros(len(N))
 
     t_max = 200
     alpha = 0.4
-    beta = 0.001
+    beta = 10 / N
 
     # iterate through populations
     for i in range(len(N)):
         t, S, I, R = gillespieDirect2Processes(t_max, S_total[i], I_total[i],
-            R_total[i], alpha, beta, N)
+            R_total[i], alpha, beta[i], N[i])
 
         # plot and export the simulation
-        outputFileName = f"pythonGraphs/SIR_Model_Pop_{N[i]}"
-        plot(t, [S, I, R], N[i], alpha, beta, outputFileName, Display=False)
+        outputFileName = f"pythonGraphs/wellMixedDirectRandom/SIR_Model_Pop_{N[i]}"
+        plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
 
 if __name__=="__main__":
     main()

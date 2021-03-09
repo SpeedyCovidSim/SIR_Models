@@ -6,7 +6,7 @@ Author: Joel Trent and Josh Looker
 '''
 from matplotlib import pyplot as plt
 
-def plot(t, SIR, N, alpha, beta, outputFileName="plot", Display=True, save=True):
+def plotSIR(t, SIR, alpha, beta, N, outputFileName="plot", Display=True, save=True):
     '''
     Inputs
     t              : Array of times at which events have occured

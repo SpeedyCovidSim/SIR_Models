@@ -15,7 +15,7 @@ module sirModels
             beta, N, t_init = 0.0)
         #=
         Note:
-        Direct Gillespie Method
+        Direct Gillespie Method, Well Mixed
         Uses rand() to sample from the exponential distribution
 
         Inputs
@@ -81,7 +81,7 @@ module sirModels
             beta, N, t_init = 0.0)
         #=
         Note:
-        Direct Gillespie Method
+        Direct Gillespie Method, Well Mixed
         Directly samples from the exponential distribution
 
         Inputs
@@ -149,7 +149,7 @@ module sirModels
             beta, N, t_init = 0.0)
         #=
         Note:
-        First reaction Gillespie Method
+        First reaction Gillespie Method, Well Mixed
 
         Inputs
         t_init  : Initial time (default of 0)

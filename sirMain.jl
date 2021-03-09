@@ -11,7 +11,7 @@ using Random, Conda, PyCall
 push!( LOAD_PATH, "./" )    #Set path to current
 using sirModels: gillespieDirect2Processes_rand, gillespieDirect2Processes_dist,
     gillespieFirstReact2Processes
-using plots: plotSIRPyPlot
+using plotsPyPlot: plotSIRPyPlot
 
 # main
 function main(Display = true, save = true)

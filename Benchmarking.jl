@@ -44,7 +44,7 @@ from sirModels import gillespieDirect2Processes
 pythonGillespieDirect = py"gillespieDirect2Processes"
 
 # Setup the inputs for the test
-N = [5, 10, 50,100,1000,10000]#,100000]
+N = [5, 10, 50,100,1000,10000,100000]
 
 S_total = N .- 1
 I_total = ceil.(0.05 .* N)
@@ -63,7 +63,7 @@ for i in 1:length(N)
     jlGillespieTimes = []
     pyGillespieTimes = []
 
-    for j in 1:(200/log10(N[i]))
+    for j in 1:(400/log10(N[i]))
         push!(jlGillespieTimes, @elapsed juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
         push!(pyGillespieTimes, @elapsed pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
     end
@@ -75,7 +75,7 @@ for i in 1:length(N)
 
 end
 
-#println(tMean)
+println(tMean)
 
 meanSpeedup = tMean[:,2]./tMean[:,1]
 medianSpeedup = tMedian[:,2]./tMedian[:,1]
@@ -85,7 +85,7 @@ println("Median Speedup of: $medianSpeedup")
 
 # graph the benchmark of time as N increases. Recommend two graphs next to
 # each other with median on one and mean on other.
-plotBenchmarks(tMean,tMedian,N,true,true)
+plotBenchmarks(tMean,tMedian,N,true,false)
 
 
 # Test benchmark on summing an array -----------------------------------------

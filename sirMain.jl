@@ -26,7 +26,7 @@ function main(Display = true, save = true)
 
     # functions are not allowed to edit these arrays. Copy values in when passing
     # to the functions
-    S_total = N .- 1
+    S_total = N - ceil.(0.05 .* N)
     I_total = ceil.(0.05 .* N)
     R_total = zeros(length(N))
 

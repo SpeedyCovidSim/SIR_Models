@@ -46,7 +46,7 @@ pythonGillespieDirect = py"gillespieDirect2Processes"
 # Setup the inputs for the test
 N = [5, 10, 50,100,1000,10000,100000]
 
-S_total = N .- 1
+S_total = N - ceil.(0.05 .* N)
 I_total = ceil.(0.05 .* N)
 R_total = zeros(length(N))
 
@@ -67,6 +67,8 @@ for i in 1:length(N)
         push!(jlGillespieTimes, @elapsed juliaGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
         push!(pyGillespieTimes, @elapsed pythonGillespieDirect(t_max, S_total[i], I_total[i], R_total[i], alpha, beta[i], N[i]))
     end
+
+    println(S_total[i])
 
     println("Completed iteration #$i")
 

@@ -19,7 +19,7 @@ def main():
     # initialise variables
     N = np.array([5, 10, 50, 100,1000,10000])
 
-    S_total = N - 1
+    S_total = N - np.ceil(0.05 * N)
     I_total = np.ceil(0.05 * N)
     R_total = np.zeros(len(N))
 

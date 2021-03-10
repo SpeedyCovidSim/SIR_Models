@@ -10,6 +10,7 @@ module sirModels
     using Distributions
     using Random
     using StatsBase
+    using networkFunctions, LightGraphs, MetaGraphs
 
     function gillespieDirect2Processes_rand(t_max, S_total, I_total, R_total, alpha,
             beta, N, t_init = 0.0)
@@ -26,7 +27,7 @@ module sirModels
         R_total : Num people recovered
         N       : Population size (unused)
         alpha   : probability of infected person recovering [0,1]
-        beta   : probability of susceptible person being infected [0,1]
+        beta    : probability of susceptible person being infected [0,1]
 
         Outputs
         t       : Array of times at which events have occured
@@ -207,5 +208,85 @@ module sirModels
 
         return t, S, I , R
     end # function
+
+    function gillespieDirect2Processes_network(t_max, S_total, I_total, R_total, network, alpha,
+            beta, N, t_init = 0.0)
+        #=
+        Note:
+        Direct Gillespie Method, on network
+        Directly samples from the exponential distribution
+
+        Inputs
+        t_init  : Initial time (default of 0)
+        t_max   : Simulation end time
+        S_total : Num people susceptible to infection
+        I_total : Num people infected
+        R_total : Num people recovered
+        network : the network containing the population to operate on
+        N       : Population size (unused)
+        alpha   : probability of infected person recovering [0,1]
+        beta    : probability of susceptible person being infected [0,1]
+
+        Outputs
+        t       : Array of times at which events have occured
+        S       : Array of Num people susceptible at each t
+        I       : Array of Num people infected at each t
+        R       : Array of Num people recovered at each t
+        =#
+
+        # initialise outputs
+        t = [copy(t_init)]
+        S = [copy(S_total)]
+        I = [copy(I_total)]
+        R = [copy(R_total)]
+        states = ["S","I","R"]
+        events = ["infected", "recovered"]
+
+        while t[end] < t_max && I_total != 0
+            # calculate the propensities to transition
+            h_i = calcHazard(network, alpha, beta)
+            h = sum(h_i)
+
+            et = Exponential(1/h)
+
+            # time to any event occurring
+            delta_t = rand(et)
+            #println(delta_t)
+
+            # selection probabilities for each transition process. sum(j) = 1
+            j = h_i ./ h
+
+            # choose the index of the individual to transition
+            eventIndex = sample(1:(S_total+I_total+R_total),pweights(j))
+
+            # cause transition, change their state and incrementInfectedNeighbors
+            # for their localNeighbourhood
+            if get_prop(network, eventIndex, :state) == states[1]  # (S->I)
+                event = events[1]
+                changeState(network, eventIndex, states[2])
+                incrementInfectedNeighbors(network, eventIndex, event)
+
+                S_total -= 1
+                I_total += 1
+
+            elseif get_prop(network, eventIndex, :state) == states[2]
+                    # (I->R) (assumes that I is not 0)
+                event = events[2]
+                changeState(network, eventIndex, states[3])
+                incrementInfectedNeighbors(network, eventIndex, event)
+                I_total -= 1
+                R_total += 1
+            end
+
+            push!(t, t[end] + delta_t)
+            push!(S, copy(S_total))
+            push!(I, copy(I_total))
+            push!(R, copy(R_total))
+
+        end # while
+
+        return t, S, I , R
+    end # function
+
 
 end  # module sirModels

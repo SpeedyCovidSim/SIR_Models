@@ -23,7 +23,7 @@ function main(Display = true, save = true)
     Random.seed!(1)
 
     # initialise variables
-    N = [5, 10, 50, 100,1000,10000]
+    N = [5,10,50,100,1000,10000]
 
 
     t_max = 200
@@ -32,18 +32,44 @@ function main(Display = true, save = true)
 
     # Could reduce redundancy here too:
 
+    if true
+        # iterate through populations. Complete Graph
+        for i in 1:length(N)
+
+            println("Iteration #$i commencing")
+            # initialise the network
+            network = MetaGraph(complete_graph(N[i]))
+            println("Network #$i returned")
+
+            S_total, I_total, R_total = initialiseNetwork(network, 0.05)
+
+            println("Network #$i has been initialised")
+
+            time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
+                copy(R_total), network, alpha, beta[i], N[i])
+
+            println("Simulation #$i has completed in $time")
+
+            if Display | save
+                population = N[i]
+                outputFileName = "juliaGraphs/networkCompleteDirect/SIR_Model_Pop_$population"
+                plotSIRPyPlot(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display, save)
+            end
+        end
+    end
     # iterate through populations
     for i in 1:length(N)
 
         println("Iteration #$i commencing")
         # initialise the network
-        network = MetaGraph(complete_graph(N[i]))
+        k = [2,3,10,20,100,1000] # degree of connection
+        network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
         S_total, I_total, R_total = initialiseNetwork(network, 0.05)
 
         println("Network #$i has been initialised")
-
+        
         time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
             copy(R_total), network, alpha, beta[i], N[i])
 
@@ -51,7 +77,7 @@ function main(Display = true, save = true)
 
         if Display | save
             population = N[i]
-            outputFileName = "juliaGraphs/networkCompleteDirect/SIR_Model_Pop_$population"
+            outputFileName = "juliaGraphs/networkSmallDegreeDirect/SIR_Model_Pop_$population"
             plotSIRPyPlot(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display, save)
         end
     end

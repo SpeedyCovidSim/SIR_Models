@@ -42,7 +42,9 @@ module plotsPyPlot
         if save
             # Save graph as pngW
             fig.savefig(outputFileName)
+
         end
+        close()
     end
 
 end  # module plots

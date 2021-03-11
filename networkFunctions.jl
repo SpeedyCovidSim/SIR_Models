@@ -36,7 +36,7 @@ module networkFunctions
         for i in infectedVertices
             set_prop!(network, i, :state, "I")
 
-            incrementInfectedNeighbors(network, i, "infected")
+            incrementInfectedNeighbors(network, i)
 
             #=
             localNeighbourhood = neighbors(network, i)

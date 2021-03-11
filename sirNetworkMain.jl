@@ -24,14 +24,12 @@ function main(Display = true, save = true)
     # initialise variables
     N = [5,10,50,100,1000,10000]
 
-
     t_max = 200
     alpha = 0.4
     beta = 10 ./ N
 
-    # Could reduce redundancy here too:
 
-    if true
+    if false
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 
@@ -56,12 +54,15 @@ function main(Display = true, save = true)
             end
         end
     end
+
+
     # iterate through populations
     for i in 1:length(N)
 
         println("Iteration #$i commencing")
         # initialise the network
         k = [2,3,10,20,100,1000] # degree of connection
+
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
@@ -80,6 +81,7 @@ function main(Display = true, save = true)
             plotSIRPyPlot(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display, save)
         end
     end
+
 
 end
 

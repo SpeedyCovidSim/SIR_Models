@@ -75,7 +75,7 @@ module networkFunctions
 
         Outputs
         hazards : calculated hazard for each individual (vertex) in the network
-                : or nothing if updateOnly as it operates in place (pass by ref)
+                : or nothing if updateOnly as it operates in place on hazards array
         =#
 
         if updateOnly
@@ -84,23 +84,26 @@ module networkFunctions
             hazards[vertexIndex] = alpha * (event == events[1])
 
             if event == events[2]
-                increment = -1
+                increment = -1 * beta
             else
-                increment = 1
+                increment = 1 * beta
             end
 
             for i in neighbors(network, vertexIndex)
                 # only update hazards for those that are susceptible
                 if get_prop(network, i, :state) == "S"
-                    hazards[i] = hazards[i] + increment * beta
+                    hazards[i] = hazards[i] + increment
                 end
             end
 
         else # initialisation
             # return num vertices
             numVertices = nv(network)
+
+            # preallocate hazards array
             hazards = zeros(numVertices)
 
+            # calculate hazard at i
             for i in 1:numVertices
                 if get_prop(network, i, :state) == "S"
                     hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
@@ -112,6 +115,7 @@ module networkFunctions
             end
             return hazards
         end
+
         return nothing
     end
 

@@ -23,7 +23,7 @@ function main(Display = true, save = true)
     Random.seed!(1)
 
     # initialise variables
-    N = [5, 10, 50, 100,1000]#,10000]
+    N = [5, 10, 50, 100,1000,10000]
 
 
     t_max = 200
@@ -43,6 +43,7 @@ function main(Display = true, save = true)
         S_total, I_total, R_total = initialiseNetwork(network, 0.05)
 
         println("Network #$i has been initialised")
+
         time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
             copy(R_total), network, alpha, beta[i], N[i])
 

@@ -242,9 +242,12 @@ module sirModels
         states = ["S","I","R"]
         events = ["infected", "recovered"]
 
+        # calculate the propensities to transition
+        # only calculate full array first time. Will cause speedups if network
+        # is not fully connected
+        h_i = calcHazard(network, alpha, beta)
+
         while t[end] < t_max && I_total != 0
-            # calculate the propensities to transition
-            h_i = calcHazard(network, alpha, beta)
             h = sum(h_i)
 
             et = Exponential(1/h)
@@ -254,17 +257,19 @@ module sirModels
             #println(delta_t)
 
             # selection probabilities for each transition process. sum(j) = 1
-            j = h_i ./ h
+            #j = h_i ./ h
 
             # choose the index of the individual to transition
-            eventIndex = sample(1:(S_total+I_total+R_total),pweights(j))
+            eventIndex = sample(1:(S_total+I_total+R_total), pweights(h_i ./ h))
 
             # cause transition, change their state and incrementInfectedNeighbors
             # for their localNeighbourhood
             if get_prop(network, eventIndex, :state) == states[1]  # (S->I)
                 event = events[1]
                 changeState(network, eventIndex, states[2])
-                incrementInfectedNeighbors(network, eventIndex, event)
+
+                # update only the necessary hazards
+                h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
 
                 S_total -= 1
                 I_total += 1
@@ -273,7 +278,10 @@ module sirModels
                     # (I->R) (assumes that I is not 0)
                 event = events[2]
                 changeState(network, eventIndex, states[3])
-                incrementInfectedNeighbors(network, eventIndex, event)
+
+                # update only the necessary hazards
+                h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
+
                 I_total -= 1
                 R_total += 1
             end

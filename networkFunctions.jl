@@ -23,7 +23,7 @@ module networkFunctions
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
         for i in 1:numVertices
-            set_prop!(network, i, :numInfectedNeighbors, 0)
+            set_prop!(network, i, :initInfectedNeighbors, 0)
             set_prop!(network, i, :state, "S")
         end
 
@@ -59,55 +59,75 @@ module networkFunctions
         return S_total, I_total, R_total
     end
 
-    function calcHazard(network, alpha, beta)
+    function calcHazard(network, alpha, beta, updateOnly = false, hazards = [],
+        vertexIndex = 0, event = "infected", events = ["infected", "recovered"])
         #=
         Inputs
         network : a undirected graph from LightGraphs and MetaGraphs
                   containing our population of interest
         alpha   : probability of infected person recovering [0,1]
         beta    : probability of susceptible person being infected [0,1]
+        hazards : calculated hazard for each individual (vertex) in the network
+        updateOnly : bool, true means only update the hazards array
+        vertexIndex : the individual (vertex) the event occured to
+        event       : string containing either "recovered" or "infected"
+        events      : an array of strings = ["infected", "recovered"]
 
         Outputs
         hazards : calculated hazard for each individual (vertex) in the network
         =#
 
-        # return num vertices
-        numVertices = nv(network)
+        if updateOnly
+            # change hazard of affected individual
+            # if infected, hazard is alpha, otherwise 0 as they've recovered
+            hazards[vertexIndex] = alpha * (event == events[1])
 
-        hazards = zeros(numVertices)
+            if event == events[2]
+                increment = -1
+            else
+                increment = 1
+            end
 
-        for i in 1:numVertices
-            if get_prop(network, i, :state) == "S"
-                hazards[i] = beta * get_prop(network, i, :numInfectedNeighbors)
-            elseif get_prop(network, i, :state) == "I"
-                hazards[i] = copy(alpha)
+            for i in neighbors(network, vertexIndex)
+                # only update hazards for those that are susceptible
+                if get_prop(network, i, :state) == "S"
+                    hazards[i] = hazards[i] + increment * beta
+                end
+            end
 
-                #else # person is recovered and their hazard is zero
+        else # initialisation
+            # return num vertices
+            numVertices = nv(network)
+            hazards = zeros(numVertices)
+
+            for i in 1:numVertices
+                if get_prop(network, i, :state) == "S"
+                    hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
+                elseif get_prop(network, i, :state) == "I"
+                    hazards[i] = copy(alpha)
+
+                    #else # person is recovered and their hazard is zero
+                end
             end
         end
         return hazards
     end
 
-    function incrementInfectedNeighbors(network, vertexIndex, event)
+    function incrementInfectedNeighbors(network, vertexIndex)
         #=
         Inputs
         network     : a undirected graph from LightGraphs and MetaGraphs
                       containing our population of interest
         vertexIndex : the individual (vertex) the event occured to
         event       : string containing either "recovered" or "infected"
+        events      : an array of strings = ["infected", "recovered"]
 
         Outputs
         nothing     : works in place on the network
         =#
 
-        if event == "recovered"
-            increment = -1
-        else
-            increment = 1
-        end
-
         for i in neighbors(network, vertexIndex)
-            set_prop!(network, i, :numInfectedNeighbors, get_prop(network, i, :numInfectedNeighbors) + increment)
+            set_prop!(network, i, :initInfectedNeighbors, get_prop(network, i, :initInfectedNeighbors) + 1)
         end
         return nothing
     end

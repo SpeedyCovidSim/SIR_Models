@@ -18,7 +18,6 @@ function main(Display = true, save = true)
 
     # testing the gillespieDirect2Processes_network functions
 
-
     # Get same thing each time
     Random.seed!(1)
 
@@ -69,7 +68,7 @@ function main(Display = true, save = true)
         S_total, I_total, R_total = initialiseNetwork(network, 0.05)
 
         println("Network #$i has been initialised")
-        
+
         time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
             copy(R_total), network, alpha, beta[i], N[i])
 

@@ -248,6 +248,7 @@ module sirModels
         h_i = calcHazard(network, alpha, beta)
 
         while t[end] < t_max && I_total != 0
+            
             h = sum(h_i)
 
             et = Exponential(1/h)
@@ -269,7 +270,8 @@ module sirModels
                 changeState(network, eventIndex, states[2])
 
                 # update only the necessary hazards
-                h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
+                #h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
+                calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
 
                 S_total -= 1
                 I_total += 1
@@ -280,8 +282,8 @@ module sirModels
                 changeState(network, eventIndex, states[3])
 
                 # update only the necessary hazards
-                h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
-
+                #h_i = calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
+                calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
                 I_total -= 1
                 R_total += 1
             end

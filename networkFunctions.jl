@@ -75,6 +75,7 @@ module networkFunctions
 
         Outputs
         hazards : calculated hazard for each individual (vertex) in the network
+                : or nothing if updateOnly as it operates in place (pass by ref)
         =#
 
         if updateOnly
@@ -109,8 +110,9 @@ module networkFunctions
                     #else # person is recovered and their hazard is zero
                 end
             end
+            return hazards
         end
-        return hazards
+        return nothing
     end
 
     function incrementInfectedNeighbors(network, vertexIndex)

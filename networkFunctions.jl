@@ -23,8 +23,7 @@ module networkFunctions
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
         for i in 1:numVertices
-            set_prop!(network, i, :initInfectedNeighbors, 0)
-            set_prop!(network, i, :state, "S")
+            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>"S"))
         end
 
         # randomly choose individuals to be infected
@@ -56,7 +55,10 @@ module networkFunctions
         S_total = numVertices - I_total
         R_total = 0
 
-        return S_total, I_total, R_total
+        set_props!(network, Dict(:S_total=>S_total, :I_total=>I_total,
+            :R_total=>R_total, :population=>numVertices))
+
+        return
     end
 
     function calcHazard(network, alpha, beta, updateOnly = false, hazards = [],

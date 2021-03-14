@@ -22,14 +22,14 @@ function main(Display = true, save = true)
     Random.seed!(1)
 
     # initialise variables
-    N = [5,10,50,100,1000,10000]
+    N = [5,10,50,100,1000]#,10000]
 
     t_max = 200
     alpha = 0.4
     beta = 10 ./ N
 
 
-    if false
+    if true
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 
@@ -38,12 +38,11 @@ function main(Display = true, save = true)
             network = MetaGraph(complete_graph(N[i]))
             println("Network #$i returned")
 
-            S_total, I_total, R_total = initialiseNetwork(network, 0.05)
+            initialiseNetwork(network, 0.05)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
-                copy(R_total), network, alpha, beta[i], N[i])
+            time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, network, alpha, beta[i], N[i])
 
             println("Simulation #$i has completed in $time")
 
@@ -66,12 +65,11 @@ function main(Display = true, save = true)
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
-        S_total, I_total, R_total = initialiseNetwork(network, 0.05)
+        initialiseNetwork(network, 0.05)
 
         println("Network #$i has been initialised")
 
-        time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, copy(S_total), copy(I_total),
-            copy(R_total), network, alpha, beta[i], N[i])
+        time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, network, alpha, beta[i], N[i])
 
         println("Simulation #$i has completed in $time")
 

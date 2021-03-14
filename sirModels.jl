@@ -209,7 +209,7 @@ module sirModels
         return t, S, I , R
     end # function
 
-    function gillespieDirect2Processes_network(t_max, S_total, I_total, R_total, network, alpha,
+    function gillespieDirect2Processes_network(t_max, network, alpha,
             beta, N, t_init = 0.0)
         #=
         Note:
@@ -236,9 +236,9 @@ module sirModels
 
         # initialise outputs
         t = [copy(t_init)]
-        S = [copy(S_total)]
-        I = [copy(I_total)]
-        R = [copy(R_total)]
+        S = [copy(get_prop(network,:S_total))]
+        I = [copy(get_prop(network,:I_total))]
+        R = [copy(get_prop(network,:R_total))]
         states = ["S","I","R"]
         events = ["infected", "recovered"]
 
@@ -247,7 +247,7 @@ module sirModels
         # is not fully connected
         h_i = calcHazard(network, alpha, beta)
 
-        while t[end] < t_max && I_total != 0
+        while t[end] < t_max && get_prop(network, :I_total) != 0
             # including this in line in the loop rather than updating it in
             # incrementally like h_i made no difference to speed, so left it here
             # even for networks with a low degree of connection
@@ -256,13 +256,12 @@ module sirModels
 
             # time to any event occurring
             delta_t = rand(et)
-            #println(delta_t)
 
             # selection probabilities for each transition process. sum(j) = 1
             #j = h_i ./ h
 
             # choose the index of the individual to transition
-            eventIndex = sample(1:(S_total+I_total+R_total), pweights(h_i ./ h))
+            eventIndex = sample(1:(get_prop(network, :population)), pweights(h_i ./ h))
 
             # cause transition, change their state and incrementInfectedNeighbors
             # for their localNeighbourhood
@@ -273,8 +272,10 @@ module sirModels
                 # update only the necessary hazards
                 calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
 
-                S_total -= 1
-                I_total += 1
+                # increment S and I totals. S -= 1, I += 1
+                set_props!(network, Dict(:S_total=>get_prop(network, :S_total)-1,
+                    :I_total=>get_prop(network,:I_total)+1))
+
 
             elseif get_prop(network, eventIndex, :state) == states[2]
                     # (I->R) (assumes that I is not 0)
@@ -283,18 +284,21 @@ module sirModels
 
                 # update only the necessary hazards
                 calcHazard(network, alpha, beta, true, h_i, eventIndex, event, events)
-                I_total -= 1
-                R_total += 1
+
+                # increment S and I totals. I -= 1, R += 1
+                set_props!(network, Dict(:I_total=>get_prop(network, :I_total)-1,
+                    :R_total=>get_prop(network,:R_total)+1))
+
             end
 
             push!(t, t[end] + delta_t)
-            push!(S, copy(S_total))
-            push!(I, copy(I_total))
-            push!(R, copy(R_total))
+            push!(S, copy(get_prop(network, :S_total)))
+            push!(I, copy(get_prop(network, :I_total)))
+            push!(R, copy(get_prop(network, :R_total)))
 
         end # while
 
-        return t, S, I , R
+        return t, S, I, R
     end # function
 
 

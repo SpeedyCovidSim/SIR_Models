@@ -15,7 +15,7 @@ def setNetwork(network, alpha, beta, prop_i=0.05):
     '''
     # get random proportion of populace to be infected
     N = network.vcount()
-    num_infected = max(prop_i*N,1)
+    num_infected = int(np.ceil(prop_i*N))
     infecteds = list(random.choice(N, num_infected, replace=False))
 
     # set SIR numbers
@@ -30,7 +30,6 @@ def setNetwork(network, alpha, beta, prop_i=0.05):
     # set states of individuals according to random draws
     network.vs["state"]="S"
     network.vs[infecteds]["state"]="I"
-    network["infecteds"] = infecteds
 
     # adding in hazards
     network = initHazards(network)
@@ -45,11 +44,11 @@ def initHazards(network):
         # RHS: list(add 1 to array of num_inf_nei for neighbouring vertices), note casting is required for easy array operations
         network.vs[network.neighbors(inf_vert)]["num_inf_nei"]=list(np.array(network.vs[network.neighbors(inf_vert)]["num_inf_nei"])+1)
         # add in recovery
-        inf_vert["rate"] = network.alpha
+        inf_vert["rate"] = network["alpha"]
     # for all susceptible vertices add in infection hazard
     # LHS: array of hazards for susceptible vertices
     # RHS: hazards calculated as beta*(num of infected neighbours), note casting is required for easy array operations
-    network.vs(state_eq="S")["rate"] = list(np.array(network.vs(state_eq="S")["num_inf_nei"])*network.beta)
+    network.vs(state_eq="S")["rate"] = list(np.array(network.vs(state_eq="S")["num_inf_nei"])*network["beta"])
     return network
 
 def gillespieDirectNetwork(t_max, network, t_init = 0.0):
@@ -95,8 +94,8 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
                 network.vs[eventIndex]["rate"] = network["alpha"]
                 # increase num_inf_neighbours for neighbouring vertices
                 network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])+1)
-                # update hazards of neighbouring vertices
-                network.vs[network.neighbors(eventIndex)]["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])*network.beta)
+                # update hazards of neighbouring susceptible vertices
+                network.vs[network.neighbors(eventIndex)](state_eq='S')["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)](state_eq='S')["num_inf_nei"])*network["beta"])
                 # update network totals
                 network["S_total"] -= 1
                 network["I_total"] += 1
@@ -107,8 +106,8 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
                 network.vs[eventIndex]["rate"] = 0
                 # decrease num_inf_neighbours for neighbouring vertices
                 network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])-1)
-                # update hazards of neighbouring vertices
-                network.vs[network.neighbors(eventIndex)]["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])*network.beta)
+                # update hazards of neighbouring susceptible vertices
+                network.vs[network.neighbors(eventIndex)](state_eq='S')["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)](state_eq='S')["num_inf_nei"])*network["beta"])
                 # update network totals
                 network["I_total"] -= 1
                 network["R_total"] += 1
@@ -132,38 +131,36 @@ def main():
     N = np.array([5, 10, 50, 100,1000,10000])
     k = [2,3,10,20,100,1000]
 
-    S_total = N - 1
-    I_total = np.ceil(0.05 * N)
-    R_total = np.zeros(len(N))
-
     t_max = 200
     alpha = 0.4
     beta = 10 / N
 
     # iterate through populations for complete graphs
-    for i in range(len(N)):
-        print(f"Iteration {i} commencing")
-        network = ig.Graph.Full(N[i])
-        network = setNetwork(network, alpha, beta[i])
-        print(f"Beginning simulation {i}")
-        t, S, I, R = gillespieDirectNetwork(t_max, network)
-        print(f"Exporting simulation {i}")
-        # plot and export the simulation
-        outputFileName = f"pythonGraphs/networkDirectFull/SIR_Model_Pop_{N[i]}"
-        plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
-    
-    print("Beginning connectedness simulations")
-    for i in range(len(N)):
-        for j in range(len(k)):
-            print(f"Iteration {i} with connectedness {j} commencing")
-            network = ig.Graph.K_Regular(N[i], k[j])
+    if True:
+        print("Beginning full graph simulations")
+        for i in range(len(N)):
+            print(f"Iteration {i} commencing")
+            network = ig.Graph.Full(N[i])
             network = setNetwork(network, alpha, beta[i])
-            print(f"Beginning simulation {i} with connectedness {j}")
+            print(f"Beginning simulation {i}")
             t, S, I, R = gillespieDirectNetwork(t_max, network)
-            print(f"Exporting simulation {i} with connectedness {j}")
+            print(f"Exporting simulation {i}")
+            # plot and export the simulation
+            outputFileName = f"pythonGraphs/networkDirectFull/SIR_Model_Pop_{N[i]}"
+            plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
+
+    if True:   
+        print("Beginning connectedness simulations")
+        for i in range(len(N)):
+            print(f"Iteration {i} commencing")
+            network = ig.Graph.K_Regular(N[i], k[i])
+            network = setNetwork(network, alpha, beta[i])
+            print(f"Beginning simulation {i}")
+            t, S, I, R = gillespieDirectNetwork(t_max, network)
+            print(f"Exporting simulation {i}")
             # plot and export the simulation
             outputFileName = f"pythonGraphs/networkDirectDegree/SIR_Model_Pop_{N[i]}"
-            plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[j], outputFileName, Display=False)
+            plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
 
 if __name__=="__main__":
     main()

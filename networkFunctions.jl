@@ -22,8 +22,9 @@ module networkFunctions
         numVertices = nv(network)
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
-        for i in 1:numVertices
+        for i in vertices(network)
             set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>"S"))
+
         end
 
         # randomly choose individuals to be infected
@@ -98,15 +99,15 @@ module networkFunctions
                 end
             end
 
+            #fil1 = filter_vertices(network[neighbors(network, vertexIndex)], :state, "S")
+
         else # initialisation
-            # return num vertices
-            numVertices = nv(network)
 
             # preallocate hazards array
-            hazards = zeros(numVertices)
+            hazards = zeros(get_prop(network, :population))
 
             # calculate hazard at i
-            for i in 1:numVertices
+            for i in vertices(network)
                 if get_prop(network, i, :state) == "S"
                     hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
                 elseif get_prop(network, i, :state) == "I"

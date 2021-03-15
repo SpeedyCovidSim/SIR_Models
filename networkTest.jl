@@ -7,7 +7,7 @@ Method
 Author: Joel Trent and Josh Looker
 =#
 
-using LightGraphs, GraphPlot, MetaGraphs
+using LightGraphs, GraphPlot, MetaGraphs, BenchmarkTools
 
 # import required modules
 push!( LOAD_PATH, "./" )    #Set path to current
@@ -18,21 +18,89 @@ using networkFunctions
 # Return a Watts-Strogatz small world random graph with n vertices, each with
 # expected degree k
 beta = 1
-n = 5
-k = 2
-network = MetaGraph(watts_strogatz(n, k, beta))
+n = 10000
+k = 100
+#network = MetaGraph(watts_strogatz(n, k, beta))
+network = MetaGraph(complete_graph(n))
 
 gplot(network, nodelabel=1:n)
 
 
 
 # tell me which neighbors you have
-neighbors(network,1)
+network[neighbors(network,1)]
+
+
+network[2, :index]
+
 
 # get a property of a vertex
 #get_prop(network, 2, :state)
 
-S_total, I_total, R_total = initialiseNetwork(network, 0.6)
+initialiseNetwork(network, 0.05)
+
+filter_vertices(network[neighbors(network, 1)], :state, "S")
+
+
+for i in filter_vertices(network[neighbors(network, 2)], :state, "S")
+    set_prop!(network, i, :state, "R")
+end
+
+get_prop(network, 5, :state)
+
+
+function hazards1(hazards, alpha, beta)
+    # calculate hazard at i
+    for i in filter_vertices(network, :state, "S")
+        hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
+
+    end
+    hazards = hazards + (hazards .== 0) * alpha
+    return hazards
+end
+
+function hazards2(hazards, alpha, beta)
+    for i in vertices(network)
+        if get_prop(network, i, :state) == "S"
+            hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
+        elseif get_prop(network, i, :state) == "I"
+            hazards[i] = copy(alpha)
+
+            #else # person is recovered and their hazard is zero
+        end
+    end
+    return hazards
+end
+
+
+alpha, beta = 1,2
+
+h1Times = []
+h2Times = []
+
+for j in 1:1000
+    hazards = zeros(get_prop(network, :population))
+    push!(h1Times, @elapsed hazards1(hazards, alpha, beta))
+    hazards = zeros(get_prop(network, :population))
+    push!(h2Times, @elapsed hazards2(hazards, alpha, beta))
+end
+
+tMean = zeros(Float64,length(100),2)
+tMedian = zeros(Float64,length(100),2)
+
+tMean[1,:] = [mean(h1Times), mean(h2Times)]
+tMedian[1,:] = [median(h1Times), median(h2Times)]
+
+
+# preallocate hazards array
+hazards = zeros(get_prop(network, :population))
+
+@elapsed hazards = hazards1(hazards, alpha, beta)
+
+# preallocate hazards array
+hazards = zeros(get_prop(network, :population))
+
+@time hazards = hazards2(hazards, alpha, beta)
 
 alpha = 0.5
 beta = 1

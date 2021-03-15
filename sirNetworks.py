@@ -1,6 +1,7 @@
 import numpy as np
 import igraph as ig
 from numpy import random
+from plots import plotSIR, plotSIRK
 
 def setNetwork(network, alpha, beta, prop_i=0.05):
     '''
@@ -124,9 +125,45 @@ def main():
     '''
     Main loop for testing within this Python file
     '''
-    network = setNetwork(network, alpha, beta)
-    t, S, I, R = gillespieDirectNetwork(network)
+    # testing the gillespieDirect2Processes function
+    # note random seed set within network model so result will occur everytime
 
-# Run main function only if this Python file is run (as opposed to being imported)
-if __name__ == 'main':
+    # initialise variables
+    N = np.array([5, 10, 50, 100,1000,10000])
+    k = [2,3,10,20,100,1000]
+
+    S_total = N - 1
+    I_total = np.ceil(0.05 * N)
+    R_total = np.zeros(len(N))
+
+    t_max = 200
+    alpha = 0.4
+    beta = 10 / N
+
+    # iterate through populations for complete graphs
+    for i in range(len(N)):
+        print(f"Iteration {i} commencing")
+        network = ig.Graph.Full(N[i])
+        network = setNetwork(network, alpha, beta[i])
+        print(f"Beginning simulation {i}")
+        t, S, I, R = gillespieDirectNetwork(t_max, network)
+        print(f"Exporting simulation {i}")
+        # plot and export the simulation
+        outputFileName = f"pythonGraphs/networkDirectFull/SIR_Model_Pop_{N[i]}"
+        plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
+    
+    print("Beginning connectedness simulations")
+    for i in range(len(N)):
+        for j in range(len(k)):
+            print(f"Iteration {i} with connectedness {j} commencing")
+            network = ig.Graph.K_Regular(N[i], k[j])
+            network = setNetwork(network, alpha, beta[i])
+            print(f"Beginning simulation {i} with connectedness {j}")
+            t, S, I, R = gillespieDirectNetwork(t_max, network)
+            print(f"Exporting simulation {i} with connectedness {j}")
+            # plot and export the simulation
+            outputFileName = f"pythonGraphs/networkDirectDegree/SIR_Model_Pop_{N[i]}"
+            plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[j], outputFileName, Display=False)
+
+if __name__=="__main__":
     main()

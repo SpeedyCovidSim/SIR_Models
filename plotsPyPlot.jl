@@ -24,6 +24,9 @@ module plotsPyPlot
         Outputs
         png            : plot of SIR model over time [by default]
         =#
+
+        
+
         fig = plt.figure()
         plt.plot(t, SIR[1], label="Susceptible", lw = 2, figure=fig)
         plt.plot(t, SIR[2], label="Infected", lw = 2, figure=fig)

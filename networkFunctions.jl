@@ -2,9 +2,10 @@
 module networkFunctions
     using LightGraphs, MetaGraphs, StatsBase
 
-    export initialiseNetwork, calcHazard, incrementInfectedNeighbors, changeState
+    export initialiseNetwork!, calcHazard!, incrementInfectedNeighbors!, changeState!,
+        incrementStateTotals!
 
-    function initialiseNetwork(network, infectionProp)
+    function initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
         #=
         Inputs
         network       : a undirected graph from LightGraphs and MetaGraphs
@@ -22,8 +23,9 @@ module networkFunctions
         numVertices = nv(network)
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
+        # states[1] will always be S/the initial state
         for i in vertices(network)
-            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>"S"))
+            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>states[1], :stateIndex=>1))
 
         end
 
@@ -35,8 +37,9 @@ module networkFunctions
         # by 1
         for i in infectedVertices
             set_prop!(network, i, :state, "I")
+            set_prop!(network, i, :stateIndex, findfirst(states .== "I"))
 
-            incrementInfectedNeighbors(network, i)
+            incrementInfectedNeighbors!(network, i)
 
             #=
             localNeighbourhood = neighbors(network, i)
@@ -52,18 +55,27 @@ module networkFunctions
             =#
         end
 
-        I_total = length(infectedVertices)
-        S_total = numVertices - I_total
-        R_total = 0
+        #I_total = length(infectedVertices)
+        #S_total = numVertices - I_total
+        #R_total = 0
 
-        set_props!(network, Dict(:S_total=>S_total, :I_total=>I_total,
-            :R_total=>R_total, :population=>numVertices))
+        stateTotals = zeros(length(states))
+        stateIncrementor = zeros(length(states))
+
+        # count the num of vertices in each state
+        for i in vertices(network)
+            stateTotals += states .== get_prop(network, i, :state)
+        end
+
+        set_props!(network, Dict(:stateTotals=>stateTotals, :states=>states,
+            :stateEvents=>stateEvents, :eventHazards=>eventHazards,
+            :population=>numVertices, :stateIncrementor=>stateIncrementor))
 
         return
     end
 
-    function calcHazard(network, alpha, beta, updateOnly = false, hazards = [],
-        vertexIndex = 0, event = "infected", events = ["infected", "recovered"])
+    function calcHazard!(network, alpha, beta, updateOnly = false, hazards = [],
+        vertexIndex = 0, event = "infected", events = ["I", "R"])
         #=
         Inputs
         network : a undirected graph from LightGraphs and MetaGraphs
@@ -92,7 +104,9 @@ module networkFunctions
                 increment = 1 * beta
             end
 
-            for i in neighbors(network, vertexIndex)
+            # multithread hazard calculation to speed up
+            # if num neighbors is low, this will actually slow it down
+            Threads.@threads for i in neighbors(network, vertexIndex)
                 # only update hazards for those that are susceptible
                 if get_prop(network, i, :state) == "S"
                     hazards[i] = hazards[i] + increment
@@ -107,7 +121,8 @@ module networkFunctions
             hazards = zeros(get_prop(network, :population))
 
             # calculate hazard at i
-            for i in vertices(network)
+            # use multithreading to speed up
+            Threads.@threads for i in vertices(network)
                 if get_prop(network, i, :state) == "S"
                     hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
                 elseif get_prop(network, i, :state) == "I"
@@ -122,7 +137,7 @@ module networkFunctions
         return nothing
     end
 
-    function incrementInfectedNeighbors(network, vertexIndex)
+    function incrementInfectedNeighbors!(network, vertexIndex)
         #=
         Inputs
         network     : a undirected graph from LightGraphs and MetaGraphs
@@ -141,7 +156,7 @@ module networkFunctions
         return nothing
     end
 
-    function changeState(network, vertexIndex, state)
+    function changeState!(network, vertexIndex, state, newStateIndex)
         #=
         Inputs
         network     : a undirected graph from LightGraphs and MetaGraphs
@@ -153,12 +168,40 @@ module networkFunctions
         nothing     : works in place on the network
         =#
 
+        set_prop!(network, vertexIndex, :state, state)
+        set_prop!(network, vertexIndex, :stateIndex, newStateIndex)
+
+        #=
         if state == "I"
             set_prop!(network, vertexIndex, :state, "I")
         elseif state == "R"
             set_prop!(network, vertexIndex, :state, "R")
         end
+        =#
+        return nothing
+    end
+
+    function incrementStateTotals!(network, prevStateIndex, newStateIndex)
+        #=
+        Inputs
+        network         : a undirected graph from LightGraphs and MetaGraphs
+                          containing our population of interest
+        prevStateIndex  : the previous state Index of the individual updated
+        newStateIndex   : the new state Index of the individual updated
+                        Indexing w/ respect to State indexing property of network
+
+        Outputs
+        nothing     : works in place on the network
+        =#
+
+        # stateIncrementor is an array of zeros
+        incrementorArray = copy(get_prop(network, :stateIncrementor))
+        incrementorArray[prevStateIndex] = -1
+        incrementorArray[newStateIndex] = 1
+
+        set_props!(network, Dict(:stateTotals=>get_prop(network, :stateTotals) + incrementorArray))
 
         return nothing
     end
+
 end

@@ -9,8 +9,8 @@ using Random, Conda, PyCall, LightGraphs, GraphPlot, MetaGraphs
 
 # import required modules
 push!( LOAD_PATH, "./" )    #Set path to current
-using networkFunctions: initialiseNetwork
-using sirModels: gillespieDirect2Processes_network
+using networkFunctions: initialiseNetwork!
+using sirModels: gillespieDirect_network!
 using plotsPyPlot: plotSIRPyPlot
 
 # main
@@ -22,14 +22,21 @@ function main(Display = true, save = true)
     Random.seed!(1)
 
     # initialise variables
-    N = [5,10,50,100,1000]#,10000]
+    N = [5,10,50,100,1000,10000]
 
     t_max = 200
     alpha = 0.4
     beta = 10 ./ N
 
+    # new inputs to the initialisation
+    infectionProp = 0.05
+    states = ["S","I","R"]
+    stateEvents = [["I"],["R"],nothing]
+    eventHazards = [[beta], [alpha], [0]]
+    HazardMultipliers = [["I"],nothing,nothing]
 
-    if true
+
+    if false
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 
@@ -38,18 +45,22 @@ function main(Display = true, save = true)
             network = MetaGraph(complete_graph(N[i]))
             println("Network #$i returned")
 
-            initialiseNetwork(network, 0.05)
+            initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, network, alpha, beta[i], N[i])
+            time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
+
+            S = state_Totals[1,:]
+            I = state_Totals[2,:]
+            R = state_Totals[3,:]
 
             println("Simulation #$i has completed in $time")
 
             if Display | save
                 population = N[i]
                 outputFileName = "juliaGraphs/networkCompleteDirect/SIR_Model_Pop_$population"
-                plotSIRPyPlot(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display, save)
+                plotSIRPyPlot(t, [S,I,R], alpha, beta[i], N[i], outputFileName, Display, save)
             end
         end
     end
@@ -65,18 +76,22 @@ function main(Display = true, save = true)
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
-        initialiseNetwork(network, 0.05)
+        initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
 
         println("Network #$i has been initialised")
 
-        time = @elapsed t, S, I, R = gillespieDirect2Processes_network(t_max, network, alpha, beta[i], N[i])
+        time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
+
+        S = state_Totals[1,:]
+        I = state_Totals[2,:]
+        R = state_Totals[3,:]
 
         println("Simulation #$i has completed in $time")
 
         if Display | save
             population = N[i]
             outputFileName = "juliaGraphs/networkSmallDegreeDirect/SIR_Model_Pop_$population"
-            plotSIRPyPlot(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display, save)
+            plotSIRPyPlot(t, [S,I,R], alpha, beta[i], N[i], outputFileName, Display, save)
         end
     end
 

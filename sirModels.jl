@@ -234,12 +234,27 @@ module sirModels
 
         # initialise outputs
         t = [copy(t_init)]
-        state_Totals = copy(get_prop(network,:stateTotals))
+
+        # could consider preallocating an array of arbitrary length to increase
+        # speed and only switch to append once the end is reached
+        # preallocate array about pop * numStates * num dependent processes/pathways (e.g. 2 for SIR and SIRD)
+        numStates = length(get_prop(network,:states))
+
+        state_Totals = zeros(get_prop(network, :population) * numStates * 2)
+
+        #lenState_Totals = length(state_Totals)
+        #println("length of state_Totals = $lenState_Totals")
+
+        state_Totals[1:numStates] = copy(get_prop(network,:stateTotals))
+        errorsCaught = 0 # this will allow us to know if we are not preallocating enough
 
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
         h_i = calcHazard!(network, alpha, beta)
+
+
+        iteration = 0
 
         while t[end] < t_max && get_prop(network, :stateTotals)[2] != 0
             # including this in line in the loop rather than updating it in
@@ -328,12 +343,29 @@ module sirModels
             end
 
             =#
+
+            iteration +=1
+
             push!(t, t[end] + delta_t)
-            state_Totals = hcat(state_Totals, copy(get_prop(network,:stateTotals)))
+
+            # use preallocated array as much as possible
+            try
+                state_Totals[(numStates*iteration+1):(numStates*iteration+numStates)] =  copy(get_prop(network,:stateTotals))
+
+            catch BoundsError # if run out of preallocation
+                append!(state_Totals, copy(get_prop(network,:stateTotals)))
+                errorsCaught = errorsCaught + 1
+            end
+
+            #state_Totals = hcat(state_Totals, copy(get_prop(network,:stateTotals)))
 
         end # while
 
-        return t, state_Totals
+        if errorsCaught != 0
+            println("Num Errors caught = $errorsCaught. Recommend increasing preallocation value")
+        end
+
+        return t, reshape(state_Totals[1:numStates*iteration+numStates],length(get_prop(network,:states)),:)
     end # function
 
 

@@ -36,7 +36,7 @@ function main(Display = true, save = true)
     HazardMultipliers = [["I"],nothing,nothing]
 
 
-    if false
+    if true
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 
@@ -54,6 +54,9 @@ function main(Display = true, save = true)
             S = state_Totals[1,:]
             I = state_Totals[2,:]
             R = state_Totals[3,:]
+
+            lengthStateTotals = length(state_Totals)
+            println("Length of state_Totals array is $lengthStateTotals")
 
             println("Simulation #$i has completed in $time")
 
@@ -85,6 +88,9 @@ function main(Display = true, save = true)
         S = state_Totals[1,:]
         I = state_Totals[2,:]
         R = state_Totals[3,:]
+
+        lengthStateTotals = length(state_Totals)
+        println("Length of state_Totals array is $lengthStateTotals")
 
         println("Simulation #$i has completed in $time")
 

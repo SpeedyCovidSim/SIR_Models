@@ -27,10 +27,11 @@ function main(Display = true, save = true)
     t_max = 200
     alpha = 0.4
     beta = 10 ./ N
+    gamma = 0.1
 
     # new inputs to the initialisation
     infectionProp = 0.05
-    simType = "SIR"
+    simType = "SIRD"
 
 
     if true
@@ -42,7 +43,7 @@ function main(Display = true, save = true)
             network = MetaGraph(complete_graph(N[i]))
             println("Network #$i returned")
 
-            initialiseNetwork!(network, infectionProp, simType, alpha, beta[i])
+            initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -51,6 +52,8 @@ function main(Display = true, save = true)
             S = state_Totals[1,:]
             I = state_Totals[2,:]
             R = state_Totals[3,:]
+            D = state_Totals[4,:]
+            #D = []
 
             lengthStateTotals = length(state_Totals)
             println("Length of state_Totals array is $lengthStateTotals")
@@ -60,7 +63,7 @@ function main(Display = true, save = true)
             if Display | save
                 population = N[i]
                 outputFileName = "juliaGraphs/networkCompleteDirect/SIR_Model_Pop_$population"
-                plotSIRPyPlot(t, [S,I,R], alpha, beta[i], N[i], outputFileName, Display, save)
+                plotSIRPyPlot(t, [S,I,R,D], alpha, beta[i], N[i], outputFileName, Display, save)
             end
         end
     end
@@ -76,7 +79,7 @@ function main(Display = true, save = true)
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
-        initialiseNetwork!(network, infectionProp, simType, alpha, beta[i])
+        initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
         println("Network #$i has been initialised")
 
@@ -85,6 +88,8 @@ function main(Display = true, save = true)
         S = state_Totals[1,:]
         I = state_Totals[2,:]
         R = state_Totals[3,:]
+        D = state_Totals[4,:]
+        #D = []
 
         lengthStateTotals = length(state_Totals)
         println("Length of state_Totals array is $lengthStateTotals")
@@ -94,7 +99,7 @@ function main(Display = true, save = true)
         if Display | save
             population = N[i]
             outputFileName = "juliaGraphs/networkSmallDegreeDirect/SIR_Model_Pop_$population"
-            plotSIRPyPlot(t, [S,I,R], alpha, beta[i], N[i], outputFileName, Display, save)
+            plotSIRPyPlot(t, [S,I,R,D], alpha, beta[i], N[i], outputFileName, Display, save)
         end
     end
 

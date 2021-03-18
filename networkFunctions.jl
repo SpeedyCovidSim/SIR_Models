@@ -20,7 +20,7 @@ module networkFunctions
         R_total       : Num people recovered
         =#
 
-        states, stateEvents, eventHazards = simType(simType, alpha, beta, gamma)
+        states, stateEvents, eventHazards, hazardMultipliers = simType!(simType, alpha, beta, gamma)
 
         # return num vertices
         numVertices = nv(network)
@@ -72,12 +72,13 @@ module networkFunctions
 
         set_props!(network, Dict(:stateTotals=>stateTotals, :states=>states,
             :stateEvents=>stateEvents, :eventHazards=>eventHazards,
-            :population=>numVertices, :stateIncrementor=>stateIncrementor))
+            :population=>numVertices, :stateIncrementor=>stateIncrementor,
+            :hazardMultipliers=>hazardMultipliers))
 
         return
     end
 
-    function simType(simType, alpha, beta, gamma)
+    function simType!(simType, alpha, beta, gamma)
         #=
         Inputs
         simType       : type of sim to use. ["SIR", "SIRD"]
@@ -94,7 +95,7 @@ module networkFunctions
         eventHazards      : hazard of an event occurring. Where multiple events
                             can happen to a particular state, these are stored
                             in an array in order with the events
-        HazardMultipliers : any relevant multiplier to use on the hazard - i.e.
+        hazardMultipliers : any relevant multiplier to use on the hazard - i.e.
                             dependence on the number of infected individuals
                             neighbouring the individual == "I". nothing otherwise
         =#
@@ -103,20 +104,137 @@ module networkFunctions
             states = ["S","I","R"]
             stateEvents = [["I"],["R"],nothing]
             eventHazards = [[beta], [alpha], [0]]
-            HazardMultipliers = [["I"],nothing,nothing]
+            hazardMultipliers = ["I",nothing,nothing]
 
         elseif simType == "SIRD"
-            states = ["S","I","R"]
-            stateEvents = [["I"],["R","D"],nothing]
-            eventHazards = [[beta], [alpha, gamma], [0]]
-            HazardMultipliers = [["I"],nothing,nothing]
+            states = ["S","I","R","D"]
+            stateEvents = [["I"],["R","D"],nothing,nothing]
+            eventHazards = [[beta], [alpha, gamma], [0],[0]]
+            hazardMultipliers = ["I",nothing,nothing,nothing]
 
         end
 
-        return states, stateEvents, eventHazards, HazardMultipliers
+        return states, stateEvents, eventHazards, hazardMultipliers
     end
 
-    function calcHazard!(network, alpha, beta, updateOnly = false, hazards = [],
+    function calcHazard!(network, updateOnly = false, hazards = [],
+        vertexIndex = 0, prevState = "S", newState = "I")
+        #=
+        Inputs
+        network : a undirected graph from LightGraphs and MetaGraphs
+                  containing our population of interest
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
+        hazards : calculated hazard for each individual (vertex) in the network
+        updateOnly : bool, true means only update the hazards array
+        vertexIndex : the individual (vertex) the event occured to
+
+
+        event       : string containing either "recovered" or "infected"
+        events      : an array of strings = ["infected", "recovered"]
+
+        Outputs
+        hazards : calculated hazard for each individual (vertex) in the network
+                : or nothing if updateOnly as it operates in place on hazards array
+        =#
+
+        if updateOnly
+            # change hazard of affected individual
+            # if infected, hazard is alpha, otherwise 0 as they've recovered
+            # NOT WRITTEN TO ALLOW FOR MULTIPLIER
+            multiplier = get_prop(network, :hazardMultipliers)[get_prop(network,vertexIndex, :stateIndex)]
+            if isnothing(multiplier)
+                hazards[vertexIndex] = sum(get_prop(network, :eventHazards)[get_prop(network,vertexIndex, :stateIndex)])
+
+            elseif  multiplier == "I" # multiplier in use
+                hazards[vertexIndex] = sum(get_prop(network, :eventHazards)[get_prop(network,vertexIndex, :stateIndex)]
+                                        * get_prop(network, vertexIndex, :initInfectedNeighbors))
+
+                # will need to add additional functionality to this later
+            end
+
+            allMultipliers = get_prop(network, :hazardMultipliers)
+
+            # hazards of neighbors depend on the event if true
+            if sum(isnothing(allMultipliers)) != length(allMultipliers)
+                stateIndex1 = 0
+                stateIndex2 = 0
+
+                # findall returns [] if nothing
+                stateIndex1 = findall(prevState .== allMultipliers) #-1
+
+                stateIndex2 = findall(newState .== allMultipliers) #+1
+
+                # determine which multipliers aren't nothing
+                #multIndexes = findall(!isnothing(allMultipliers))
+
+                if stateIndex1 != []
+                    # multithread hazard calculation to speed up
+                    # if num neighbors is low, this will actually slow it down
+                    Threads.@threads for i in neighbors(network, vertexIndex)
+                        # only update hazards for those that are susceptible
+
+
+                        # THIS WILL BREAK IF HAZARD IS DEPENDENT ON MULTIPLE MULTIPLIERS. OR IF MULTIPLIER SHOULD BE INVERSE SIGN
+                        # OR IF MULTIPLE HAZARDS ASSOCIATED WITH A STATE
+                        if get_prop(network, i, :stateIndex) in stateIndex1
+                            hazards[i] = hazards[i] - get_prop(network, :eventHazards)[get_prop(network, i, :stateIndex)][1]
+                        end
+                    end
+                end
+
+                if stateIndex2 != []
+                    # multithread hazard calculation to speed up
+                    # if num neighbors is low, this will actually slow it down
+                    Threads.@threads for i in neighbors(network, vertexIndex)
+                        # only update hazards for those that are susceptible
+
+
+                        # THIS WILL BREAK IF HAZARD IS DEPENDENT ON MULTIPLE MULTIPLIERS. OR IF MULTIPLIER SHOULD BE INVERSE SIGN
+                        # OR IF MULTIPLE HAZARDS ASSOCIATED WITH A STATE
+                        if get_prop(network, i, :stateIndex) in stateIndex2
+                            hazards[i] = hazards[i] + get_prop(network, :eventHazards)[get_prop(network, i, :stateIndex)][1]
+                        end
+                    end
+                end
+
+            end
+
+
+            #fil1 = filter_vertices(network[neighbors(network, vertexIndex)], :state, "S")
+
+        else # initialisation
+
+            # preallocate hazards array
+            hazards = zeros(get_prop(network, :population))
+
+            # calculate hazard at i
+            # use multithreading to speed up
+            Threads.@threads for i in vertices(network)
+                # if multiple hazards for the state, sum them
+                eventHazards = get_prop(network, :eventHazards)[get_prop(network,i, :stateIndex)]
+
+                # check if there is a multiplier
+                multiplier = get_prop(network, :hazardMultipliers)[get_prop(network,i, :stateIndex)]
+                if !isnothing(multiplier)
+                    if multiplier == "I"
+                        eventHazards = eventHazards * get_prop(network, i, :initInfectedNeighbors)
+                    end
+                    # add more here as becomes relevant
+                end
+
+                hazards[i] = sum(eventHazards)
+
+
+                #else # person is recovered and their hazard is zero
+            end
+            return hazards
+        end
+
+        return nothing
+    end
+
+    function calcHazardOld!(network, alpha, beta, updateOnly = false, hazards = [],
         vertexIndex = 0, event = "infected", events = ["I", "R"])
         #=
         Inputs

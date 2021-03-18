@@ -29,7 +29,7 @@ infectionProp = 0.05
 states = ["S","I","R"]
 stateEvents = [["I"],["R"],nothing]
 eventHazards = [[beta], [alpha], [0]]
-HazardMultipliers = [["I"],nothing,nothing]
+hazardMultipliers = ["I",nothing,nothing]
 
 initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
 

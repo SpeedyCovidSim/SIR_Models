@@ -250,7 +250,7 @@ module sirModels
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i = calcHazard!(network, alpha, beta)
+        h_i = calcHazard!(network)
 
 
         iteration = 0
@@ -290,7 +290,7 @@ module sirModels
                 eventIndex = sample(1:length(events), pweights(eventHazardArray ./ sum(eventHazardArray)))
             end
 
-            # change state of individual and note prev state
+            # change state of individual and note prev state and newState
             prevState = get_prop(network,:states)[stateIndex]
             newState = events[eventIndex]
 
@@ -300,11 +300,8 @@ module sirModels
                 changeState!(network, vertexIndex, newState, newStateIndex)
 
                 # update hazard of individual
-                calcHazard!(network, alpha, beta, true, h_i, vertexIndex, newState)
-
-
                 # update hazards of neighbors (if applicable)
-
+                calcHazard!(network, true, h_i, vertexIndex, prevState, newState)
 
 
                 # increment stateTotals (network, prevState, newState)

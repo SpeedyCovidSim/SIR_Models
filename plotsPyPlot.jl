@@ -25,13 +25,16 @@ module plotsPyPlot
         png            : plot of SIR model over time [by default]
         =#
 
-        
+
 
         fig = plt.figure()
         plt.plot(t, SIR[1], label="Susceptible", lw = 2, figure=fig)
         plt.plot(t, SIR[2], label="Infected", lw = 2, figure=fig)
         plt.plot(t, SIR[3], label="Recovered", lw=2, figure=fig)
-
+        try
+            plt.plot(t, SIR[4], label="Deceased", lw=2, figure=fig)
+        catch
+        end
         plt.xlabel("Time")
         plt.ylabel("Population Number")
         plt.suptitle("SIR model over time with a population size of $N")

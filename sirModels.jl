@@ -26,8 +26,8 @@ module sirModels
         I_total : Num people infected
         R_total : Num people recovered
         N       : Population size (unused)
-        alpha   : probability of infected person recovering [0,1]
-        beta    : probability of susceptible person being infected [0,1]
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
 
         Outputs
         t       : Array of times at which events have occured
@@ -92,8 +92,8 @@ module sirModels
         I_total : Num people infected
         R_total : Num people recovered
         N       : Population size (unused)
-        alpha   : probability of infected person recovering [0,1]
-        beta   : probability of susceptible person being infected [0,1]
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
 
         Outputs
         t       : Array of times at which events have occured
@@ -159,8 +159,8 @@ module sirModels
         I_total : Num people infected
         R_total : Num people recovered
         N       : Population size (unused)
-        alpha   : probability of infected person recovering [0,1]
-        beta   : probability of susceptible person being infected [0,1]
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
 
         Outputs
         t       : Array of times at which events have occured
@@ -217,13 +217,12 @@ module sirModels
         Directly samples from the exponential distribution
 
         Inputs
-        t_init  : Initial time (default of 0)
         t_max   : Simulation end time
-
         network : the network containing the population to operate on
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
         N       : Population size (unused)
-        alpha   : probability of infected person recovering [0,1]
-        beta    : probability of susceptible person being infected [0,1]
+        t_init  : Initial time (default of 0)
 
         Outputs
         t       : Array of times at which events have occured

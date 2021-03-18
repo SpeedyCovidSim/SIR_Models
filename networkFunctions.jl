@@ -5,12 +5,13 @@ module networkFunctions
     export initialiseNetwork!, calcHazard!, incrementInfectedNeighbors!, changeState!,
         incrementStateTotals!
 
-    function initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
+    function initialiseNetwork!(network, infectionProp, simType, alpha, beta, gamma = 0)
         #=
         Inputs
         network       : a undirected graph from LightGraphs and MetaGraphs
                         containing our population of interest
         infectionProp : proportion of people to be infected [0, 1)
+        simType       : type of sim to use. ["SIR", "SIRD"]
 
         Outputs
         network       : works in place on the network. network is initialised
@@ -18,6 +19,8 @@ module networkFunctions
         I_total       : Num people infected
         R_total       : Num people recovered
         =#
+
+        states, stateEvents, eventHazards = simType(simType, alpha, beta, gamma)
 
         # return num vertices
         numVertices = nv(network)
@@ -74,14 +77,53 @@ module networkFunctions
         return
     end
 
+    function simType(simType, alpha, beta, gamma)
+        #=
+        Inputs
+        simType       : type of sim to use. ["SIR", "SIRD"]
+        alpha         : rate of infected person recovering
+        beta          : rate of susceptible person being infected
+        gamma         : rate of infected person dieing
+
+        Outputs
+        states            : allowable simulation states
+        stateEvents       : events that can happen to each state. E.g. "I" means
+                            an individual in the state of the same index of states
+                            as "I" is in stateEvents, means that individual can
+                            become "I". i.e. for SIR, a "S" can become "I"
+        eventHazards      : hazard of an event occurring. Where multiple events
+                            can happen to a particular state, these are stored
+                            in an array in order with the events
+        HazardMultipliers : any relevant multiplier to use on the hazard - i.e.
+                            dependence on the number of infected individuals
+                            neighbouring the individual == "I". nothing otherwise
+        =#
+
+        if simType == "SIR"
+            states = ["S","I","R"]
+            stateEvents = [["I"],["R"],nothing]
+            eventHazards = [[beta], [alpha], [0]]
+            HazardMultipliers = [["I"],nothing,nothing]
+
+        elseif simType == "SIRD"
+            states = ["S","I","R"]
+            stateEvents = [["I"],["R","D"],nothing]
+            eventHazards = [[beta], [alpha, gamma], [0]]
+            HazardMultipliers = [["I"],nothing,nothing]
+
+        end
+
+        return states, stateEvents, eventHazards, HazardMultipliers
+    end
+
     function calcHazard!(network, alpha, beta, updateOnly = false, hazards = [],
         vertexIndex = 0, event = "infected", events = ["I", "R"])
         #=
         Inputs
         network : a undirected graph from LightGraphs and MetaGraphs
                   containing our population of interest
-        alpha   : probability of infected person recovering [0,1]
-        beta    : probability of susceptible person being infected [0,1]
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
         hazards : calculated hazard for each individual (vertex) in the network
         updateOnly : bool, true means only update the hazards array
         vertexIndex : the individual (vertex) the event occured to

@@ -30,10 +30,7 @@ function main(Display = true, save = true)
 
     # new inputs to the initialisation
     infectionProp = 0.05
-    states = ["S","I","R"]
-    stateEvents = [["I"],["R"],nothing]
-    eventHazards = [[beta], [alpha], [0]]
-    HazardMultipliers = [["I"],nothing,nothing]
+    simType = "SIR"
 
 
     if true
@@ -45,7 +42,7 @@ function main(Display = true, save = true)
             network = MetaGraph(complete_graph(N[i]))
             println("Network #$i returned")
 
-            initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
+            initialiseNetwork!(network, infectionProp, simType, alpha, beta[i])
 
             println("Network #$i has been initialised")
 
@@ -79,7 +76,7 @@ function main(Display = true, save = true)
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
-        initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
+        initialiseNetwork!(network, infectionProp, simType, alpha, beta[i])
 
         println("Network #$i has been initialised")
 

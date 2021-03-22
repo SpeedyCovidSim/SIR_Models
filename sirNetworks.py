@@ -1,7 +1,7 @@
 import numpy as np
 import igraph as ig
 from numpy import random
-from plots import plotSIR, plotSIRK
+from plots import plotSIRD, plotSIRDK
 
 def setNetwork(network, alpha, beta, gamma, prop_i=0.05):
     '''
@@ -93,7 +93,7 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
             if network.vs[eventIndex]["state"] == "S":  # (S->I)
                 # change state and individual rate
                 network.vs[eventIndex]["state"] = "I"
-                network.vs[eventIndex]["rate"] = network["alpha"]
+                network.vs[eventIndex]["rate"] = network["alpha"] + network["gamma"]
                 # increase num_inf_neighbours for neighbouring vertices
                 network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])+1)
                 # update hazards of neighbouring susceptible vertices
@@ -104,7 +104,7 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
 
             elif network.vs[eventIndex]["state"] == "I": # (I->R)
                 # choose recovery or death
-                event = random.choice(a=1,p=network["inf_death"])
+                event = random.choice(a=2,p=network["inf_death"])
                 # if recovery
                 if event == 0:
                     # change state and individual rate
@@ -165,8 +165,8 @@ def main():
             t, S, I, R, D = gillespieDirectNetwork(t_max, network)
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/networkDirectFull/SIR_Model_Pop_{N[i]}"
-            plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
+            outputFileName = f"pythonGraphs/networkDirectSIRD/SIRD_Model_Pop_{N[i]}"
+            plotSIRD(t, [S, I, R, D], alpha, beta[i], N[i], outputFileName, Display=False)
 
     if True:   
         print("Beginning connectedness simulations")
@@ -178,8 +178,8 @@ def main():
             t, S, I, R, D = gillespieDirectNetwork(t_max, network)
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/networkDirectDegree/SIR_Model_Pop_{N[i]}"
-            plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
+            outputFileName = f"pythonGraphs/networkDirectSIRD/SIRD_Model_Pop_{N[i]}"
+            plotSIRDK(t, [S, I, R, D], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
 
 if __name__=="__main__":
     main()

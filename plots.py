@@ -6,7 +6,7 @@ Author: Joel Trent and Josh Looker
 '''
 from matplotlib import pyplot as plt
 
-def plotSIR(t, SIR, alpha, beta, N, outputFileName="plot", Display=True, save=True):
+def plotSIRD(t, SIRD, alpha, beta, N, outputFileName="plot", Display=True, save=True):
     '''
     Inputs
     t              : Array of times at which events have occured
@@ -21,13 +21,14 @@ def plotSIR(t, SIR, alpha, beta, N, outputFileName="plot", Display=True, save=Tr
     png            : plot of SIR model over time [by default]
     '''
     fig = plt.figure()
-    plt.plot(t, SIR[0], label="Susceptible", lw = 2, figure=fig)
-    plt.plot(t, SIR[1], label="Infected", lw = 2, figure=fig)
-    plt.plot(t, SIR[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[0], label="Susceptible", lw = 2, figure=fig)
+    plt.plot(t, SIRD[1], label="Infected", lw = 2, figure=fig)
+    plt.plot(t, SIRD[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[3], label="Dead", lw=2, figure=fig)
 
     plt.xlabel("Time")
     plt.ylabel("Population Number")
-    plt.suptitle(f"SIR model over time with a population size of {N}")
+    plt.suptitle(f"SIRD model over time with a population size of {N}")
     plt.title(f"For alpha = {alpha} and beta {beta}")
     plt.legend()
 
@@ -39,7 +40,7 @@ def plotSIR(t, SIR, alpha, beta, N, outputFileName="plot", Display=True, save=Tr
         # Save graph as pngW
         fig.savefig(outputFileName)
 
-def plotSIRK(t, SIR, alpha, beta, N, k, outputFileName="plot", Display=True, save=True):
+def plotSIRDK(t, SIRD, alpha, beta, N, k, outputFileName="plot", Display=True, save=True):
     '''
     Inputs
     t              : Array of times at which events have occured
@@ -55,13 +56,14 @@ def plotSIRK(t, SIR, alpha, beta, N, k, outputFileName="plot", Display=True, sav
     png            : plot of SIR model over time [by default]
     '''
     fig = plt.figure()
-    plt.plot(t, SIR[0], label="Susceptible", lw = 2, figure=fig)
-    plt.plot(t, SIR[1], label="Infected", lw = 2, figure=fig)
-    plt.plot(t, SIR[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[0], label="Susceptible", lw = 2, figure=fig)
+    plt.plot(t, SIRD[1], label="Infected", lw = 2, figure=fig)
+    plt.plot(t, SIRD[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[3], label="Dead", lw=2, figure=fig)
 
     plt.xlabel("Time")
     plt.ylabel("Population Number")
-    plt.suptitle(f"SIR model over time with a population size of {N} and connectedness {k}")
+    plt.suptitle(f"SIRD model over time with a population size of {N} and connectedness {k}")
     plt.title(f"For alpha = {alpha} and beta {beta}")
     plt.legend()
 

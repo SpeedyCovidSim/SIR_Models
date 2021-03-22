@@ -3,7 +3,7 @@ import igraph as ig
 from numpy import random
 from plots import plotSIR, plotSIRK
 
-def setNetwork(network, alpha, beta, prop_i=0.05):
+def setNetwork(network, alpha, beta, gamma, prop_i=0.05):
     '''
     Initialises a parsed network with required random infected individuals (1 if too small)
     Inputs
@@ -22,10 +22,13 @@ def setNetwork(network, alpha, beta, prop_i=0.05):
     network["I_total"] = num_infected
     network["S_total"] = N-num_infected
     network["R_total"] = 0
+    network["D_total"] = 0
 
     # set disease params
     network["alpha"] = alpha
     network["beta"] = beta
+    network["gamma"] = gamma
+    network["inf_death"] = np.array([alpha, gamma])/(alpha + gamma)
 
     # set states of individuals according to random draws
     network.vs["state"]="S"
@@ -44,7 +47,7 @@ def initHazards(network):
         # RHS: list(add 1 to array of num_inf_nei for neighbouring vertices), note casting is required for easy array operations
         network.vs[network.neighbors(inf_vert)]["num_inf_nei"]=list(np.array(network.vs[network.neighbors(inf_vert)]["num_inf_nei"])+1)
         # add in recovery
-        inf_vert["rate"] = network["alpha"]
+        inf_vert["rate"] = network["alpha"] + network["gamma"]
     # for all susceptible vertices add in infection hazard
     # LHS: array of hazards for susceptible vertices
     # RHS: hazards calculated as beta*(num of infected neighbours), note casting is required for easy array operations
@@ -73,6 +76,7 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
         S = [network["S_total"]]
         I = [network["I_total"]]
         R = [network["R_total"]]
+        D = [network["D_total"]]
 
         # initialise random variate generation with set seed
         rng = random.default_rng(123)
@@ -99,24 +103,40 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
                 network["I_total"] += 1
 
             elif network.vs[eventIndex]["state"] == "I": # (I->R)
-                # change state and individual rate
-                network.vs[eventIndex]["state"] = "R"
-                network.vs[eventIndex]["rate"] = 0
-                # decrease num_inf_neighbours for neighbouring vertices
-                network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])-1)
-                # update hazards of neighbouring susceptible vertices
-                network.vs[network.neighbors(eventIndex)](state_eq='S')["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)](state_eq='S')["num_inf_nei"])*network["beta"])
-                # update network totals
-                network["I_total"] -= 1
-                network["R_total"] += 1
+                # choose recovery or death
+                event = random.choice(a=1,p=network["inf_death"])
+                # if recovery
+                if event == 0:
+                    # change state and individual rate
+                    network.vs[eventIndex]["state"] = "R"
+                    network.vs[eventIndex]["rate"] = 0
+                    # decrease num_inf_neighbours for neighbouring vertices
+                    network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])-1)
+                    # update hazards of neighbouring susceptible vertices
+                    network.vs[network.neighbors(eventIndex)](state_eq='S')["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)](state_eq='S')["num_inf_nei"])*network["beta"])
+                    # update network totals
+                    network["I_total"] -= 1
+                    network["R_total"] += 1
+                # if death
+                else: 
+                    # decrease num_inf_neighbours for neighbouring vertices
+                    network.vs[network.neighbors(eventIndex)]["num_inf_nei"] = list(np.array(network.vs[network.neighbors(eventIndex)]["num_inf_nei"])-1)
+                    # update hazards of neighbouring susceptible vertices
+                    network.vs[network.neighbors(eventIndex)](state_eq='S')["rate"] = list(np.array(network.vs[network.neighbors(eventIndex)](state_eq='S')["num_inf_nei"])*network["beta"])
+                    # delete node from network
+                    network.delete_vertices(eventIndex)
+                    # update network totals
+                    network["I_total"] -= 1
+                    network["D_total"] += 1
 
             # append new totals
             t.append(t[-1]+delta_t)
             S.append(network["S_total"])
             I.append(network["I_total"])
             R.append(network["R_total"])
+            D.append(network["D_total"])
 
-        return t, S, I, R
+        return t, S, I, R, D
 
 def main():
     '''
@@ -132,6 +152,7 @@ def main():
     t_max = 200
     alpha = 0.4
     beta = 10 / N
+    gamma = 0.1
 
     # iterate through populations for complete graphs
     if True:
@@ -139,9 +160,9 @@ def main():
         for i in range(len(N)):
             print(f"Iteration {i} commencing")
             network = ig.Graph.Full(N[i])
-            network = setNetwork(network, alpha, beta[i])
+            network = setNetwork(network, alpha, beta[i], gamma)
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(t_max, network)
+            t, S, I, R, D = gillespieDirectNetwork(t_max, network)
             print(f"Exporting simulation {i}")
             # plot and export the simulation
             outputFileName = f"pythonGraphs/networkDirectFull/SIR_Model_Pop_{N[i]}"
@@ -152,9 +173,9 @@ def main():
         for i in range(len(N)):
             print(f"Iteration {i} commencing")
             network = ig.Graph.K_Regular(N[i], k[i])
-            network = setNetwork(network, alpha, beta[i])
+            network = setNetwork(network, alpha, beta[i], gamma)
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(t_max, network)
+            t, S, I, R, D = gillespieDirectNetwork(t_max, network)
             print(f"Exporting simulation {i}")
             # plot and export the simulation
             outputFileName = f"pythonGraphs/networkDirectDegree/SIR_Model_Pop_{N[i]}"

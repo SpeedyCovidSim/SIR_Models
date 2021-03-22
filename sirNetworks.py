@@ -73,8 +73,6 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
         S = [network["S_total"]]
         I = [network["I_total"]]
         R = [network["R_total"]]
-        states = ["S","I","R"]
-        events = ["infected", "recovered"]
 
         # initialise random variate generation with set seed
         rng = random.default_rng(123)

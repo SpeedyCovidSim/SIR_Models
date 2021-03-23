@@ -239,23 +239,23 @@ module sirModels
         # preallocate array about pop * numStates * num dependent processes/pathways (e.g. 2 for SIR and SIRD)
         numStates = length(get_prop(network,:states))
 
-        state_Totals = zeros(get_prop(network, :population) * numStates * 2)
+        state_Totals = convert.(Int, zeros(get_prop(network, :population) * numStates * 2))
+        state_Totals_Iteration = convert.(Int, zeros(numStates))
 
         #lenState_Totals = length(state_Totals)
         #println("length of state_Totals = $lenState_Totals")
 
-        state_Totals[1:numStates] = copy(get_prop(network,:stateTotals))
+        state_Totals[1:numStates] = copy(outputStateTotals(network, numStates))
         errorsCaught = 0 # this will allow us to know if we are not preallocating enough
 
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i = calcHazard!(network)
-
+        h_i = calcHazardSir!(network)
 
         iteration = 0
 
-        while t[end] < t_max && get_prop(network, :stateTotals)[2] != 0
+        while t[end] < t_max && get_prop(network, :ITotal) != 0
             # including this in line in the loop rather than updating it in
             # incrementally like h_i made no difference to speed, so left it here
             # even for networks with a low degree of connection
@@ -274,38 +274,40 @@ module sirModels
             # cause transition, change their state
 
             # identify individual's state, w/ respect to property mapping in network description
-            stateIndex = get_prop(network, vertexIndex, :stateIndex)
+            #let this be their previous state
+            prevState = get_prop(network, vertexIndex, :state)
+            #stateIndex = get_prop(network, vertexIndex, :stateIndex)
 
             # determine num events that can happen to an individual in this state
-            events = get_prop(network, :stateEvents)[stateIndex]
+            events = get_prop(network, Symbol(prevState, "Events"))
 
             eventIndex = 1
-            # if multiple events, choose one based on hazard weighting
+            # if multiple events possible, choose one based on hazard weighting
             if length(events) > 1
                 # assumes constant probability of each event. Hazard does not
                 # depend on anything but state
-                # bad assumption, which we'll deal with later
-                eventHazardArray = get_prop(network, :eventHazards)[stateIndex]
+                # BAD ASSUMPTION, WHICH WE'LL DEAL WITH LATER
+                eventHazardArray = get_prop(network, Symbol(prevState, "EventHazards"))
 
                 eventIndex = sample(1:length(events), pweights(eventHazardArray ./ sum(eventHazardArray)))
             end
 
             # change state of individual and note prev state and newState
-            prevState = get_prop(network,:states)[stateIndex]
+            #prevState = get_prop(network,:states)[stateIndex]
             newState = events[eventIndex]
 
             # code like this in case of ghost processes
             if prevState != newState
-                newStateIndex = findfirst(get_prop(network,:states) .== newState)
-                changeState!(network, vertexIndex, newState, newStateIndex)
+                #newStateIndex = findfirst(get_prop(network,:states) .== newState)
+                changeState!(network, vertexIndex, newState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                calcHazard!(network, true, h_i, vertexIndex, prevState, newState)
+                updateHazardSir!(network, h_i, vertexIndex, prevState, newState)
 
 
                 # increment stateTotals (network, prevState, newState)
-                incrementStateTotals!(network, stateIndex, newStateIndex)
+                incrementStateTotals!(network, prevState, newState)
 
             end
 
@@ -345,11 +347,14 @@ module sirModels
             push!(t, t[end] + delta_t)
 
             # use preallocated array as much as possible
+
+            state_Totals_Iteration = outputStateTotals(network,numStates)
+
             try
-                state_Totals[(numStates*iteration+1):(numStates*iteration+numStates)] =  copy(get_prop(network,:stateTotals))
+                state_Totals[(numStates*iteration+1):(numStates*iteration+numStates)] = copy(state_Totals_Iteration)
 
             catch BoundsError # if run out of preallocation
-                append!(state_Totals, copy(get_prop(network,:stateTotals)))
+                append!(state_Totals, copy(state_Totals_Iteration))
                 errorsCaught = errorsCaught + 1
             end
 

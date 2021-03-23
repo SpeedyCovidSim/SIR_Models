@@ -3,7 +3,7 @@ module networkFunctions
     using LightGraphs, MetaGraphs, StatsBase
 
     export initialiseNetwork!, calcHazard!, incrementInfectedNeighbors!, changeState!,
-        incrementStateTotals!
+        incrementStateTotals!, outputStateTotals, calcHazardSir!, updateHazardSir!
 
     function initialiseNetwork!(network, infectionProp, simType, alpha, beta, gamma = 0)
         #=
@@ -28,7 +28,7 @@ module networkFunctions
         # Initialise all states as "S", all numInfectedNeighbors as zero
         # states[1] will always be S/the initial state
         for i in vertices(network)
-            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>states[1], :stateIndex=>1))
+            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>states[1]))
 
         end
 
@@ -40,7 +40,7 @@ module networkFunctions
         # by 1
         for i in infectedVertices
             set_prop!(network, i, :state, "I")
-            set_prop!(network, i, :stateIndex, findfirst(states .== "I"))
+            #set_prop!(network, i, :stateIndex, findfirst(states .== "I"))
 
             incrementInfectedNeighbors!(network, i)
 
@@ -62,19 +62,31 @@ module networkFunctions
         #S_total = numVertices - I_total
         #R_total = 0
 
-        stateTotals = zeros(length(states))
-        stateIncrementor = zeros(length(states))
+        stateTotals = convert.(Int, zeros(length(states)))
+        #stateIncrementor = zeros(length(states))
 
         # count the num of vertices in each state
         for i in vertices(network)
             stateTotals += states .== get_prop(network, i, :state)
         end
 
+        stateIndex = 1
+        for state in states
+            set_props!(network, Dict(Symbol(state, "Total")=>stateTotals[stateIndex],
+                Symbol(state, "Events")=>stateEvents[stateIndex],
+                Symbol(state, "EventHazards")=>eventHazards[stateIndex],
+                Symbol(state, "HazardMult")=>hazardMultipliers[stateIndex]))
+            stateIndex +=1
+        end
+
+        set_props!(network, Dict(:population=>numVertices, :states=>states))
+
+        #=
         set_props!(network, Dict(:stateTotals=>stateTotals, :states=>states,
             :stateEvents=>stateEvents, :eventHazards=>eventHazards,
             :population=>numVertices, :stateIncrementor=>stateIncrementor,
             :hazardMultipliers=>hazardMultipliers))
-
+        =#
         return
     end
 
@@ -100,13 +112,14 @@ module networkFunctions
                             neighbouring the individual == "I". nothing otherwise
         =#
 
-        if simType == "SIR"
+        if simType == "SIR_direct"
             states = ["S","I","R"]
             stateEvents = [["I"],["R"],nothing]
             eventHazards = [[beta], [alpha], [0]]
             hazardMultipliers = ["I",nothing,nothing]
 
-        elseif simType == "SIRD"
+
+        elseif simType == "SIRD_direct"
             states = ["S","I","R","D"]
             stateEvents = [["I"],["R","D"],nothing,nothing]
             eventHazards = [[beta], [alpha, gamma], [0],[0]]
@@ -171,7 +184,8 @@ module networkFunctions
                 if stateIndex1 != []
                     # multithread hazard calculation to speed up
                     # if num neighbors is low, this will actually slow it down
-                    Threads.@threads for i in neighbors(network, vertexIndex)
+                    #Threads.@threads for i in neighbors(network, vertexIndex)
+                    for i in neighbors(network, vertexIndex)
                         # only update hazards for those that are susceptible
 
 
@@ -186,7 +200,8 @@ module networkFunctions
                 if stateIndex2 != []
                     # multithread hazard calculation to speed up
                     # if num neighbors is low, this will actually slow it down
-                    Threads.@threads for i in neighbors(network, vertexIndex)
+                    #Threads.@threads for i in neighbors(network, vertexIndex)
+                    for i in neighbors(network, vertexIndex)
                         # only update hazards for those that are susceptible
 
 
@@ -210,7 +225,8 @@ module networkFunctions
 
             # calculate hazard at i
             # use multithreading to speed up
-            Threads.@threads for i in vertices(network)
+            #Threads.@threads for i in vertices(network)
+            for i in vertices(network)
                 # if multiple hazards for the state, sum them
                 eventHazards = get_prop(network, :eventHazards)[get_prop(network,i, :stateIndex)]
 
@@ -229,6 +245,57 @@ module networkFunctions
                 #else # person is recovered and their hazard is zero
             end
             return hazards
+        end
+
+        return nothing
+    end
+
+    function calcHazardSir!(network) # also for SIRD
+
+        # preallocate hazards array
+        hazards = zeros(get_prop(network, :population))
+
+        beta = get_prop(network, :SEventHazards)[1]
+        alpha = get_prop(network, :IEventHazards)[1]
+
+        # calculate hazard at i
+        # use multithreading to speed up
+        Threads.@threads for i in vertices(network)
+            if get_prop(network, i, :state) == "S"
+                hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
+            elseif get_prop(network, i, :state) == "I"
+                hazards[i] = copy(alpha)
+
+                #else # person is recovered or deceased and their hazard is zero
+            end
+        end
+        return hazards
+    end
+
+    function updateHazardSir!(network, hazards, vertexIndex, prevState, newState) # also works for SIRD
+
+        beta = get_prop(network, :SEventHazards)[1]
+        #alpha = get_prop(network, :IHazard)
+
+        # change hazard of affected individual
+        # if infected, hazard is alpha, otherwise 0 as they've recovered
+        hazards[vertexIndex] = get_prop(network, Symbol(newState, "EventHazards"))[1]
+
+        #alpha * (event == "I")
+
+        if newState == "I"
+            increment = 1 * beta
+        else
+            increment = -1 * beta
+        end
+
+        # multithread hazard calculation to speed up
+        # if num neighbors is low, this will actually slow it down
+        Threads.@threads for i in neighbors(network, vertexIndex)
+            # only update hazards for those that are susceptible
+            if get_prop(network, i, :state) == "S"
+                hazards[i] = hazards[i] + increment
+            end
         end
 
         return nothing
@@ -316,7 +383,7 @@ module networkFunctions
         return nothing
     end
 
-    function changeState!(network, vertexIndex, state, newStateIndex)
+    function changeState!(network, vertexIndex, state)
         #=
         Inputs
         network     : a undirected graph from LightGraphs and MetaGraphs
@@ -329,7 +396,7 @@ module networkFunctions
         =#
 
         set_prop!(network, vertexIndex, :state, state)
-        set_prop!(network, vertexIndex, :stateIndex, newStateIndex)
+        #set_prop!(network, vertexIndex, :stateIndex, newStateIndex)
 
         #=
         if state == "I"
@@ -341,27 +408,41 @@ module networkFunctions
         return nothing
     end
 
-    function incrementStateTotals!(network, prevStateIndex, newStateIndex)
+    function incrementStateTotals!(network, prevState, newState)
         #=
         Inputs
         network         : a undirected graph from LightGraphs and MetaGraphs
                           containing our population of interest
-        prevStateIndex  : the previous state Index of the individual updated
-        newStateIndex   : the new state Index of the individual updated
-                        Indexing w/ respect to State indexing property of network
+        prevStateIndex  : the previous state of the individual updated
+        newStateIndex   : the new state of the individual updated
 
         Outputs
         nothing     : works in place on the network
         =#
 
         # stateIncrementor is an array of zeros
-        incrementorArray = copy(get_prop(network, :stateIncrementor))
-        incrementorArray[prevStateIndex] = -1
-        incrementorArray[newStateIndex] = 1
+        #incrementorArray = copy(get_prop(network, :stateIncrementor))
+        #incrementorArray[prevStateIndex] = -1
+        #incrementorArray[newStateIndex] = 1
 
-        set_props!(network, Dict(:stateTotals=>get_prop(network, :stateTotals) + incrementorArray))
+        prevStateSymbol = Symbol(prevState, "Total")
+        newStateSymbol = Symbol(newState, "Total")
+
+        set_props!(network, Dict(prevStateSymbol=>get_prop(network, prevStateSymbol) - 1,
+            newStateSymbol=>get_prop(network, newStateSymbol) + 1))
 
         return nothing
     end
 
+    function outputStateTotals(network, numStates)
+
+        stateTotal = zeros(numStates)
+        i = 1
+        for state in get_prop(network, :states)
+            stateTotal[i] = get_prop(network, Symbol(state, "Total"))
+            i+=1
+        end
+
+        return stateTotal
+    end
 end

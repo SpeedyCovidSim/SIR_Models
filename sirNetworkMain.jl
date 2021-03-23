@@ -31,7 +31,7 @@ function main(Display = true, save = true)
 
     # new inputs to the initialisation
     infectionProp = 0.05
-    simType = "SIRD"
+    simType = "SIR_direct"
 
 
     if true
@@ -52,8 +52,8 @@ function main(Display = true, save = true)
             S = state_Totals[1,:]
             I = state_Totals[2,:]
             R = state_Totals[3,:]
-            D = state_Totals[4,:]
-            #D = []
+            #D = state_Totals[4,:]
+            D = []
 
             lengthStateTotals = length(state_Totals)
             println("Length of state_Totals array is $lengthStateTotals")
@@ -70,6 +70,7 @@ function main(Display = true, save = true)
 
 
     # iterate through populations
+    #@profiler for i in 1:length(N)
     for i in 1:length(N)
 
         println("Iteration #$i commencing")
@@ -84,12 +85,13 @@ function main(Display = true, save = true)
         println("Network #$i has been initialised")
 
         time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
+        #t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
 
         S = state_Totals[1,:]
         I = state_Totals[2,:]
         R = state_Totals[3,:]
-        D = state_Totals[4,:]
-        #D = []
+        #D = state_Totals[4,:]
+        D = []
 
         lengthStateTotals = length(state_Totals)
         println("Length of state_Totals array is $lengthStateTotals")

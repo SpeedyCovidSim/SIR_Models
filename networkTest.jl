@@ -18,13 +18,53 @@ using networkFunctions
 # Return a Watts-Strogatz small world random graph with n vertices, each with
 # expected degree k
 beta = 1
-n = 1000
+n = 100000
 k = 100
 #network = MetaGraph(watts_strogatz(n, k, beta))
-network = MetaGraph(complete_graph(n))
 alpha = 0.2
 beta = 0.1
 
+
+
+@profiler for k in 1:50
+
+    # graph test
+    network = MetaGraph(SimpleGraph(n))
+    state = 0
+
+    # store a new index, retrieve the index, then store again
+    for i in 1:n
+        set_prop!(network, i, :index, i)
+
+        state = copy(get_prop(network, i, :index))
+
+        set_prop!(network, i, :index, i+1)
+
+    end
+
+    # dictionary test
+    network_dict = Dict()
+
+    # store a new index, retrieve the index, then store again
+    for i in 1:n
+        network_dict[i] = Dict("index"=>1)
+
+        state = copy(network_dict[i]["index"])
+
+        #network_dict[i] = Dict("index"=>1+1)
+
+        network_dict[i]["index"] += 1
+
+    end
+end
+
+network_dict["S"] = Dict("Total"=>20, "Events"=>["I"], "Hazards"=>"[0.1]")
+
+
+# Generators are easy to create with no memory allocation needed
+sum(1/n^2 for n=1:1000)
+
+#=
 infectionProp = 0.05
 states = ["S","I","R"]
 stateEvents = [["I"],["R"],nothing]
@@ -36,7 +76,7 @@ initialiseNetwork!(network, infectionProp, states, stateEvents, eventHazards)
 get_prop(network,:stateTotals)
 
 get_prop(network,:stateEvents)
-
+=#
 
 if false
 

@@ -43,11 +43,11 @@ function main(Display = true, save = true)
             network = MetaGraph(complete_graph(N[i]))
             println("Network #$i returned")
 
-            initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_dict, network_dict, stateTotals = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
+            time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals)
 
             S = state_Totals[1,:]
             I = state_Totals[2,:]
@@ -80,11 +80,11 @@ function main(Display = true, save = true)
         network = MetaGraph(random_regular_graph(N[i], k[i]))
         println("Network #$i returned")
 
-        initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+        networkVertex_dict, network_dict, stateTotals = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
         println("Network #$i has been initialised")
 
-        time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
+        time = @elapsed t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals)
         #t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
 
         S = state_Totals[1,:]

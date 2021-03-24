@@ -22,13 +22,21 @@ module networkFunctions
 
         states, stateEvents, eventHazards, hazardMultipliers = simType!(simType, alpha, beta, gamma)
 
+        # initialise dictionaries and arrays for storing network attributes
+        networkVertex_dict = Dict()
+        network_dict = Dict()
+        stateTotals = convert.(Int, zeros(length(states)))
+
         # return num vertices
         numVertices = nv(network)
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
         # states[1] will always be S/the initial state
+        # for loop has i as the vertex index
         for i in vertices(network)
-            set_props!(network, i, Dict(:initInfectedNeighbors=>0, :state=>states[1]))
+
+            # use vertex index as the primary key for the dictionary
+            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
 
         end
 
@@ -39,55 +47,32 @@ module networkFunctions
         # Set them as infected and increment numInfectedNeighbors for their localNeighbourhood
         # by 1
         for i in infectedVertices
-            set_prop!(network, i, :state, "I")
-            #set_prop!(network, i, :stateIndex, findfirst(states .== "I"))
+            networkVertex_dict[i]["state"] = "I"
 
-            incrementInfectedNeighbors!(network, i)
+            incrementInfectedNeighbors!(network, networkVertex_dict, i)
 
-            #=
-            localNeighbourhood = neighbors(network, i)
-            for j in localNeighbourhood
-                set_prop!(network, j, :numInfectedNeighbors, get_prop(network, j, :numInfectedNeighbors) + 1)
-
-                #= Technically only matters if they are susceptible, but will write
-                like this^ to make more future proof (additional states)
-                if  get_prop(network, j, :state) == "S"
-
-                end=#
-            end
-            =#
         end
-
-        #I_total = length(infectedVertices)
-        #S_total = numVertices - I_total
-        #R_total = 0
-
-        stateTotals = convert.(Int, zeros(length(states)))
-        #stateIncrementor = zeros(length(states))
 
         # count the num of vertices in each state
         for i in vertices(network)
-            stateTotals += states .== get_prop(network, i, :state)
+            stateTotals += states .== networkVertex_dict[i]["state"]
+            #get_prop(network, i, :state)
         end
+
+        # add attributes to the network_dict
+        network_dict = Dict("states"=>states, "population"=>numVertices)
 
         stateIndex = 1
         for state in states
-            set_props!(network, Dict(Symbol(state, "Total")=>stateTotals[stateIndex],
-                Symbol(state, "Events")=>stateEvents[stateIndex],
-                Symbol(state, "EventHazards")=>eventHazards[stateIndex],
-                Symbol(state, "HazardMult")=>hazardMultipliers[stateIndex]))
+
+            network_dict[state] = Dict("stateIndex"=>stateIndex,
+                "events"=>stateEvents[stateIndex], "eventHazards"=>eventHazards[stateIndex],
+                "hazardMult"=>hazardMultipliers[stateIndex])
+
             stateIndex +=1
         end
 
-        set_props!(network, Dict(:population=>numVertices, :states=>states))
-
-        #=
-        set_props!(network, Dict(:stateTotals=>stateTotals, :states=>states,
-            :stateEvents=>stateEvents, :eventHazards=>eventHazards,
-            :population=>numVertices, :stateIncrementor=>stateIncrementor,
-            :hazardMultipliers=>hazardMultipliers))
-        =#
-        return
+        return networkVertex_dict, network_dict, stateTotals
     end
 
     function simType!(simType, alpha, beta, gamma)
@@ -250,20 +235,20 @@ module networkFunctions
         return nothing
     end
 
-    function calcHazardSir!(network) # also for SIRD
+    function calcHazardSir!(network, networkVertex_dict, network_dict) # also for SIRD
 
         # preallocate hazards array
-        hazards = zeros(get_prop(network, :population))
+        hazards = zeros(network_dict["population"])
 
-        beta = get_prop(network, :SEventHazards)[1]
-        alpha = get_prop(network, :IEventHazards)[1]
+        beta = network_dict["S"]["eventHazards"][1]
+        alpha = network_dict["I"]["eventHazards"][1]
 
         # calculate hazard at i
         # use multithreading to speed up
         Threads.@threads for i in vertices(network)
-            if get_prop(network, i, :state) == "S"
-                hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
-            elseif get_prop(network, i, :state) == "I"
+            if networkVertex_dict[i]["state"] == "S"
+                hazards[i] = beta * networkVertex_dict[i]["initInfectedNeighbors"]
+            elseif networkVertex_dict[i]["state"] == "I"
                 hazards[i] = copy(alpha)
 
                 #else # person is recovered or deceased and their hazard is zero
@@ -272,16 +257,14 @@ module networkFunctions
         return hazards
     end
 
-    function updateHazardSir!(network, hazards, vertexIndex, prevState, newState) # also works for SIRD
+    function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
+        networkVertex_dict, network_dict) # also works for SIRD
 
-        beta = get_prop(network, :SEventHazards)[1]
-        #alpha = get_prop(network, :IHazard)
+        beta = network_dict["S"]["eventHazards"][1]
 
         # change hazard of affected individual
         # if infected, hazard is alpha, otherwise 0 as they've recovered
-        hazards[vertexIndex] = get_prop(network, Symbol(newState, "EventHazards"))[1]
-
-        #alpha * (event == "I")
+        hazards[vertexIndex] = network_dict[newState]["eventHazards"][1]
 
         if newState == "I"
             increment = 1 * beta
@@ -293,7 +276,7 @@ module networkFunctions
         # if num neighbors is low, this will actually slow it down
         Threads.@threads for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
-            if get_prop(network, i, :state) == "S"
+            if networkVertex_dict[i]["state"] == "S"
                 hazards[i] = hazards[i] + increment
             end
         end
@@ -301,6 +284,7 @@ module networkFunctions
         return nothing
     end
 
+    #=
     function calcHazardOld!(network, alpha, beta, updateOnly = false, hazards = [],
         vertexIndex = 0, event = "infected", events = ["I", "R"])
         #=
@@ -363,77 +347,60 @@ module networkFunctions
 
         return nothing
     end
-
-    function incrementInfectedNeighbors!(network, vertexIndex)
+    =#
+    function incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
         #=
         Inputs
-        network     : a undirected graph from LightGraphs and MetaGraphs
-                      containing our population of interest
-        vertexIndex : the individual (vertex) the event occured to
-        event       : string containing either "recovered" or "infected"
-        events      : an array of strings = ["infected", "recovered"]
+        network            : a undirected graph from LightGraphs and MetaGraphs
+                             containing our population of interest
+        networkVertex_dict : a dictionary containing each vertex in network,
+                             with their states and numInfectedNeighbors
+        vertexIndex        : the individual (vertex) the event occured to
 
         Outputs
-        nothing     : works in place on the network
+        nothing            : works in place on the networkVertex_dict
         =#
 
         for i in neighbors(network, vertexIndex)
-            set_prop!(network, i, :initInfectedNeighbors, get_prop(network, i, :initInfectedNeighbors) + 1)
+            networkVertex_dict[i]["initInfectedNeighbors"] += 1
         end
         return nothing
     end
 
-    function changeState!(network, vertexIndex, state)
+    function changeState!(networkVertex_dict, vertexIndex, newState)
         #=
         Inputs
-        network     : a undirected graph from LightGraphs and MetaGraphs
-                      containing our population of interest
-        vertexIndex : the individual (vertex) the state change occured to
-        state       : state to change to
+        networkVertex_dict     : a dictionary containing our population of interest
+        vertexIndex            : the individual (vertex) the state change occured to
+        newState               : state to change to (string)
 
         Outputs
-        nothing     : works in place on the network
+        nothing     : works in place on the networkVertex_dict
         =#
 
-        set_prop!(network, vertexIndex, :state, state)
-        #set_prop!(network, vertexIndex, :stateIndex, newStateIndex)
+        networkVertex_dict[vertexIndex]["state"] = newState
 
-        #=
-        if state == "I"
-            set_prop!(network, vertexIndex, :state, "I")
-        elseif state == "R"
-            set_prop!(network, vertexIndex, :state, "R")
-        end
-        =#
         return nothing
     end
 
-    function incrementStateTotals!(network, prevState, newState)
+    function incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
         #=
         Inputs
         network         : a undirected graph from LightGraphs and MetaGraphs
                           containing our population of interest
-        prevStateIndex  : the previous state of the individual updated
-        newStateIndex   : the new state of the individual updated
+        prevState  : the previous state of the individual updated (string)
+        newState   : the new state of the individual updated (string)
 
         Outputs
         nothing     : works in place on the network
         =#
 
-        # stateIncrementor is an array of zeros
-        #incrementorArray = copy(get_prop(network, :stateIncrementor))
-        #incrementorArray[prevStateIndex] = -1
-        #incrementorArray[newStateIndex] = 1
-
-        prevStateSymbol = Symbol(prevState, "Total")
-        newStateSymbol = Symbol(newState, "Total")
-
-        set_props!(network, Dict(prevStateSymbol=>get_prop(network, prevStateSymbol) - 1,
-            newStateSymbol=>get_prop(network, newStateSymbol) + 1))
+        stateTotals[network_dict[prevState]["stateIndex"]] -= 1
+        stateTotals[network_dict[newState]["stateIndex"]] += 1
 
         return nothing
     end
-
+    #=
     function outputStateTotals(network, numStates)
 
         stateTotal = zeros(numStates)
@@ -445,4 +412,5 @@ module networkFunctions
 
         return stateTotal
     end
+    =#
 end

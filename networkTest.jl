@@ -18,12 +18,13 @@ using networkFunctions
 # Return a Watts-Strogatz small world random graph with n vertices, each with
 # expected degree k
 beta = 1
-n = 100000
+n = 100
 k = 100
 #network = MetaGraph(watts_strogatz(n, k, beta))
 alpha = 0.2
 beta = 0.1
 
+network = MetaGraph(SimpleGraph(n))
 
 
 @profiler for k in 1:50

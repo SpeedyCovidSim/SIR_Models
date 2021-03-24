@@ -209,8 +209,8 @@ module sirModels
         return t, S, I , R
     end # function
 
-    function gillespieDirect_network!(t_max, network, alpha,
-            beta, N, t_init = 0.0)
+    function gillespieDirect_network!(t_max, network, alpha, beta, N,
+        networkVertex_dict, network_dict, stateTotals, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, on network
@@ -237,27 +237,23 @@ module sirModels
         # could consider preallocating an array of arbitrary length to increase
         # speed and only switch to append once the end is reached
         # preallocate array about pop * numStates * num dependent processes/pathways (e.g. 2 for SIR and SIRD)
-        numStates = length(get_prop(network,:states))
+        numStates = length(network_dict["states"])
 
-        state_Totals = convert.(Int, zeros(get_prop(network, :population) * numStates * 2))
-        state_Totals_Iteration = convert.(Int, zeros(numStates))
+        stateTotalsAll = convert.(Int, zeros(network_dict["population"] * numStates * 2))
 
-        #lenState_Totals = length(state_Totals)
-        #println("length of state_Totals = $lenState_Totals")
-
-        state_Totals[1:numStates] = copy(outputStateTotals(network, numStates))
+        stateTotalsAll[1:numStates] = copy(stateTotals)
         errorsCaught = 0 # this will allow us to know if we are not preallocating enough
 
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i = calcHazardSir!(network)
+        h_i = calcHazardSir!(network, networkVertex_dict, network_dict)
 
         iteration = 0
 
-        while t[end] < t_max && get_prop(network, :ITotal) != 0
+        while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
             # including this in line in the loop rather than updating it in
-            # incrementally like h_i made no difference to speed, so left it here
+            # incrementally like h_i. It made no difference to speed, so left it here
             # even for networks with a low degree of connection
             h = sum(h_i)
             et = Exponential(1/h)
@@ -269,17 +265,16 @@ module sirModels
             #j = h_i ./ h
 
             # choose the index of the individual to transition
-            vertexIndex = sample(1:(get_prop(network, :population)), pweights(h_i ./ h))
+            vertexIndex = sample(1:network_dict["population"], pweights(h_i ./ h))
 
             # cause transition, change their state
 
             # identify individual's state, w/ respect to property mapping in network description
-            #let this be their previous state
-            prevState = get_prop(network, vertexIndex, :state)
-            #stateIndex = get_prop(network, vertexIndex, :stateIndex)
+            # let this be their previous state
+            prevState = networkVertex_dict[vertexIndex]["state"]
 
             # determine num events that can happen to an individual in this state
-            events = get_prop(network, Symbol(prevState, "Events"))
+            events = network_dict[prevState]["events"]
 
             eventIndex = 1
             # if multiple events possible, choose one based on hazard weighting
@@ -287,78 +282,38 @@ module sirModels
                 # assumes constant probability of each event. Hazard does not
                 # depend on anything but state
                 # BAD ASSUMPTION, WHICH WE'LL DEAL WITH LATER
-                eventHazardArray = get_prop(network, Symbol(prevState, "EventHazards"))
+                eventHazardArray = network_dict[prevState]["eventHazards"]
 
                 eventIndex = sample(1:length(events), pweights(eventHazardArray ./ sum(eventHazardArray)))
             end
 
             # change state of individual and note prev state and newState
-            #prevState = get_prop(network,:states)[stateIndex]
             newState = events[eventIndex]
 
             # code like this in case of ghost processes
             if prevState != newState
-                #newStateIndex = findfirst(get_prop(network,:states) .== newState)
-                changeState!(network, vertexIndex, newState)
+                changeState!(networkVertex_dict, vertexIndex, newState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                updateHazardSir!(network, h_i, vertexIndex, prevState, newState)
-
+                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict)
 
                 # increment stateTotals (network, prevState, newState)
-                incrementStateTotals!(network, prevState, newState)
+                incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
 
             end
-
-
-            #=
-
-            if get_prop(network, vertexIndex, :state) == states[1]  # (S->I)
-                event = events[1]
-                changeState!(network, vertexIndex, states[2])
-
-                # update only the necessary hazards
-                calcHazard!(network, alpha, beta, true, h_i, vertexIndex, event, events)
-
-                # increment S and I totals. S -= 1, I += 1
-                set_props!(network, Dict(:S_total=>get_prop(network, :S_total)-1,
-                    :I_total=>get_prop(network,:I_total)+1))
-
-
-            elseif get_prop(network, vertexIndex, :state) == states[2]
-                    # (I->R) (assumes that I is not 0)
-                event = events[2]
-                changeState!(network, vertexIndex, states[3])
-
-                # update only the necessary hazards
-                calcHazard!(network, alpha, beta, true, h_i, vertexIndex, event, events)
-
-                # increment S and I totals. I -= 1, R += 1
-                set_props!(network, Dict(:I_total=>get_prop(network, :I_total)-1,
-                    :R_total=>get_prop(network,:R_total)+1))
-
-            end
-
-            =#
 
             iteration +=1
-
             push!(t, t[end] + delta_t)
 
             # use preallocated array as much as possible
-
-            state_Totals_Iteration = outputStateTotals(network,numStates)
-
             try
-                state_Totals[(numStates*iteration+1):(numStates*iteration+numStates)] = copy(state_Totals_Iteration)
+                stateTotalsAll[(numStates*iteration+1):(numStates*iteration+numStates)] = copy(stateTotals)
 
             catch BoundsError # if run out of preallocation
-                append!(state_Totals, copy(state_Totals_Iteration))
+                append!(stateTotalsAll, copy(stateTotals))
                 errorsCaught = errorsCaught + 1
             end
-
-            #state_Totals = hcat(state_Totals, copy(get_prop(network,:stateTotals)))
 
         end # while
 
@@ -366,8 +321,7 @@ module sirModels
             println("Num Errors caught = $errorsCaught. Recommend increasing preallocation value")
         end
 
-        return t, reshape(state_Totals[1:numStates*iteration+numStates],length(get_prop(network,:states)),:)
+        return t, reshape(stateTotalsAll[1:numStates*iteration+numStates],length(network_dict["states"]),:)
     end # function
-
 
 end  # module sirModels

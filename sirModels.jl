@@ -301,6 +301,7 @@ module sirModels
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
 
+                #incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
             end
 
             iteration +=1

@@ -35,6 +35,23 @@ function main(Display = true, save = true)
 
 
     if true
+
+        #= profiling the gillespieDirect_network function
+        for i in length(N):length(N)
+            println("Iteration #$i commencing")
+            # initialise the network
+            k = [2,3,10,20,100,1000] # degree of connection
+
+            network = MetaGraph(random_regular_graph(N[i], k[i]))
+            println("Network #$i returned")
+
+            networkVertex_dict, network_dict, stateTotals = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+
+            println("Network #$i has been initialised")
+
+            @profiler gillespieDirect_network!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals)
+        end
+        =#
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 

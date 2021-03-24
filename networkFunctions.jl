@@ -246,6 +246,7 @@ module networkFunctions
         # calculate hazard at i
         # use multithreading to speed up
         Threads.@threads for i in vertices(network)
+        #for i in vertices(network)
             if networkVertex_dict[i]["state"] == "S"
                 hazards[i] = beta * networkVertex_dict[i]["initInfectedNeighbors"]
             elseif networkVertex_dict[i]["state"] == "I"
@@ -275,9 +276,10 @@ module networkFunctions
         # multithread hazard calculation to speed up
         # if num neighbors is low, this will actually slow it down
         Threads.@threads for i in neighbors(network, vertexIndex)
+        #for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
             if networkVertex_dict[i]["state"] == "S"
-                hazards[i] = hazards[i] + increment
+                hazards[i] += increment
             end
         end
 
@@ -361,7 +363,7 @@ module networkFunctions
         nothing            : works in place on the networkVertex_dict
         =#
 
-        for i in neighbors(network, vertexIndex)
+        Threads.@threads for i in neighbors(network, vertexIndex)
             networkVertex_dict[i]["initInfectedNeighbors"] += 1
         end
         return nothing

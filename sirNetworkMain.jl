@@ -52,6 +52,7 @@ function main(Display = true, save = true)
             @profiler gillespieDirect_network!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals)
         end
         =#
+
         # iterate through populations. Complete Graph
         for i in 1:length(N)
 

@@ -65,6 +65,23 @@ network_dict["S"] = Dict("Total"=>20, "Events"=>["I"], "Hazards"=>"[0.1]")
 # Generators are easy to create with no memory allocation needed
 sum(1/n^2 for n=1:1000)
 
+
+function testBoolSpeed()
+    j = 0
+    k = 0
+    for i in 1:100000000
+        if true
+            j +=1
+
+        end
+
+        if "S" == "S"
+            k +=1
+        end
+    end
+end
+
+@profiler testBoolSpeed()
 #=
 infectionProp = 0.05
 states = ["S","I","R"]

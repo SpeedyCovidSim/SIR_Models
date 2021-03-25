@@ -36,7 +36,7 @@ module networkFunctions
         for i in vertices(network)
 
             # use vertex index as the primary key for the dictionary
-            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
+            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0, "isS"=>true)
 
         end
 
@@ -48,6 +48,7 @@ module networkFunctions
         # by 1
         for i in infectedVertices
             networkVertex_dict[i]["state"] = "I"
+            networkVertex_dict[i]["isS"] = false
 
             incrementInfectedNeighbors!(network, networkVertex_dict, i)
 
@@ -278,7 +279,8 @@ module networkFunctions
         Threads.@threads for i in neighbors(network, vertexIndex)
         #for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
-            if networkVertex_dict[i]["state"] == "S"
+            #if networkVertex_dict[i]["state"] == "S"
+            if networkVertex_dict[i]["isS"]
                 hazards[i] += increment
             end
         end
@@ -363,6 +365,7 @@ module networkFunctions
         nothing            : works in place on the networkVertex_dict
         =#
 
+        #for i in neighbors(network, vertexIndex)
         Threads.@threads for i in neighbors(network, vertexIndex)
             networkVertex_dict[i]["initInfectedNeighbors"] += 1
         end
@@ -382,6 +385,9 @@ module networkFunctions
 
         networkVertex_dict[vertexIndex]["state"] = newState
 
+        if newState != "S"
+            networkVertex_dict[vertexIndex]["isS"] = false
+        end
         return nothing
     end
 

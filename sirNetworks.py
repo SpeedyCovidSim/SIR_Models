@@ -71,12 +71,20 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
         R       : Array of num people recovered at each t
         '''
 
-        # initialise outputs
-        t = [t_init]
-        S = [network["S_total"]]
-        I = [network["I_total"]]
-        R = [network["R_total"]]
-        D = [network["D_total"]]
+        # initialise outputs and preallocate space
+        maxi = network.vcount()*4
+        S = np.zeros(maxi)
+        t = 1*S
+        t[0] = t_init
+        I = 1*S
+        R = 1*S
+        D = 1*S
+        S[0] = network["S_total"]
+        I[0] = network["I_total"]
+        R[0] = network["R_total"]
+        D[0] = network["D_total"]
+        i = 1
+
 
         # initialise random variate generation with set seed
         rng = random.default_rng(123)
@@ -129,13 +137,26 @@ def gillespieDirectNetwork(t_max, network, t_init = 0.0):
                     network["I_total"] -= 1
                     network["D_total"] += 1
 
-            # append new totals
-            t.append(t[-1]+delta_t)
-            S.append(network["S_total"])
-            I.append(network["I_total"])
-            R.append(network["R_total"])
-            D.append(network["D_total"])
+            if i < maxi:
+                t[i] = t[i-1] + delta_t
+                S[i] = network["S_total"]
+                I[i] = network["I_total"]
+                R[i] = network["R_total"]
+                D[i] = network["D_total"]
+            else:
+                t.append(t[1] + delta_t)
+                S.append(network["S_total"])
+                I.append(network["I_total"])
+                R.append(network["R_total"])
+                D.append(network["D_total"])
 
+            i += 1
+    
+        S = S[:i]
+        t = t[:i]
+        R = R[:i]
+        D = D[:i]
+        I = I[:i]
         return t, S, I, R, D
 
 def main():
@@ -146,8 +167,11 @@ def main():
     # note random seed set within network model so result will occur everytime
 
     # initialise variables
-    N = np.array([5, 10, 50, 100,1000,10000])
-    k = [2,3,10,20,100,1000]
+    N = np.array([5, 10, 50, 100,1000])
+    k = [2,3,10,20,100]
+    # N = np.array([5, 10, 50, 100,1000,10000])
+    # k = [2,3,10,20,100,1000]
+
 
     t_max = 200
     alpha = 0.4
@@ -178,7 +202,7 @@ def main():
             t, S, I, R, D = gillespieDirectNetwork(t_max, network)
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/networkDirectSIRD/SIRD_Model_Pop_{N[i]}"
+            outputFileName = f"pythonGraphs/networkDirectDegreeSIRD/SIRD_Model_Pop_{N[i]}"
             plotSIRDK(t, [S, I, R, D], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
 
 if __name__=="__main__":

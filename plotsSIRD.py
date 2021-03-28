@@ -6,7 +6,7 @@ Author: Joel Trent and Josh Looker
 '''
 from matplotlib import pyplot as plt
 
-def plotSIR(t, SIRD, alpha, beta, N, outputFileName="plot", Display=True, save=True):
+def plotSIRD(t, SIRD, alpha, beta, N, outputFileName="plot", Display=True, save=True):
     '''
     Inputs
     t              : Array of times at which events have occured
@@ -24,6 +24,7 @@ def plotSIR(t, SIRD, alpha, beta, N, outputFileName="plot", Display=True, save=T
     plt.plot(t, SIRD[0], label="Susceptible", lw = 2, figure=fig)
     plt.plot(t, SIRD[1], label="Infected", lw = 2, figure=fig)
     plt.plot(t, SIRD[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[3], label="Dead", lw=2, figure=fig)
 
     plt.xlabel("Time")
     plt.ylabel("Population Number")
@@ -39,7 +40,7 @@ def plotSIR(t, SIRD, alpha, beta, N, outputFileName="plot", Display=True, save=T
         # Save graph as pngW
         fig.savefig(outputFileName)
 
-def plotSIRK(t, SIRD, alpha, beta, N, k, outputFileName="plot", Display=True, save=True):
+def plotSIRDK(t, SIRD, alpha, beta, N, k, outputFileName="plot", Display=True, save=True):
     '''
     Inputs
     t              : Array of times at which events have occured
@@ -58,6 +59,7 @@ def plotSIRK(t, SIRD, alpha, beta, N, k, outputFileName="plot", Display=True, sa
     plt.plot(t, SIRD[0], label="Susceptible", lw = 2, figure=fig)
     plt.plot(t, SIRD[1], label="Infected", lw = 2, figure=fig)
     plt.plot(t, SIRD[2], label="Recovered", lw=2, figure=fig)
+    plt.plot(t, SIRD[3], label="Dead", lw=2, figure=fig)
 
     plt.xlabel("Time")
     plt.ylabel("Population Number")

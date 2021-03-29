@@ -58,7 +58,7 @@ def initHazards(network, infecteds, N):
     numInfNei[infecteds] = 0
     return numInfNei
 
-def selectEventIndex(rates, probs, rng, N):
+def selectEventIndex(rates, rng):
     '''
     finds time and index of next event
     Inputs
@@ -71,16 +71,16 @@ def selectEventIndex(rates, probs, rng, N):
     eventIndex  : index of next event
     '''
     # get hazard sum and next event time
-    h = np.sum(rates)
-    deltaT = rng.exponential(1/h)
+    deltaT = rng.exponential(1/rates)
     # choose the index of the individual to transition
-    eventIndex = random.choice(a=N,p=probs)
+    eventIndex = deltaT.argmin()
+    deltaT = deltaT[eventIndex]
     return deltaT, eventIndex
 
 
-def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, tInit = 0.0):
+def FirstReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, tInit = 0.0):
     '''
-    Direct Gillespie Method, on network
+    First Reaction Method, on network
     Uses numpy's random module for r.v. and sampling
     Inputs
     tInit  : Initial time (default of 0)
@@ -110,11 +110,10 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
 
     # initialise random variate generation with set seed
     rng = random.default_rng(123)
-    probs = rates/np.sum(rates)
 
     while t[-1] < tMax and iTotal != 0:
         # get next event time and next event index
-        deltaT, eventIndex = selectEventIndex(rates, probs, rng, N)
+        deltaT, eventIndex = selectEventIndex(rates, rng)
         # update local neighbourhood attributes
         if susceptible[eventIndex]:  # (S->I)
             # change state and individual rate
@@ -144,10 +143,6 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
             # update network totals
             iTotal -= 1
             rTotal += 1
-
-        # update probabilities
-        if rates.any():
-            probs = rates/np.sum(rates)
 
         # add totals
         if i < maxI:
@@ -196,10 +191,10 @@ def main():
             network = ig.Graph.Full(N[i])
             iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
+            t, S, I, R = FirstReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectSIR/SIR_Model_Pop_{N[i]}"
+            outputFileName = f"pythonGraphs/SpeedTest/firstReactSIR/SIR_Model_Pop_{N[i]}"
             plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
 
     if True:   
@@ -209,10 +204,10 @@ def main():
             network = ig.Graph.K_Regular(N[i], k[i])
             iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
+            t, S, I, R = FirstReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectDegreeSIR/SIR_Model_Pop_{N[i]}"
+            outputFileName = f"pythonGraphs/SpeedTest/firstReactDegreeSIR/SIR_Model_Pop_{N[i]}"
             plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
 
 if __name__=="__main__":

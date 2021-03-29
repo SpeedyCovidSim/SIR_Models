@@ -17,21 +17,48 @@ def main():
 
     network = ig.Graph.Erdos_Renyi(10000,0.1)
 
-    start = time.time()
-    for i in range(10):
-        print(f"Beginning simulation {i+1}")
-        iTotal, sTotal, rTotal, numInfNei, rates, susceptible = data.setNetwork(network, alpha, beta)
-        t, S, I, R = data.gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta)
-    end = time.time()
+    if True:
+        start = time.time()
+        for i in range(1000):
+            neighbors = network.neighbors(100)
+        end = time.time()
 
-    print(f"Avg. time taken for data sims: {(end-start)/10}")
+        print(f"Avg. time taken for inbuilt method: {(end-start)/1000}")
 
-    start = time.time()
-    for i in range(10):
-        print(f"Beginning simulation {i+1}")
-        network = attr.setNetwork(network, alpha, beta)
-        t, S, I, R = attr.gillespieDirectNetwork(tMax, network)
-    end = time.time()
+        start = time.time()
+        for i in range(10):
+            neighbors = {}
+            for i in range(10000):
+                neighbors[i] = network.neighbors(i)
+        end = time.time()
+
+        print(f"Avg. time taken to build dictionary: {(end-start)/10}")
+        
+        start = time.time()
+        for i in range(1000):
+            neighbor = neighbors[100] 
+        end = time.time()
+
+        print(f"Avg. time taken for dictionary method: {(end-start)/1000}")
+        
+
+
+    if False:
+        start = time.time()
+        for i in range(10):
+            print(f"Beginning simulation {i+1}")
+            iTotal, sTotal, rTotal, numInfNei, rates, susceptible = data.setNetwork(network, alpha, beta)
+            t, S, I, R = data.gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta)
+        end = time.time()
+
+        print(f"Avg. time taken for data sims: {(end-start)/10}")
+
+        start = time.time()
+        for i in range(10):
+            print(f"Beginning simulation {i+1}")
+            network = attr.setNetwork(network, alpha, beta)
+            t, S, I, R = attr.gillespieDirectNetwork(tMax, network)
+        end = time.time()
 
     print(f"Avg. time taken for attr sims: {(end-start)/10}")
 

@@ -58,27 +58,7 @@ def initHazards(network, infecteds, N):
     numInfNei[infecteds] = 0
     return numInfNei
 
-def selectEventIndex(rates, probs, rng, N):
-    '''
-    finds time and index of next event
-    Inputs
-    rates       : array of hazard rates
-    probs       : array of hazard probabilities
-    rng         : rng object
-    N           : total number of vertices
-    Outputs
-    deltaT      : time till next event
-    eventIndex  : index of next event
-    '''
-    # get hazard sum and next event time
-    h = np.sum(rates)
-    deltaT = rng.exponential(1/h)
-    # choose the index of the individual to transition
-    eventIndex = random.choice(a=N,p=probs)
-    return deltaT, eventIndex
-
-
-def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, tInit = 0.0):
+def nextReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -110,23 +90,28 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
 
     # initialise random variate generation with set seed
     rng = random.default_rng(123)
-    probs = rates/np.sum(rates)
+
+    # get next event times
+    deltaT = rng.exponential(1/rates)
 
     while t[-1] < tMax and iTotal != 0:
-        # get next event time and next event index
-        deltaT, eventIndex = selectEventIndex(rates, probs, rng, N)
+        eventIndex = deltaT.argmin()
+        tInit = deltaT[eventIndex] 
         # update local neighbourhood attributes
         if susceptible[eventIndex]:  # (S->I)
             # change state and individual rate
             susceptible[eventIndex] = 0
             rates[eventIndex] = alpha
+            deltaT[eventIndex] = tInit + rng.exponential(1/alpha)
             # get neighbouring vertices
             neighbors = network.neighbors(eventIndex)
             # update hazards of neighbouring susceptible vertices
             for n in neighbors:
                 if susceptible[n]:
                     numInfNei[n] += 1
+                    hOld = rates[n]
                     rates[n] = numInfNei[n]*beta
+                    deltaT[n] = tInit + (hOld/rates[n])*(deltaT[n]-tInit)
             # update network totals
             sTotal-= 1
             iTotal += 1
@@ -136,27 +121,26 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
             rates[eventIndex] = 0
             # get neighbouring vertices
             neighbors = network.neighbors(eventIndex)
+            deltaT[eventIndex] = np.inf
             # update hazards of neighbouring susceptible vertices
             for n in neighbors:
                 if susceptible[n]:
                     numInfNei[n] -= 1
+                    hOld = rates[n]
                     rates[n] = numInfNei[n]*beta
+                    deltaT[n] = tInit + (hOld/rates[n])*(deltaT[n]-tInit)
             # update network totals
             iTotal -= 1
             rTotal += 1
 
-        # update probabilities
-        if rates.any():
-            probs = rates/np.sum(rates)
-
         # add totals
         if i < maxI:
-            t[i] = t[i-1] + deltaT
+            t[i] = tInit
             S[i] = sTotal
             I[i] = iTotal
             R[i] = rTotal
         else:
-            t.append(t[-1] + deltaT)
+            t.append(tInit)
             S.append(sTotal)
             I.append(iTotal)
             R.append(rTotal)
@@ -196,10 +180,10 @@ def main():
             network = ig.Graph.Full(N[i])
             iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
+            t, S, I, R = nextReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectSIR/SIR_Model_Pop_{N[i]}"
+            outputFileName = f"pythonGraphs/SpeedTest/nextReactSIR/SIR_Model_Pop_{N[i]}"
             plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
 
     if True:   
@@ -209,10 +193,10 @@ def main():
             network = ig.Graph.K_Regular(N[i], k[i])
             iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
+            t, S, I, R = nextReactNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
             print(f"Exporting simulation {i}")
             # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectDegreeSIR/SIR_Model_Pop_{N[i]}"
+            outputFileName = f"pythonGraphs/SpeedTest/nextReactDegreeSIR/SIR_Model_Pop_{N[i]}"
             plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
 
 if __name__=="__main__":

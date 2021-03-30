@@ -3,16 +3,59 @@ This is a code base for comparing the ODE solution to a well-mixed SIR simulatio
 to a randomly generated SIR solution, using the gillespie direct approach
 
 Author: Joel Trent
+
+Discrepancies would be due to random realisations and the fact that interpolation
+is required to obtain values at the same time steps as the ODE model and between
+any two simulations.
 =#
 
 #Pkg.add("DifferentialEquations")
 #Pkg.add("Interpolations")
 
-using DifferentialEquations, Plots, Dierckx, StatsBase, LightGraphs, MetaGraphs #Interpolations
+using DifferentialEquations, Dierckx, StatsBase, LightGraphs, MetaGraphs, PyPlot, Seaborn
+#Interpolations, Plots
 
 push!( LOAD_PATH, "./" )
 using sirModels: gillespieDirect2Processes_dist, gillespieDirect_network!
 using networkFunctions: initialiseNetwork!
+
+
+function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, Display=true, save=false)
+
+    #PyPlot.rcParams["figure.dpi"] = 300
+
+    Seaborn.set()
+    Seaborn.set_color_codes("pastel")
+    fig = plt.figure(dpi=300)
+    plt.plot(times, Smean, "k-", label="S - Simulation Mean", lw=2.5, figure=fig)
+    plt.plot(times, Imean, "b-", label="I - Simulation Mean", lw=2.5, figure=fig)
+    plt.plot(times, Rmean, "r-", label="R - Simulation Mean", lw=2.5, figure=fig)
+
+    plt.plot(times, ODEarray[:,1], "g-.", label="S - ODE", lw=1.5, figure=fig, alpha = 1)
+    plt.plot(times, ODEarray[:,2], "w-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
+    plt.plot(times, ODEarray[:,3], "k-.", label="R - ODE", lw=1.5, figure=fig, alpha = 1)
+
+
+    plt.xlabel("Time")
+    plt.ylabel("Population Number")
+    #plt.suptitle("ODE Solution vs Simulation Solution")
+    plt.title(title)
+    plt.legend()
+
+    if Display
+        # required to display graph on plots.
+        display(fig)
+    end
+    if save
+        # Save graph as pngW
+        fig.savefig(outputFileName)
+
+    end
+    close()
+
+
+end
+
 
 # solve the SIR system of equations
 function ODEsir!(du,u,p,t)
@@ -86,7 +129,7 @@ function main(wellMixed, Network)
 
         println("Beginning simulation of well mixed")
 
-        numSims = 2000
+        numSims = 8000
         # Julia is column major
         StStep = zeros(Int(tspan[end]/tStep+1),numSims)
         ItStep = copy(StStep)
@@ -115,6 +158,10 @@ function main(wellMixed, Network)
 
         misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, ODEarray)
         println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Well Mixed ODE Solution vs Simulation Solution, Non-network"
+        outputFileName = "./verifiedODE/nonNetwork"
+        ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
     end
 
     println("Solving ODE")
@@ -156,19 +203,19 @@ function main(wellMixed, Network)
 
         println("Beginning simulation of network")
 
-        numSims = 1000
+        numSims = 2000
         # Julia is column major
         StStep = zeros(Int(tspan[end]/tStep+1),numSims)
         ItStep = copy(StStep)
         RtStep = copy(StStep)
 
-        for i = 1:numSims
+        time = @elapsed Threads.@threads for i = 1:numSims
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_dict, network_dict, stateTotals, isS = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
 
-            t, state_Totals = gillespieDirect_network!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals)
+            t, state_Totals = gillespieDirect_network!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -179,8 +226,7 @@ function main(wellMixed, Network)
             ItStep[:,i] = splineI(times)
             RtStep[:,i] = splineR(times)
         end
-
-        println("Finished Simulation")
+        println("Finished Simulation in $time seconds")
 
         Smean = mean(StStep, dims = 2)
         Imean = mean(ItStep, dims = 2)
@@ -189,6 +235,9 @@ function main(wellMixed, Network)
         misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, ODEarray)
         println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
 
+        title = "Well Mixed ODE Solution vs Simulation Solution, Network"
+        outputFileName = "./verifiedODE/Network"
+        ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
     end
 
 end

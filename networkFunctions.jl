@@ -27,8 +27,12 @@ module networkFunctions
         network_dict = Dict()
         stateTotals = convert.(Int, zeros(length(states)))
 
+
         # return num vertices
         numVertices = nv(network)
+
+        # array containing whether or not the individual is "S"
+        isS = convert.(Bool,zeros(numVertices))
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
         # states[1] will always be S/the initial state
@@ -36,7 +40,8 @@ module networkFunctions
         for i in vertices(network)
 
             # use vertex index as the primary key for the dictionary
-            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0, "isS"=>true)
+            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
+            isS[i] = true
 
         end
 
@@ -48,7 +53,7 @@ module networkFunctions
         # by 1
         for i in infectedVertices
             networkVertex_dict[i]["state"] = "I"
-            networkVertex_dict[i]["isS"] = false
+            isS[i] = false
 
             incrementInfectedNeighbors!(network, networkVertex_dict, i)
 
@@ -73,7 +78,7 @@ module networkFunctions
             stateIndex +=1
         end
 
-        return networkVertex_dict, network_dict, stateTotals
+        return networkVertex_dict, network_dict, stateTotals, isS
     end
 
     function simType!(simType, alpha, beta, gamma)
@@ -246,11 +251,11 @@ module networkFunctions
 
         # calculate hazard at i
         # use multithreading to speed up
-        Threads.@threads for i in vertices(network)
-        #for i in vertices(network)
-            if networkVertex_dict[i]["state"] == "S"
+        #Threads.@threads for i in vertices(network)
+        for i in vertices(network)
+            if networkVertex_dict[i]["state"] === "S"
                 hazards[i] = beta * networkVertex_dict[i]["initInfectedNeighbors"]
-            elseif networkVertex_dict[i]["state"] == "I"
+            elseif networkVertex_dict[i]["state"] === "I"
                 hazards[i] = copy(alpha)
 
                 #else # person is recovered or deceased and their hazard is zero
@@ -260,7 +265,7 @@ module networkFunctions
     end
 
     function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
-        networkVertex_dict, network_dict) # also works for SIRD
+        networkVertex_dict, network_dict, isS) # also works for SIRD
 
         beta = network_dict["S"]["eventHazards"][1]
 
@@ -268,7 +273,7 @@ module networkFunctions
         # if infected, hazard is alpha, otherwise 0 as they've recovered
         hazards[vertexIndex] = network_dict[newState]["eventHazards"][1]
 
-        if newState == "I"
+        if newState === "I"
             increment = 1 * beta
         else
             increment = -1 * beta
@@ -280,7 +285,7 @@ module networkFunctions
         #for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
             #if networkVertex_dict[i]["state"] == "S"
-            if networkVertex_dict[i]["isS"]
+            if isS[i]
                 hazards[i] += increment
             end
         end
@@ -372,7 +377,7 @@ module networkFunctions
         return nothing
     end
 
-    function changeState!(networkVertex_dict, vertexIndex, newState)
+    function changeState!(networkVertex_dict, vertexIndex, newState, isS)
         #=
         Inputs
         networkVertex_dict     : a dictionary containing our population of interest
@@ -386,7 +391,7 @@ module networkFunctions
         networkVertex_dict[vertexIndex]["state"] = newState
 
         if newState != "S"
-            networkVertex_dict[vertexIndex]["isS"] = false
+            isS[vertexIndex] = false
         end
         return nothing
     end

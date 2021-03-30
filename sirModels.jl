@@ -210,7 +210,7 @@ module sirModels
     end # function
 
     function gillespieDirect_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals, t_init = 0.0)
+        networkVertex_dict, network_dict, stateTotals, isS, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, on network
@@ -251,6 +251,8 @@ module sirModels
 
         iteration = 0
 
+        #j = zeros(network_dict["population"])
+
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
             # including this in line in the loop rather than updating it in
             # incrementally like h_i. It made no difference to speed, so left it here
@@ -262,10 +264,13 @@ module sirModels
             delta_t = rand(et)
 
             # selection probabilities for each transition process. sum(j) = 1
+
+            # about 50% of the time was spent in this line - weights don't have
+            # to be normalised
             #j = h_i ./ h
 
             # choose the index of the individual to transition
-            vertexIndex = sample(1:network_dict["population"], pweights(h_i ./ h))
+            vertexIndex = sample(1:network_dict["population"], pweights(h_i))
 
             # cause transition, change their state
 
@@ -292,11 +297,11 @@ module sirModels
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, vertexIndex, newState)
+                changeState!(networkVertex_dict, vertexIndex, newState, isS)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict)
+                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict, isS)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)

@@ -18,7 +18,7 @@ using networkFunctions
 # Return a Watts-Strogatz small world random graph with n vertices, each with
 # expected degree k
 beta = 1
-n = 100
+n = 100000
 k = 100
 #network = MetaGraph(watts_strogatz(n, k, beta))
 alpha = 0.2
@@ -58,6 +58,91 @@ network = MetaGraph(SimpleGraph(n))
 
     end
 end
+
+# array vs dictionary. Array is significantly faster
+@profiler for k in 1:50
+
+    network_array = zeros(n)
+
+    # store a new index, retrieve the index, then store again
+    for i in 1:n
+        network_array[i] = i
+        index = copy(network_array[i])
+        network_array[i] += 1
+
+
+    end
+
+    # dictionary test
+    network_dict = Dict()
+
+    # store a new index, retrieve the index, then store again
+    for i in 1:n
+        network_dict[i] = Dict("index"=>1)
+
+        #network_dict[i]["index"] = i::Int
+
+        state = copy(network_dict[i]["index"])
+
+        network_dict[i]["index"] += 1
+
+    end
+end
+
+# array vs dictionary for bool if statements
+@profiler for k in 1:2
+
+    n = 10000
+    # init bool and dictionary bools
+    bool_array = convert.(Bool,zeros(n))
+    for i in 1:n
+        if i % 2 == 0
+            bool_array[i] = true
+        end
+    end
+
+    # dictionary test
+    network_dict = Dict()
+
+    # store a new index, retrieve the index, then store again
+    for i in 1:n
+        if i % 2 == 0
+            network_dict[i] = Dict("index"=>true)
+        else
+            network_dict[i] = Dict("index"=>false)
+        end
+    end
+    index1 = 0
+    index2 = 0
+
+    # test bool performance on if statement
+    for x in 1:10
+        for j in 1:n
+            if bool_array[j]
+                index1 = copy(j)
+            end
+            if network_dict[j]["index"]
+                index2 = copy(j)
+            end
+        end
+    end
+end
+
+
+## Checking identicality is much faster than checking equality
+state = "S"
+index1 = 0
+index2 = 0
+@profiler for i in 1:10000000
+    if state == "S"
+        index1 = i
+    end
+    if state === "S"
+        index2 = i
+    end
+end
+
+
 
 network_dict["S"] = Dict("Total"=>20, "Events"=>["I"], "Hazards"=>"[0.1]")
 

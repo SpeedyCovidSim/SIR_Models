@@ -78,8 +78,8 @@ module sirModels
         return t, S, I , R
     end # function
 
-    function gillespieDirect2Processes_dist(t_max, S_total, I_total, R_total, alpha,
-            beta, N, t_init = 0.0)
+    function gillespieDirect2Processes_dist(t_max::Float64, S_total::Int, I_total::Int, R_total::Int, alpha::Float64,
+            beta::Float64, N::Int, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, Well Mixed
@@ -103,10 +103,10 @@ module sirModels
         =#
 
         # initialise outputs
-        t = [copy(t_init)]
-        S = [copy(S_total)]
-        I = [copy(I_total)]
-        R = [copy(R_total)]
+        t = Float64[copy(t_init)]
+        S = Int[copy(S_total)]
+        I = Int[copy(I_total)]
+        R = Int[copy(R_total)]
         items = ["I","R"]
 
         while t[end] < t_max && I_total != 0
@@ -210,7 +210,7 @@ module sirModels
     end # function
 
     function gillespieDirect_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals, isS, t_init = 0.0)
+        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, on network
@@ -232,14 +232,14 @@ module sirModels
         =#
 
         # initialise outputs
-        t = [copy(t_init)]
+        t = Float64[copy(t_init)]
 
         # could consider preallocating an array of arbitrary length to increase
         # speed and only switch to append once the end is reached
         # preallocate array about pop * numStates * num dependent processes/pathways (e.g. 2 for SIR and SIRD)
-        numStates = length(network_dict["states"])
+        numStates::Int64 = length(network_dict["states"])
 
-        stateTotalsAll = convert.(Int, zeros(network_dict["population"] * numStates * 2))
+        stateTotalsAll = convert.(Int64, zeros(network_dict["population"] * numStates * 2)::Array{Float64,1})
 
         stateTotalsAll[1:numStates] = copy(stateTotals)
         errorsCaught = 0 # this will allow us to know if we are not preallocating enough
@@ -247,7 +247,7 @@ module sirModels
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i = calcHazardSir!(network, networkVertex_dict, network_dict)
+        h_i::Array{Float64,1} = calcHazardSir!(network, networkVertex_dict, network_dict)
 
         iteration = 0
 
@@ -257,8 +257,8 @@ module sirModels
             # including this in line in the loop rather than updating it in
             # incrementally like h_i. It made no difference to speed, so left it here
             # even for networks with a low degree of connection
-            h = sum(h_i)
-            et = Exponential(1/h)
+            h = sum(h_i::Array{Float64,1})
+            et = Exponential((1/h)::Float64)
 
             # time to any event occurring
             delta_t = rand(et)
@@ -270,16 +270,16 @@ module sirModels
             #j = h_i ./ h
 
             # choose the index of the individual to transition
-            vertexIndex = sample(1:network_dict["population"], pweights(h_i))
+            vertexIndex::Int = sample((1:network_dict["population"])::UnitRange{Int64}, pweights(h_i::Array{Float64,1}))
 
             # cause transition, change their state
 
             # identify individual's state, w/ respect to property mapping in network description
             # let this be their previous state
-            prevState = networkVertex_dict[vertexIndex]["state"]
+            prevState::String = networkVertex_dict[vertexIndex]["state"]
 
             # determine num events that can happen to an individual in this state
-            events = network_dict[prevState]["events"]
+            events::Array{String,1} = network_dict[prevState]["events"]
 
             eventIndex = 1
             # if multiple events possible, choose one based on hazard weighting
@@ -293,7 +293,7 @@ module sirModels
             end
 
             # change state of individual and note prev state and newState
-            newState = events[eventIndex]
+            newState::String = events[eventIndex]
 
             # code like this in case of ghost processes
             if prevState != newState
@@ -327,7 +327,7 @@ module sirModels
             println("Num Errors caught = $errorsCaught. Recommend increasing preallocation value")
         end
 
-        return t, reshape(stateTotalsAll[1:numStates*iteration+numStates],length(network_dict["states"]),:)
+        return t, reshape(stateTotalsAll[1:numStates*iteration+numStates]::Array{Int64,1},length(network_dict["states"]),:)
     end # function
 
 end  # module sirModels

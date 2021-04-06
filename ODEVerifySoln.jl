@@ -52,8 +52,6 @@ function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileNa
 
     end
     close()
-
-
 end
 
 
@@ -103,7 +101,7 @@ function main(wellMixed, Network)
     beta = 1.5 / N
 
     # initial SIR totals
-    u0 = [N*0.95,N*0.05,0]
+    u0 = Int[N*0.95,N*0.05,0]
 
     # time span to solve on
     tspan = (0.0,40.0)

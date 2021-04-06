@@ -23,8 +23,8 @@ module networkFunctions
         states, stateEvents, eventHazards, hazardMultipliers = simType!(simType, alpha, beta, gamma)
 
         # initialise dictionaries and arrays for storing network attributes
-        networkVertex_dict = Dict()
-        network_dict = Dict()
+        networkVertex_dict = Dict{Int64, Dict{String, Any}}()
+        network_dict = Dict{String, Any}()
         stateTotals = convert.(Int, zeros(length(states)))
 
 
@@ -106,14 +106,14 @@ module networkFunctions
         if simType == "SIR_direct"
             states = ["S","I","R"]
             stateEvents = [["I"],["R"],nothing]
-            eventHazards = [[beta], [alpha], [0]]
+            eventHazards = [[beta], [alpha], [0.0]]
             hazardMultipliers = ["I",nothing,nothing]
 
 
         elseif simType == "SIRD_direct"
             states = ["S","I","R","D"]
             stateEvents = [["I"],["R","D"],nothing,nothing]
-            eventHazards = [[beta], [alpha, gamma], [0],[0]]
+            eventHazards = [[beta], [alpha, gamma], [0.0],[0.0]]
             hazardMultipliers = ["I",nothing,nothing,nothing]
 
         end
@@ -121,7 +121,7 @@ module networkFunctions
         return states, stateEvents, eventHazards, hazardMultipliers
     end
 
-    function calcHazard!(network, updateOnly = false, hazards = [],
+    function calcHazard!(network, updateOnly = false, hazards = Float64[],
         vertexIndex = 0, prevState = "S", newState = "I")
         #=
         Inputs
@@ -246,8 +246,8 @@ module networkFunctions
         # preallocate hazards array
         hazards = zeros(network_dict["population"])
 
-        beta = network_dict["S"]["eventHazards"][1]
-        alpha = network_dict["I"]["eventHazards"][1]
+        beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
+        alpha::Float64 = network_dict["I"]["eventHazards"][1]::Float64
 
         # calculate hazard at i
         # use multithreading to speed up
@@ -267,22 +267,24 @@ module networkFunctions
     function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
         networkVertex_dict, network_dict, isS) # also works for SIRD
 
-        beta = network_dict["S"]["eventHazards"][1]
+        beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
 
         # change hazard of affected individual
         # if infected, hazard is alpha, otherwise 0 as they've recovered
         hazards[vertexIndex] = network_dict[newState]["eventHazards"][1]
 
+        increment::Float64 = 0.0
+
         if newState === "I"
-            increment = 1 * beta
+            increment = 1.0 * beta
         else
-            increment = -1 * beta
+            increment = -1.0 * beta
         end
 
         # multithread hazard calculation to speed up
         # if num neighbors is low, this will actually slow it down
-        Threads.@threads for i in neighbors(network, vertexIndex)
-        #for i in neighbors(network, vertexIndex)
+        #Threads.@threads for i in neighbors(network, vertexIndex)
+        for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
             #if networkVertex_dict[i]["state"] == "S"
             if isS[i]

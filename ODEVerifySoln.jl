@@ -16,7 +16,7 @@ using DifferentialEquations, Dierckx, StatsBase, LightGraphs, MetaGraphs, PyPlot
 #Interpolations, Plots
 
 push!( LOAD_PATH, "./" )
-using sirModels: gillespieDirect2Processes_dist, gillespieDirect_network!
+using sirModels: gillespieDirect2Processes_dist, gillespieDirect_network!, gillespieFirstReact_network!
 using networkFunctions: initialiseNetwork!
 
 
@@ -52,6 +52,7 @@ function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileNa
 
     end
     close()
+
 end
 
 
@@ -92,7 +93,7 @@ function vectorToArray(ODESolution)
     return reverse(rotr90(ODEarray),dims=2)
 end
 
-function main(wellMixed, Network)
+function main(wellMixed, NetworkDirect, NetworkFirstReact)
 
     println("Solving ODE")
     N = 10000
@@ -189,7 +190,7 @@ function main(wellMixed, Network)
 
     ODEarray = vectorToArray(ODESolution)
 
-    if Network
+    if NetworkDirect
         t_max = tspan[end]
         infectionProp = 0.05
         simType = "SIR_direct"
@@ -238,6 +239,82 @@ function main(wellMixed, Network)
         ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
     end
 
+    println("Solving ODE")
+    N = 1000
+
+    Alpha = 0.15
+    beta = 1.5 / N
+
+    # initial SIR totals
+    u0 = [N*0.95,N*0.05,0]
+
+    # time span to solve on
+    tspan = (0.0,40.0)
+    tStep = 0.01
+
+    # times to solve on
+    times = [i for i=tspan[1]:tStep:tspan[end]]
+
+    # solve the ODE
+    prob = ODEProblem(ODEnetwork!, u0, tspan)
+    sol = solve(prob)
+
+    println("ODE Solved")
+
+    Solution = sol(times)
+    ODESolution = Solution.u
+
+    ODEarray = vectorToArray(ODESolution)
+
+    if NetworkFirstReact
+        t_max = tspan[end]
+        infectionProp = 0.05
+        simType = "SIR_direct"
+        gamma = 0
+
+        # initialise the network
+        network = MetaGraph(complete_graph(N))
+        println("Network returned")
+
+        println("Beginning simulation of network")
+
+        numSims = 200
+        # Julia is column major
+        StStep = zeros(Int(tspan[end]/tStep+1),numSims)
+        ItStep = copy(StStep)
+        RtStep = copy(StStep)
+
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            # Verifying the well mixed network solution
+
+            networkVertex_dict, network_dict, stateTotals, isS = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+
+            t, state_Totals = gillespieFirstReact_network!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+
+            # interpolate using linear splines
+            splineS = Spline1D(t, state_Totals[1,:], k=1)
+            splineI = Spline1D(t, state_Totals[2,:], k=1)
+            splineR = Spline1D(t, state_Totals[3,:], k=1)
+
+            StStep[:,i] = splineS(times)
+            ItStep[:,i] = splineI(times)
+            RtStep[:,i] = splineR(times)
+        end
+        println("Finished Simulation in $time seconds")
+
+        Smean = mean(StStep, dims = 2)
+        Imean = mean(ItStep, dims = 2)
+        Rmean = mean(RtStep, dims = 2)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, ODEarray)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Well Mixed ODE Solution vs Simulation Solution, Network First React"
+        outputFileName = "./verifiedODE/NetworkFirstReact"
+        ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
+    end
+
 end
 
-main(true, true)
+main(false, false, true)

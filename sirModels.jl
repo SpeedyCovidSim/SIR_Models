@@ -330,4 +330,124 @@ module sirModels
         return t, reshape(stateTotalsAll[1:numStates*iteration+numStates]::Array{Int64,1},length(network_dict["states"]),:)
     end # function
 
+    function gillespieFirstReact_network!(t_max, network, alpha, beta, N,
+        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
+        #=
+        Note:
+        Direct Gillespie Method, on network
+        Directly samples from the exponential distribution
+
+        Inputs
+        t_max   : Simulation end time
+        network : the network containing the population to operate on
+        alpha   : rate of infected person recovering
+        beta    : rate of susceptible person being infected
+        N       : Population size (unused)
+        t_init  : Initial time (default of 0)
+
+        Outputs
+        t       : Array of times at which events have occured
+        S       : Array of Num people susceptible at each t
+        I       : Array of Num people infected at each t
+        R       : Array of Num people recovered at each t
+        =#
+
+        # initialise outputs
+        t = Float64[copy(t_init)]
+
+        # could consider preallocating an array of arbitrary length to increase
+        # speed and only switch to append once the end is reached
+        # preallocate array about pop * numStates * num dependent processes/pathways (e.g. 2 for SIR and SIRD)
+        numStates::Int64 = length(network_dict["states"])
+
+        stateTotalsAll = convert.(Int64, zeros(network_dict["population"] * numStates * 2)::Array{Float64,1})
+
+        stateTotalsAll[1:numStates] = copy(stateTotals)
+        errorsCaught = 0 # this will allow us to know if we are not preallocating enough
+
+        # calculate the propensities to transition
+        # only calculate full array first time. Will cause speedups if network
+        # is not fully connected
+
+
+        # let h_i be a Float64 2D array of the hazards for every possible
+        # reaction that  could happen to a given individual i, regardless of
+        # state. Hazards for individual i is stored in columns as Julia is col
+        # major. If a reaction cannot occur for a given state (e.g. if in state S
+        # cannot transition to R) then the hazard stored is zero.
+        # Produces correct result when sampling time to event (Infinity)
+        h_i::Array{Float64,2}, events, stateForEvents, eventHazards,
+            allHazardMult = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
+
+        iteration = 0
+
+        while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
+            # including this in line in the loop rather than updating it in
+            # incrementally like h_i. It made no difference to speed, so left it here
+            # even for networks with a low degree of connection
+
+            if sum(h_i .< 0) > 0
+                negElement = argmin(h_i)
+                negState = networkVertex_dict[negElement[2]]["state"]
+                println("An element of h_i is less than zero at iteration #$iteration !")
+                println("It is in state $negState, with value $(h_i[negElement])")
+
+            end
+
+            # time to all events occurring
+            delta_ti = rand.(Exponential.(1.0 ./h_i))
+
+            # determine the first reaction that occurs
+            reaction_j = argmin(delta_ti)
+
+            # determine which index the reaction belongs to
+            # reaction that occurred is reaction_j[1]
+
+            # individual occured to is reaction_j[2]
+            @assert(stateForEvents[reaction_j[1]] == networkVertex_dict[reaction_j[2]]["state"])
+
+            # change state of individual and note prev state and newState
+            # newState::String = events[eventIndex]
+            prevState = stateForEvents[reaction_j[1]]
+            newState = events[reaction_j[1]]
+
+            # cause transition, change their state
+
+            # code like this in case of ghost processes
+            if prevState != newState
+                changeState!(networkVertex_dict, reaction_j[2], newState, isS)
+
+                # update hazard of individual
+                # update hazards of neighbors (if applicable)
+                updateHazardFirstReact!(network, h_i, reaction_j, prevState,
+                    newState, networkVertex_dict, network_dict, isS, events,
+                    stateForEvents, eventHazards, allHazardMult)
+
+                # increment stateTotals (network, prevState, newState)
+                incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
+
+                #incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
+            end
+
+            iteration +=1
+            push!(t, t[end] + delta_ti[reaction_j])
+
+            # use preallocated array as much as possible
+            try
+                stateTotalsAll[(numStates*iteration+1):(numStates*iteration+numStates)] = copy(stateTotals)
+
+            catch BoundsError # if run out of preallocation
+                append!(stateTotalsAll, copy(stateTotals))
+                errorsCaught = errorsCaught + 1
+            end
+
+        end # while
+
+        if errorsCaught != 0
+            println("Num Errors caught = $errorsCaught. Recommend increasing preallocation value")
+        end
+
+        return t, reshape(stateTotalsAll[1:numStates*iteration+numStates]::Array{Int64,1},length(network_dict["states"]),:)
+    end # function
+
 end  # module sirModels

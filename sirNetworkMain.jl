@@ -139,7 +139,7 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
 
         # new inputs to the initialisation
         infectionProp = 0.05
-        simType = "SIR_firstReact"
+        simType = "SIRD_firstReact"
 
 
         if profiling
@@ -163,7 +163,7 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
         end
 
         # iterate through populations. Complete Graph
-        for i in 1:length(N)-1
+        for i in 1:length(N)
 
             println("Iteration #$i commencing")
             # initialise the network
@@ -179,8 +179,8 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
             S = state_Totals[1,:]
             I = state_Totals[2,:]
             R = state_Totals[3,:]
-            # D = state_Totals[4,:]
-            D = []
+            D = state_Totals[4,:]
+            # D = []
 
             lengthStateTotals = length(state_Totals)
             println("Length of state_Totals array is $lengthStateTotals")
@@ -216,8 +216,8 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
             S = state_Totals[1,:]
             I = state_Totals[2,:]
             R = state_Totals[3,:]
-            # D = state_Totals[4,:]
-            D = []
+            D = state_Totals[4,:]
+            # D = []
 
             lengthStateTotals = length(state_Totals)
             println("Length of state_Totals array is $lengthStateTotals")

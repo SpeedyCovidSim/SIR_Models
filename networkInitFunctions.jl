@@ -21,7 +21,8 @@ module networkInitFunctions
         R_total       : Num people recovered
         =#
 
-        states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model! = simType!(simType, alpha, beta, gamma)
+        states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!,
+            eventsPerState = simType!(simType, alpha, beta, gamma)
 
         # initialise dictionaries and arrays for storing network attributes
         networkVertex_dict = Dict{Int64, Dict{String, Any}}()
@@ -67,7 +68,9 @@ module networkInitFunctions
         end
 
         # add attributes to the network_dict
-        network_dict = Dict("states"=>states, "population"=>numVertices, "simpleHazards"=>simpleHazards)
+        network_dict = Dict("states"=>states, "population"=>numVertices,
+            "simpleHazards"=>simpleHazards, "eventsPerState"=>eventsPerState,
+            "allMultipliers"=>hazardMultipliers)
 
         stateIndex = 1
         for state in states
@@ -111,6 +114,7 @@ module networkInitFunctions
             hazardMultipliers = [["I"],[nothing],[nothing]]
             simpleHazards = true
             model! = gillespieDirect_network!
+            eventsPerState = Int64[1,1,1]
 
 
         elseif simType == "SIRD_direct"
@@ -120,6 +124,7 @@ module networkInitFunctions
             hazardMultipliers = [["I"],[nothing, nothing],[nothing],[nothing]]
             simpleHazards = true
             model! = gillespieDirect_network!
+            eventsPerState = Int64[1,2,1,1]
 
         elseif simType == "SIR_firstReact"
             states = ["S","I","R"]
@@ -128,6 +133,7 @@ module networkInitFunctions
             hazardMultipliers = [["I"],[nothing],[nothing]]
             simpleHazards = true
             model! = gillespieFirstReact_network!
+            eventsPerState = Int64[1,1,1]
 
 
         elseif simType == "SIRD_firstReact"
@@ -137,9 +143,10 @@ module networkInitFunctions
             hazardMultipliers = [["I"],[nothing, nothing],[nothing],[nothing]]
             simpleHazards = true
             model! = gillespieFirstReact_network!
+            eventsPerState = Int64[1,2,1,1]
         end
 
-        return states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!
+        return states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!, eventsPerState
     end
 
 

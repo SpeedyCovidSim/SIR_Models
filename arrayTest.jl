@@ -20,11 +20,10 @@ x2 = copy(rotr90(x))
 n=10
 a = convert.(Int,cumsum(ones(n*2)))
 
-b = zeros(2,n)
+b = convert.(Int, zeros(n*2,2))
 
 
-b = divrem.(a .-1, 10) 
+b[:,1] = div.(a .-1, 10) .+1
+b[:,2] = rem.(a .-1, 10) .+1
 
-I1 = [[x[1],x[2]] for x in b]
-
-b[:,2] .+= 1
+println(b)

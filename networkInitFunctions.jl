@@ -34,7 +34,7 @@ module networkInitFunctions
         numVertices = nv(network)
 
         # array containing whether or not the individual is "S"
-        isS = convert.(Bool,zeros(numVertices))
+        isState = convert.(Bool,zeros(numVertices, length(states)))
 
         # Initialise all states as "S", all numInfectedNeighbors as zero
         # states[1] will always be S/the initial state
@@ -43,7 +43,7 @@ module networkInitFunctions
 
             # use vertex index as the primary key for the dictionary
             networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
-            isS[i] = true
+            isState[i,1] = true
 
         end
 
@@ -55,7 +55,8 @@ module networkInitFunctions
         # by 1
         for i in infectedVertices
             networkVertex_dict[i]["state"] = "I"
-            isS[i] = false
+            isState[i,1] = false
+            isState[i,2] = true
 
             incrementInfectedNeighbors!(network, networkVertex_dict, i)
 
@@ -82,7 +83,7 @@ module networkInitFunctions
             stateIndex +=1
         end
 
-        return networkVertex_dict, network_dict, stateTotals, isS, model!
+        return networkVertex_dict, network_dict, stateTotals, isState, model!
     end
 
     function simType!(simType, alpha, beta, gamma)

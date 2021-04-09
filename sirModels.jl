@@ -210,7 +210,7 @@ module sirModels
     end # function
 
     function gillespieDirect_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
+        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, on network
@@ -247,7 +247,7 @@ module sirModels
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i::Array{Float64,1} = calcHazardSir!(network, networkVertex_dict, network_dict)
+        h_i::Array{Float64,1} = calcHazardSir!(network, networkVertex_dict, network_dict, isState)
 
         iteration = 0
 
@@ -297,11 +297,11 @@ module sirModels
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, vertexIndex, newState, isS)
+                changeState!(networkVertex_dict, network_dict, vertexIndex, prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict, isS)
+                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
@@ -331,7 +331,7 @@ module sirModels
     end # function
 
     function gillespieFirstReact_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
+        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         First React Gillespie Method, on network
@@ -374,7 +374,7 @@ module sirModels
         # to any state. If only one event for a state, the hazard is stored in
         # the individual's network index in the array. If multiple, then they are
         # stored in individual's network index * 0, ... * 1,... etc. in the array
-        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
+        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState)
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         iteration = 0
@@ -413,12 +413,12 @@ module sirModels
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, reaction_j[2], newState, isS)
+                changeState!(networkVertex_dict, network_dict, reaction_j[2], prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
                 updateHazardFirstReact!(network, h_i, reaction_j, prevState,
-                    newState, networkVertex_dict, network_dict, isS)
+                    newState, networkVertex_dict, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
@@ -448,7 +448,7 @@ module sirModels
     end # function
 
     function gillespieNextReact_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
+        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         Next React Gillespie Method, on network (See Gibson & Bruck 2000)

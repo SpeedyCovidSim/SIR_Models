@@ -126,7 +126,7 @@ module networkFunctions
         return nothing
     end
 
-    function calcHazardSir!(network, networkVertex_dict, network_dict) # also for SIRD
+    function calcHazardSir!(network, networkVertex_dict, network_dict, isState) # also for SIRD
 
         # preallocate hazards array
         hazards = zeros(network_dict["population"])
@@ -138,9 +138,9 @@ module networkFunctions
         # use multithreading to speed up
         #Threads.@threads for i in vertices(network)
         for i in vertices(network)
-            if networkVertex_dict[i]["state"] === "S"
+            if isState[i, network_dict["S"]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === "S"
                 hazards[i] = beta * networkVertex_dict[i]["initInfectedNeighbors"]
-            elseif networkVertex_dict[i]["state"] === "I"
+            elseif isState[i, network_dict["I"]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === "I"
                 hazards[i] = copy(alpha)
 
                 #else # person is recovered or deceased and their hazard is zero
@@ -150,7 +150,7 @@ module networkFunctions
     end
 
     function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
-        networkVertex_dict, network_dict, isS) # also works for SIRD
+        networkVertex_dict, network_dict, isState) # also works for SIRD
 
         beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
 
@@ -171,7 +171,7 @@ module networkFunctions
         for i in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
             # if networkVertex_dict[i]["state"] == "S"
-            if isS[i]
+            if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
                 hazards[i] += increment
             end
         end
@@ -179,7 +179,7 @@ module networkFunctions
         return nothing
     end
 
-    function calcHazardFirstReact!(network, networkVertex_dict, network_dict) # also for SIRD
+    function calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState) # also for SIRD
 
         # identify the max number of possible events
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
@@ -199,7 +199,7 @@ module networkFunctions
                 state = network_dict["states"][stateIndex]::String
 
                 # determine whether the individual is the relevant state
-                if networkVertex_dict[i]["state"] === state
+                if isState[i, network_dict[state]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === state
 
                     # if there a multiple events for a given state
                     for j in 1:numEvents
@@ -231,7 +231,7 @@ module networkFunctions
 
 
     function updateHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
-        networkVertex_dict, network_dict, isS) # also works for SIRD
+        networkVertex_dict, network_dict, isState) # also works for SIRD
 
         # reaction_j position 1 contains reaction index, position 2 contains individual
         # change hazard of affected individual. Zero all hazards from previous state
@@ -279,7 +279,7 @@ module networkFunctions
 
                 # only update hazards for those that are susceptible
                 #if networkVertex_dict[i]["state"] == "S"
-                if isS[i]
+                if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
                     hazards[i] += increment
                     # Make sure we don't have a precision error
                     if abs(hazards[i]) < 1e-10
@@ -325,9 +325,9 @@ module networkFunctions
                         # update hazards for relevant states
                         for j in stateIndex1
 
-                            if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
-
-                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_dict[i]["state"]]["eventHazards"][j[2]]
+                            #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                            if isState[i, j[1]]
+                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_dict[i]["state"]::String]["eventHazards"][j[2]]::Float64
 
                                 # Make sure we don't have a precision error
                                 if abs(hazards[i + (j[2]-1)*network_dict["population"]::Int64]) < 1e-10
@@ -348,9 +348,9 @@ module networkFunctions
                         # update hazards for relevant states
                         for j in stateIndex2
 
-                            if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
-
-                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_dict[i]["state"]]["eventHazards"][j[2]]
+                            #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                            if isState[i, j[1]]
+                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_dict[i]["state"]::String]["eventHazards"][j[2]]::Float64
 
                             end
 
@@ -447,7 +447,7 @@ module networkFunctions
         return nothing
     end
 
-    function changeState!(networkVertex_dict, vertexIndex, newState, isS)
+    function changeState!(networkVertex_dict, network_dict, vertexIndex, prevState, newState, isState)
         #=
         Inputs
         networkVertex_dict     : a dictionary containing our population of interest
@@ -460,9 +460,12 @@ module networkFunctions
 
         networkVertex_dict[vertexIndex]["state"] = newState
 
-        if newState != "S"
-            isS[vertexIndex] = false
-        end
+        isState[vertexIndex, network_dict[prevState]["stateIndex"]] = false
+        isState[vertexIndex, network_dict[newState]["stateIndex"]] = true
+
+        # if newState != "S"
+        #     isS[vertexIndex] = false
+        # end
         return nothing
     end
 

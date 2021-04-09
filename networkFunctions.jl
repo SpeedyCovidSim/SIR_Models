@@ -181,86 +181,11 @@ module networkFunctions
 
     function calcHazardFirstReact!(network, networkVertex_dict, network_dict) # also for SIRD
 
-        # # identify the number of possible events that could occur
-        # # create a corresponding master event and hazard array for this - unpack
-        # # the vector of vectors in the network_dict.
-        # states::Array{String,1} = copy(network_dict["states"])
-        # numPossEvents=0
-        #
-        # events = String[]
-        # stateForEvents = String[]
-        # eventHazards = Float64[]
-        # allHazardMult = String[]
-        #
-        # for state in states
-        #     # count how many possible events could occur for any individual
-        #
-        #     possEvents = network_dict[state]["events"]
-        #     possMult = network_dict[state]["hazardMult"]
-        #     numPossEvents += length(possEvents)
-        #
-        #     for i in 1:length(possEvents)
-        #         if possEvents[i] === nothing
-        #             push!(events, "")
-        #         else
-        #             push!(events, possEvents[i]::String)
-        #         end
-        #
-        #         if possMult[i] === nothing
-        #             push!(allHazardMult, "")
-        #         else
-        #             push!(allHazardMult, possMult[i])
-        #         end
-        #
-        #         push!(eventHazards, network_dict[state]["eventHazards"][i])
-        #         push!(stateForEvents, state)
-        #     end
-        # end
-        #
-        #
-        # # preallocate hazards array
-        # hazards = zeros(numPossEvents, network_dict["population"])
-        #
-        # # beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
-        # # alpha::Float64 = network_dict["I"]["eventHazards"][1]::Float64
-        #
-        # # calculate hazard of events for individual i
-        # # use multithreading to speed up
-        # #Threads.@threads for i in vertices(network)
-        # for i in vertices(network)
-        #     for j in 1:numPossEvents
-        #
-        #         # determine whether the individual is an event's state
-        #         if networkVertex_dict[i]["state"] === stateForEvents[j]
-        #
-        #             # check if there is a multiplier for that event
-        #             # multiplier = allHazardMult[j]
-        #
-        #             if allHazardMult[j] != ""
-        #                 if allHazardMult[j] == "I"
-        #                     hazards[j,i] = eventHazards[j] *  networkVertex_dict[i]["initInfectedNeighbors"]
-        #                 end
-        #                 # add more here as becomes relevant
-        #             else
-        #                 hazards[j,i] = copy(eventHazards[j])
-        #             end
-        #         end
-        #     end
-        # end
-        #
-        # # hazards[:,i] = (networkVertex_dict[i]["state"] .=== stateForEvents) .* eventHazards
-        #
-        #
-        # return hazards, events, stateForEvents, eventHazards, allHazardMult
-
+        # identify the max number of possible events
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         # preallocate hazards array
         hazards = zeros(network_dict["population"]::Int64 * maxEvents)
-
-        # beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
-        # alpha::Float64 = network_dict["I"]["eventHazards"][1]::Float64
-
 
         # calculate hazard of events for individual i
         # use multithreading to speed up
@@ -293,15 +218,6 @@ module networkFunctions
                            hazards[i + (j-1)*network_dict["population"]::Int64] = copy(network_dict[state]["eventHazards"][j])
                         end
 
-                        # if allHazardMult[j] != ""
-                        #     if allHazardMult[j] == "I"
-                        #
-                        #         hazards[j,i] = eventHazards[j] *  networkVertex_dict[i]["initInfectedNeighbors"]
-                        #     end
-                        #     # add more here as becomes relevant
-                        # else
-                        #     hazards[j,i] = copy(eventHazards[j])
-                        # end
                     end
                 end
                 stateIndex+=1
@@ -309,21 +225,15 @@ module networkFunctions
 
         end # vertices loop
 
-        # hazards[:,i] = (networkVertex_dict[i]["state"] .=== stateForEvents) .* eventHazards
-
-
-        return hazards#, events, stateForEvents, eventHazards, allHazardMult
+        return hazards
 
     end
 
-    # function updateHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
-    #     networkVertex_dict, network_dict, isS, events, stateForEvents, eventHazards, allHazardMult)
 
     function updateHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
         networkVertex_dict, network_dict, isS) # also works for SIRD
 
         # reaction_j position 1 contains reaction index, position 2 contains individual
-
         # change hazard of affected individual. Zero all hazards from previous state
         stateIndex1 = 0
         stateIndex2 = 0
@@ -349,7 +259,6 @@ module networkFunctions
         for i in 1:eventsNewState
             hazards[reaction_j[2] + (i-1)*network_dict["population"]::Int64] = copy(network_dict[newState]["eventHazards"][i]::Float64)
         end
-
 
         # by simple hazards I mean a set of hazards where S is the only thing
         # that depends on other states, and only depends on I
@@ -386,6 +295,7 @@ module networkFunctions
             stateIndex = 1
             stateIndex1 = Vector{Int64}[]
             stateIndex2 = Vector{Int64}[]
+
             for numEvents in network_dict["eventsPerState"]::Array{Int64,1}
 
                 state = network_dict["states"][stateIndex]::String
@@ -450,100 +360,6 @@ module networkFunctions
             end
 
         end
-
-
-        # stateIndex1 = findall(prevState .== stateForEvents)
-        # stateIndex2 = findall(newState .== stateForEvents)
-        #
-        # # Zero all hazards from previous state
-        # for i in stateIndex1
-        #     hazards[i, reaction_j[2]] = 0.0
-        # end
-        #
-        # # UPDATE later if events other than S depend on multiple things
-        # for i in stateIndex2
-        #     hazards[i, reaction_j[2]] = eventHazards[i]
-        # end
-
-        # # by simple hazards I mean a set of hazards where S is the only thing
-        # # that depends on other states, and only depends on I
-        # simpleHazards = network_dict["simpleHazards"]::Bool
-        # if simpleHazards
-        #     # sneaky way of doing it
-        #     if newState === "I"
-        #         increment = 1.0
-        #     else
-        #         increment = -1.0
-        #     end
-        #
-        #     # Threads.@threads for i in neighbors(network, reaction_j[2])
-        #     for i in neighbors(network, reaction_j[2])
-        #
-        #         # only update hazards for those that are susceptible
-        #         #if networkVertex_dict[i]["state"] == "S"
-        #         if isS[i]
-        #             hazards[1,i] += eventHazards[1] * increment
-        #             # Make sure we don't have a precision error
-        #             if abs(hazards[1,i]) < 1e-10
-        #                 hazards[1,i] = 0.0
-        #             end
-        #         end
-        #
-        #     end
-        #
-        # else
-        #
-        #     # hazards of neighbors depend on the event if true
-        #     if sum(allHazardMult .== "") != length(allHazardMult)
-        #         stateIndex1 = 0
-        #         stateIndex2 = 0
-        #
-        #         # findall returns [] if nothing
-        #         stateIndex1 = findall(prevState .=== allHazardMult) #-1
-        #
-        #         stateIndex2 = findall(newState .=== allHazardMult) #+1
-        #
-        #         if stateIndex1 != []
-        #
-        #             # multithread hazard calculation to speed up
-        #             # if num neighbors is low, this will actually slow it down
-        #             #Threads.@threads for i in neighbors(network, vertexIndex)
-        #             for i in neighbors(network, reaction_j[2])
-        #                 # update hazards for relevant states
-        #                 for j in stateIndex1
-        #
-        #                     if networkVertex_dict[i]["state"] === stateForEvents[j]
-        #                         hazards[j,i] -= eventHazards[j]
-        #
-        #                         # Make sure we don't have a precision error
-        #                         if abs(hazards[j,i]) < 1e-10
-        #                             hazards[j,i] = 0.0
-        #                         end
-        #                     end
-        #
-        #                 end
-        #             end
-        #         end
-        #
-        #         if stateIndex2 != []
-        #
-        #             # multithread hazard calculation to speed up
-        #             # if num neighbors is low, this will actually slow it down
-        #             #Threads.@threads for i in neighbors(network, vertexIndex)
-        #             for i in neighbors(network, reaction_j[2])
-        #                 # update hazards for relevant states
-        #                 for j in stateIndex2
-        #
-        #                     if networkVertex_dict[i]["state"] === stateForEvents[j]
-        #                         hazards[j,i] += eventHazards[j]
-        #                     end
-        #
-        #                 end
-        #             end
-        #         end
-        #     end
-        #
-        # end
         return nothing
     end
 

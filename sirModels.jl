@@ -380,13 +380,16 @@ module sirModels
         #     allHazardMult = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
 
 
+        # let h_i be a Float64 1D array of the hazards where it's size is the
+        # population size multiplied by the max number of events that can happen
+        # to any state. If only one event for a state, the hazard is stored in
+        # the individual's network index in the array. If multiple, then they are
+        # stored in individual's network index * 0, ... * 1,... etc. in the array
         h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         iteration = 0
-
         reaction_j = Int[0,0]
-
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
             # including this in line in the loop rather than updating it in
             # incrementally like h_i. It made no difference to speed, so left it here

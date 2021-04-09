@@ -334,7 +334,7 @@ module sirModels
         networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
         #=
         Note:
-        Direct Gillespie Method, on network
+        First React Gillespie Method, on network
         Directly samples from the exponential distribution
 
         Inputs
@@ -369,17 +369,6 @@ module sirModels
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
 
-
-        # let h_i be a Float64 2D array of the hazards for every possible
-        # reaction that  could happen to a given individual i, regardless of
-        # state. Hazards for individual i is stored in columns as Julia is col
-        # major. If a reaction cannot occur for a given state (e.g. if in state S
-        # cannot transition to R) then the hazard stored is zero.
-        # Produces correct result when sampling time to event (Infinity)
-        # h_i::Array{Float64,2}, events, stateForEvents, eventHazards,
-        #     allHazardMult = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
-
-
         # let h_i be a Float64 1D array of the hazards where it's size is the
         # population size multiplied by the max number of events that can happen
         # to any state. If only one event for a state, the hazard is stored in
@@ -391,9 +380,6 @@ module sirModels
         iteration = 0
         reaction_j = Int[0,0]
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
-            # including this in line in the loop rather than updating it in
-            # incrementally like h_i. It made no difference to speed, so left it here
-            # even for networks with a low degree of connection
 
             if sum(h_i .< 0) > 0
                 negElement = argmin(h_i)
@@ -419,18 +405,7 @@ module sirModels
                 reaction_j = [1, reaction_index]
             end
 
-            # # determine which index the reaction belongs to
-            # # reaction that occurred is reaction_j[1]
-            #
-            # # individual occured to is reaction_j[2]
-            # # @assert(stateForEvents[reaction_j[1]] == networkVertex_dict[reaction_j[2]]["state"])
-            #
-            # # change state of individual and note prev state and newState
-            # # newState::String = events[eventIndex]
-            # prevState = stateForEvents[reaction_j[1]]
-            # newState = events[reaction_j[1]]
-
-
+            # change state of individual and note prev state and newState
             prevState = networkVertex_dict[reaction_j[2]]["state"]::String
             newState = network_dict[prevState]["events"][reaction_j[1]]::String
 
@@ -442,9 +417,6 @@ module sirModels
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                # updateHazardFirstReact!(network, h_i, reaction_j, prevState,
-                #     newState, networkVertex_dict, network_dict, isS, events,
-                #     stateForEvents, eventHazards, allHazardMult)
                 updateHazardFirstReact!(network, h_i, reaction_j, prevState,
                     newState, networkVertex_dict, network_dict, isS)
 
@@ -479,8 +451,9 @@ module sirModels
         networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isS, t_init = 0.0)
         #=
         Note:
-        Direct Gillespie Method, on network
+        Next React Gillespie Method, on network (See Gibson & Bruck 2000)
         Directly samples from the exponential distribution
+        Uses absolute times
 
         Inputs
         t_max   : Simulation end time
@@ -514,26 +487,21 @@ module sirModels
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
 
-
-        # let h_i be a Float64 2D array of the hazards for every possible
-        # reaction that  could happen to a given individual i, regardless of
-        # state. Hazards for individual i is stored in columns as Julia is col
-        # major. If a reaction cannot occur for a given state (e.g. if in state S
-        # cannot transition to R) then the hazard stored is zero.
-        # Produces correct result when sampling time to event (Infinity)
-        h_i::Array{Float64,2}, events, stateForEvents, eventHazards,
-            allHazardMult = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
+        # let h_i be a Float64 1D array of the hazards where it's size is the
+        # population size multiplied by the max number of events that can happen
+        # to any state. If only one event for a state, the hazard is stored in
+        # the individual's network index in the array. If multiple, then they are
+        # stored in individual's network index * 0, ... * 1,... etc. in the array
+        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
+        maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         iteration = 0
-
+        reaction_j = Int[0,0]
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
-            # including this in line in the loop rather than updating it in
-            # incrementally like h_i. It made no difference to speed, so left it here
-            # even for networks with a low degree of connection
 
             if sum(h_i .< 0) > 0
                 negElement = argmin(h_i)
-                negState = networkVertex_dict[negElement[2]]["state"]
+                negState = networkVertex_dict[rem(negElement-1, network_dict["population"]::Int64)+1]["state"]
                 println("An element of h_i is less than zero at iteration #$iteration !")
                 println("It is in state $negState, with value $(h_i[negElement])")
 
@@ -543,18 +511,21 @@ module sirModels
             delta_ti = rand.(Exponential.(1.0 ./h_i))
 
             # determine the first reaction that occurs
-            reaction_j = argmin(delta_ti)
+            reaction_index = argmin(delta_ti)
 
-            # determine which index the reaction belongs to
-            # reaction that occurred is reaction_j[1]
-
-            # individual occured to is reaction_j[2]
-            @assert(stateForEvents[reaction_j[1]] == networkVertex_dict[reaction_j[2]]["state"])
+            # reaction_j[1] stores the index of the event that occurred for
+            # a given state. If only one event per state, then it is one
+            # reaction_j[2] stores the individual the event occurs to (vertexIndex)
+            if maxEvents > 1
+                reaction_j[1] = div(reaction_index-1, network_dict["population"]::Int64)+1
+                reaction_j[2] = rem(reaction_index-1, network_dict["population"]::Int64)+1
+            else
+                reaction_j = [1, reaction_index]
+            end
 
             # change state of individual and note prev state and newState
-            # newState::String = events[eventIndex]
-            prevState = stateForEvents[reaction_j[1]]
-            newState = events[reaction_j[1]]
+            prevState = networkVertex_dict[reaction_j[2]]["state"]::String
+            newState = network_dict[prevState]["events"][reaction_j[1]]::String
 
             # cause transition, change their state
 
@@ -565,8 +536,7 @@ module sirModels
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
                 updateHazardFirstReact!(network, h_i, reaction_j, prevState,
-                    newState, networkVertex_dict, network_dict, isS, events,
-                    stateForEvents, eventHazards, allHazardMult)
+                    newState, networkVertex_dict, network_dict, isS)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
@@ -575,7 +545,7 @@ module sirModels
             end
 
             iteration +=1
-            push!(t, t[end] + delta_ti[reaction_j])
+            push!(t, t[end] + delta_ti[reaction_index])
 
             # use preallocated array as much as possible
             try

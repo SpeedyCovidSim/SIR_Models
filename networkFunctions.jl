@@ -302,9 +302,9 @@ module networkFunctions
 
                 for j in 1:numEvents
                     # newState != prevState
-                    if prevState === network_dict["states"]["hazardMult"][j]
+                    if prevState === network_dict[state]["hazardMult"][j]
                         push!(stateIndex1, copy([stateIndex, j]))
-                    elseif newState === network_dict["states"]["hazardMult"][j]
+                    elseif newState === network_dict[state]["hazardMult"][j]
                         push!(stateIndex2, copy([stateIndex, j]))
                     end
                 end
@@ -325,9 +325,9 @@ module networkFunctions
                         # update hazards for relevant states
                         for j in stateIndex1
 
-                            if networkVertex_dict[i]["state"] === network_dict["states"][j[1]]
+                            if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
 
-                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[network_dict["states"][j[1]]]["eventHazards"][j[2]]
+                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_dict[i]["state"]]["eventHazards"][j[2]]
 
                                 # Make sure we don't have a precision error
                                 if abs(hazards[i + (j[2]-1)*network_dict["population"]::Int64]) < 1e-10
@@ -348,9 +348,9 @@ module networkFunctions
                         # update hazards for relevant states
                         for j in stateIndex2
 
-                            if networkVertex_dict[i]["state"] === network_dict["states"][j[1]]
+                            if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
 
-                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[network_dict["states"][j[1]]]["eventHazards"][j[2]]
+                                hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_dict[i]["state"]]["eventHazards"][j[2]]
 
                             end
 

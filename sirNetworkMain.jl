@@ -92,10 +92,8 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
             println("Iteration #$i commencing")
             # initialise the network
             k = [2,3,10,20,100,1000] # degree of connection
-            # k = copy(N)
 
-            # network = MetaGraph(random_regular_graph(N[i], k[i]))
-            network = MetaGraph(complete_graph(N[i]))
+            network = MetaGraph(random_regular_graph(N[i], k[i]))
             println("Network #$i returned")
 
             networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
@@ -200,10 +198,8 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
             println("Iteration #$i commencing")
             # initialise the network
             k = [2,3,10,20,100,1000] # degree of connection
-            # k = copy(N)
 
-            # network = MetaGraph(random_regular_graph(N[i], k[i]))
-            network = MetaGraph(complete_graph(N[i]))
+            network = MetaGraph(random_regular_graph(N[i], k[i]))
             println("Network #$i returned")
 
             networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
@@ -234,4 +230,4 @@ function main(direct, firstReact, Display = true, save = true, profiling = true)
 end
 
 # main(Display, save)
-main(false, true, true, false, false)
+main(true, true, true, false, false)

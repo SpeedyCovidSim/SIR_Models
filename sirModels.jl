@@ -11,6 +11,7 @@ module sirModels
     using Random
     using StatsBase
     using networkFunctions, LightGraphs, MetaGraphs
+    using TrackingHeaps
 
     function gillespieDirect2Processes_rand(t_max, S_total, I_total, R_total, alpha,
             beta, N, t_init = 0.0)
@@ -287,9 +288,9 @@ module sirModels
                 # assumes constant probability of each event. Hazard does not
                 # depend on anything but state
                 # BAD ASSUMPTION, WHICH WE'LL DEAL WITH LATER
-                eventHazardArray = network_dict[prevState]["eventHazards"]
+                eventHazardArray = network_dict[prevState]["eventHazards"]::Array{Float64,1}
 
-                eventIndex = sample(1:length(events), pweights(eventHazardArray ./ sum(eventHazardArray)))
+                eventIndex = sample(1:length(events), pweights(eventHazardArray))
             end
 
             # change state of individual and note prev state and newState
@@ -379,7 +380,7 @@ module sirModels
 
         iteration = 0
         reaction_j = Int[0,0]
-        while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
+        while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]::Int] != 0
 
             if sum(h_i .< 0) > 0
                 negElement = argmin(h_i)
@@ -451,9 +452,8 @@ module sirModels
         networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
-        Next React Gillespie Method, on network (See Gibson & Bruck 2000)
+        Next React Gillespie Method, on network
         Directly samples from the exponential distribution
-        Uses absolute times
 
         Inputs
         t_max   : Simulation end time
@@ -492,26 +492,28 @@ module sirModels
         # to any state. If only one event for a state, the hazard is stored in
         # the individual's network index in the array. If multiple, then they are
         # stored in individual's network index * 0, ... * 1,... etc. in the array
-        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict)
+        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState)
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
+
+        # time of all events occurring
+        tau_i = rand.(Exponential.(1.0 ./h_i))
+
+        tau_heap = TrackingHeap(Float64, S=NoTrainingWheels, O=MinHeapOrder, N = 4, init_val_coll=tau_i)
 
         iteration = 0
         reaction_j = Int[0,0]
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
 
-            if sum(h_i .< 0) > 0
-                negElement = argmin(h_i)
-                negState = networkVertex_dict[rem(negElement-1, network_dict["population"]::Int64)+1]["state"]
-                println("An element of h_i is less than zero at iteration #$iteration !")
-                println("It is in state $negState, with value $(h_i[negElement])")
-
-            end
-
-            # time to all events occurring
-            delta_ti = rand.(Exponential.(1.0 ./h_i))
+            # if sum(h_i .< 0) > 0
+            #     negElement = argmin(h_i)
+            #     negState = networkVertex_dict[rem(negElement-1, network_dict["population"]::Int64)+1]["state"]
+            #     @warn "An element of h_i is less than zero at iteration #$iteration !"
+            #     @warn "It is in state $negState, with value $(h_i[negElement])"
+            #
+            # end
 
             # determine the first reaction that occurs
-            reaction_index = argmin(delta_ti)
+            reaction_index = top(tau_heap)[1]
 
             # reaction_j[1] stores the index of the event that occurred for
             # a given state. If only one event per state, then it is one
@@ -523,6 +525,9 @@ module sirModels
                 reaction_j = [1, reaction_index]
             end
 
+            # Set t = min(tau_i)
+            push!(t, copy(top(tau_heap)[2]))
+
             # change state of individual and note prev state and newState
             prevState = networkVertex_dict[reaction_j[2]]["state"]::String
             newState = network_dict[prevState]["events"][reaction_j[1]]::String
@@ -531,12 +536,13 @@ module sirModels
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, reaction_j[2], newState, isS)
+                changeState!(networkVertex_dict, network_dict, reaction_j[2], prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                updateHazardFirstReact!(network, h_i, reaction_j, prevState,
-                    newState, networkVertex_dict, network_dict, isS)
+                # update reaction times
+                updateNextReact!(network, h_i, tau_heap, t[end], reaction_j, prevState,
+                    newState, networkVertex_dict, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
@@ -545,7 +551,6 @@ module sirModels
             end
 
             iteration +=1
-            push!(t, t[end] + delta_ti[reaction_index])
 
             # use preallocated array as much as possible
             try
@@ -559,7 +564,7 @@ module sirModels
         end # while
 
         if errorsCaught != 0
-            println("Num Errors caught = $errorsCaught. Recommend increasing preallocation value")
+            @warn "Num Errors caught = $errorsCaught. Recommend increasing preallocation value"
         end
 
         return t, reshape(stateTotalsAll[1:numStates*iteration+numStates]::Array{Int64,1},length(network_dict["states"]),:)

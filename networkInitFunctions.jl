@@ -1,7 +1,8 @@
 module networkInitFunctions
 
     using LightGraphs, MetaGraphs, StatsBase
-    using sirModels: gillespieDirect_network!, gillespieFirstReact_network!
+    using sirModels: gillespieDirect_network!, gillespieFirstReact_network!,
+        gillespieNextReact_network!
     using networkFunctions: incrementInfectedNeighbors!
 
     export initialiseNetwork!
@@ -24,7 +25,8 @@ module networkInitFunctions
         states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!,
             eventsPerState = simType!(simType, alpha, beta, gamma)
 
-        # initialise dictionaries and arrays for storing network attributes
+        # initialise dictionaries and arrays for storing network attributes.
+        # THIS NEEDS TO BE CHANGED FOR SPEED LATER ON. DO NOT DECLARE TYPE "ANY"
         networkVertex_dict = Dict{Int64, Dict{String, Any}}()
         network_dict = Dict{String, Any}()
         stateTotals = convert.(Int, zeros(length(states)))
@@ -144,6 +146,25 @@ module networkInitFunctions
             hazardMultipliers = [["I"],[nothing, nothing],[nothing],[nothing]]
             simpleHazards = true
             model! = gillespieFirstReact_network!
+            eventsPerState = Int64[1,2,1,1]
+
+        elseif simType == "SIR_nextReact"
+            states = ["S","I","R"]
+            stateEvents = [["I"],["R"],[nothing]]
+            eventHazards = [[beta], [alpha], [0.0]]
+            hazardMultipliers = [["I"],[nothing],[nothing]]
+            simpleHazards = false
+            model! = gillespieNextReact_network!
+            eventsPerState = Int64[1,1,1]
+
+
+        elseif simType == "SIRD_nextReact"
+            states = ["S","I","R","D"]
+            stateEvents = [["I"],["R","D"],[nothing],[nothing]]
+            eventHazards = [[beta], [alpha, gamma], [0.0],[0.0]]
+            hazardMultipliers = [["I"],[nothing, nothing],[nothing],[nothing]]
+            simpleHazards = false
+            model! = gillespieNextReact_network!
             eventsPerState = Int64[1,2,1,1]
         end
 

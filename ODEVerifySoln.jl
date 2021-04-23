@@ -149,7 +149,7 @@ function vectorToArray(ODESolution)
     return reverse(rotr90(ODEarray),dims=2)
 end
 
-function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact)
+function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
     println("Solving ODE")
     N = 10000
@@ -371,9 +371,86 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact)
         ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
     end
 
+    println("Solving ODE")
+    N = 1000
+
+    Alpha = 0.15
+    beta = 1.5 / N
+
+    # initial SIR totals
+    u0 = [N*0.95,N*0.05,0]
+
+    # time span to solve on
+    tspan = (0.0,40.0)
+    tStep = 0.01
+
+    # times to solve on
+    times = [i for i=tspan[1]:tStep:tspan[end]]
+
+    # solve the ODE
+    prob = ODEProblem(ODEnetwork!, u0, tspan)
+    sol = solve(prob)
+
+    println("ODE Solved")
+
+    Solution = sol(times)
+    ODESolution = Solution.u
+
+    ODEarray = vectorToArray(ODESolution)
+
+
+    if NetworkNextReact
+        t_max = tspan[end]
+        infectionProp = 0.05
+        simType = "SIR_nextReact"
+        gamma = 0
+
+        # initialise the network
+        network = MetaGraph(complete_graph(N))
+        println("Network returned")
+
+        println("Beginning simulation of network")
+
+        numSims = 1000
+        # Julia is column major
+        StStep = zeros(Int(tspan[end]/tStep+1),numSims)
+        ItStep = copy(StStep)
+        RtStep = copy(StStep)
+
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            # Verifying the well mixed network solution
+
+            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+
+            # interpolate using linear splines
+            splineS = Spline1D(t, state_Totals[1,:], k=1)
+            splineI = Spline1D(t, state_Totals[2,:], k=1)
+            splineR = Spline1D(t, state_Totals[3,:], k=1)
+
+            StStep[:,i] = splineS(times)
+            ItStep[:,i] = splineI(times)
+            RtStep[:,i] = splineR(times)
+        end
+        println("Finished Simulation in $time seconds")
+
+        Smean = mean(StStep, dims = 2)
+        Imean = mean(ItStep, dims = 2)
+        Rmean = mean(RtStep, dims = 2)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, ODEarray)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Well Mixed ODE Solution vs Simulation Solution, Network Next React"
+        outputFileName = "./verifiedODE/NetworkNextReact"
+        ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileName, true, true)
+    end
+
 end
 
-function mainSIRD(NetworkDirect, NetworkFirstReact)
+function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
     println("Solving ODE")
     N = 1000
@@ -535,17 +612,96 @@ function mainSIRD(NetworkDirect, NetworkFirstReact)
         ODEVerifyPlotSIRD(Smean, Imean, Rmean, Dmean, ODEarray, times, title, outputFileName, true, true)
     end
 
+    # --------------------------------------------------------------------------
+
+    Alpha = 0.15
+    beta = 1.5 / N
+    mu = Alpha * 0.25
+
+    # initial SIR totals
+    u0 = [N*0.95,N*0.05,0,0]
+
+    # time span to solve on
+    tspan = (0.0,40.0)
+    tStep = 0.01
+
+    # times to solve on
+    times = [i for i=tspan[1]:tStep:tspan[end]]
+
+    # solve the ODE
+    prob = ODEProblem(ODEnetworkSIRD!, u0, tspan)
+    sol = solve(prob)
+
+    println("ODE Solved")
+
+    Solution = sol(times)
+    ODESolution = Solution.u
+
+    ODEarray = vectorToArray(ODESolution)
+
+    if NetworkNextReact
+        t_max = tspan[end]
+        infectionProp = 0.05
+        simType = "SIRD_nextReact"
+
+        # initialise the network
+        network = MetaGraph(complete_graph(N))
+        println("Network returned")
+
+        println("Beginning simulation of network")
+
+        numSims = 1000
+        # Julia is column major
+        StStep = zeros(Int(tspan[end]/tStep+1),numSims)
+        ItStep = copy(StStep)
+        RtStep = copy(StStep)
+        DtStep = copy(StStep)
+
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            # Verifying the well mixed network solution
+
+            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+
+            # interpolate using linear splines
+            splineS = Spline1D(t, state_Totals[1,:], k=1)
+            splineI = Spline1D(t, state_Totals[2,:], k=1)
+            splineR = Spline1D(t, state_Totals[3,:], k=1)
+            splineD = Spline1D(t, state_Totals[4,:], k=1)
+
+            StStep[:,i] = splineS(times)
+            ItStep[:,i] = splineI(times)
+            RtStep[:,i] = splineR(times)
+            DtStep[:,i] = splineD(times)
+        end
+        println("Finished Simulation in $time seconds")
+
+        Smean = mean(StStep, dims = 2)
+        Imean = mean(ItStep, dims = 2)
+        Rmean = mean(RtStep, dims = 2)
+        Dmean = mean(DtStep, dims = 2)
+
+        misfitS, misfitI, misfitR, misfitD = meanAbsErrorSIRD(Smean, Imean, Rmean, Dmean, ODEarray)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, Mean Abs Error D = $misfitD ")
+
+        title = "Well Mixed ODE Solution vs Simulation Solution, Network Next React SIRD"
+        outputFileName = "./verifiedODE/NetworkNextReactSIRD"
+        ODEVerifyPlotSIRD(Smean, Imean, Rmean, Dmean, ODEarray, times, title, outputFileName, true, true)
+    end
+
 end
 
 
 function main(SIR, SIRD)
 
     if SIR
-        mainSIR(false, true, true)
+        mainSIR(false, false, false, true)
     end
 
     if SIRD
-        mainSIRD(true, true)
+        mainSIRD(false, false, true)
     end
 end
 

@@ -211,7 +211,7 @@ module sirModels
     end # function
 
     function gillespieDirect_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
+        networkVertex_df, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, on network
@@ -248,7 +248,7 @@ module sirModels
         # calculate the propensities to transition
         # only calculate full array first time. Will cause speedups if network
         # is not fully connected
-        h_i::Array{Float64,1} = calcHazardSir!(network, networkVertex_dict, network_dict, isState)
+        h_i::Array{Float64,1} = calcHazardSir!(network, networkVertex_df, network_dict, isState)
 
         iteration = 0
 
@@ -277,7 +277,7 @@ module sirModels
 
             # identify individual's state, w/ respect to property mapping in network description
             # let this be their previous state
-            prevState::String = networkVertex_dict[vertexIndex]["state"]
+            prevState::String = networkVertex_df[vertexIndex, :state]
 
             # determine num events that can happen to an individual in this state
             events::Array{String,1} = network_dict[prevState]["events"]
@@ -298,16 +298,16 @@ module sirModels
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, network_dict, vertexIndex, prevState, newState, isState)
+                changeState!(networkVertex_df, network_dict, vertexIndex, prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
-                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_dict, network_dict, isState)
+                updateHazardSir!(network, h_i, vertexIndex, prevState, newState, networkVertex_df, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
 
-                #incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
+                #incrementInfectedNeighbors!(network, networkVertex_df, vertexIndex)
             end
 
             iteration +=1
@@ -332,7 +332,7 @@ module sirModels
     end # function
 
     function gillespieFirstReact_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
+        networkVertex_df, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         First React Gillespie Method, on network
@@ -375,16 +375,16 @@ module sirModels
         # to any state. If only one event for a state, the hazard is stored in
         # the individual's network index in the array. If multiple, then they are
         # stored in individual's network index * 0, ... * 1,... etc. in the array
-        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState)
+        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_df, network_dict, isState)
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         iteration = 0
-        reaction_j = Int[0,0]
+        reaction_j = Int64[0,0]
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]::Int] != 0
 
             if sum(h_i .< 0) > 0
                 negElement = argmin(h_i)
-                negState = networkVertex_dict[rem(negElement-1, network_dict["population"]::Int64)+1]["state"]
+                negState = networkVertex_df[rem(negElement-1, network_dict["population"]::Int64)+1, :state]
                 println("An element of h_i is less than zero at iteration #$iteration !")
                 println("It is in state $negState, with value $(h_i[negElement])")
 
@@ -407,24 +407,24 @@ module sirModels
             end
 
             # change state of individual and note prev state and newState
-            prevState = networkVertex_dict[reaction_j[2]]["state"]::String
+            prevState = networkVertex_df[reaction_j[2], :state]::String
             newState = network_dict[prevState]["events"][reaction_j[1]]::String
 
             # cause transition, change their state
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, network_dict, reaction_j[2], prevState, newState, isState)
+                changeState!(networkVertex_df, network_dict, reaction_j[2], prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
                 updateHazardFirstReact!(network, h_i, reaction_j, prevState,
-                    newState, networkVertex_dict, network_dict, isState)
+                    newState, networkVertex_df, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
 
-                #incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
+                #incrementInfectedNeighbors!(network, networkVertex_df, vertexIndex)
             end
 
             iteration +=1
@@ -449,7 +449,7 @@ module sirModels
     end # function
 
     function gillespieNextReact_network!(t_max, network, alpha, beta, N,
-        networkVertex_dict, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
+        networkVertex_df, network_dict, stateTotals::Array{Int64,1}, isState, t_init = 0.0)
         #=
         Note:
         Next React Gillespie Method, on network
@@ -492,7 +492,7 @@ module sirModels
         # to any state. If only one event for a state, the hazard is stored in
         # the individual's network index in the array. If multiple, then they are
         # stored in individual's network index * 0, ... * 1,... etc. in the array
-        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState)
+        h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_df, network_dict, isState)
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
 
         # time of all events occurring
@@ -501,19 +501,19 @@ module sirModels
         tau_heap = TrackingHeap(Float64, S=NoTrainingWheels, O=MinHeapOrder, N = 4, init_val_coll=tau_i)
 
         iteration = 0
-        reaction_j = Int[0,0]
+        reaction_j = Int64[0,0]
         while t[end] < t_max && stateTotals[network_dict["I"]["stateIndex"]] != 0
 
             # if sum(h_i .< 0) > 0
             #     negElement = argmin(h_i)
-            #     negState = networkVertex_dict[rem(negElement-1, network_dict["population"]::Int64)+1]["state"]
+            #     negState = networkVertex_df[rem(negElement-1, network_dict["population"]::Int64)+1, :state]
             #     @warn "An element of h_i is less than zero at iteration #$iteration !"
             #     @warn "It is in state $negState, with value $(h_i[negElement])"
             #
             # end
 
             # determine the first reaction that occurs
-            reaction_index = top(tau_heap)[1]
+            reaction_index::Int64 = top(tau_heap)[1]
 
             # reaction_j[1] stores the index of the event that occurred for
             # a given state. If only one event per state, then it is one
@@ -529,25 +529,25 @@ module sirModels
             push!(t, copy(top(tau_heap)[2]))
 
             # change state of individual and note prev state and newState
-            prevState = networkVertex_dict[reaction_j[2]]["state"]::String
+            prevState = networkVertex_df[reaction_j[2], :state]::String
             newState = network_dict[prevState]["events"][reaction_j[1]]::String
 
             # cause transition, change their state
 
             # code like this in case of ghost processes
             if prevState != newState
-                changeState!(networkVertex_dict, network_dict, reaction_j[2], prevState, newState, isState)
+                changeState!(networkVertex_df, network_dict, reaction_j[2], prevState, newState, isState)
 
                 # update hazard of individual
                 # update hazards of neighbors (if applicable)
                 # update reaction times
                 updateNextReact!(network, h_i, tau_heap, t[end], reaction_j, prevState,
-                    newState, networkVertex_dict, network_dict, isState)
+                    newState, networkVertex_df, network_dict, isState)
 
                 # increment stateTotals (network, prevState, newState)
                 incrementStateTotals!(network, prevState, newState, stateTotals, network_dict)
 
-                #incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
+                #incrementInfectedNeighbors!(network, networkVertex_df, vertexIndex)
             end
 
             iteration +=1

@@ -4,7 +4,7 @@ Gillespie Direct Method
 
 Author: Joel Trent and Josh Looker
 =#
-using Random, Conda, PyCall, LightGraphs, GraphPlot, MetaGraphs
+using Random, Conda, PyCall, LightGraphs, GraphPlot#, MetaGraphs
 
 
 # import required modules
@@ -42,14 +42,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 # initialise the network
                 k = [2,3,10,20,100,1000] # degree of connection
 
-                network = MetaGraph(random_regular_graph(N[i], k[i]))
+                network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
-                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             end
             #
         end
@@ -59,14 +59,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
             println("Iteration #$i commencing")
             # initialise the network
-            network = MetaGraph(complete_graph(N[i]))
+            network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
 
             S = state_Totals[1,:]
             I = state_Totals[2,:]
@@ -93,14 +93,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             # initialise the network
             k = [2,3,10,20,100,1000] # degree of connection
 
-            network = MetaGraph(random_regular_graph(N[i], k[i]))
+            network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             #t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
 
             S = state_Totals[1,:]
@@ -148,14 +148,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 # initialise the network
                 k = [2,3,10,20,100,1000] # degree of connection
 
-                network = MetaGraph(random_regular_graph(N[i], k[i]))
+                network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
-                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             end
             #
         end
@@ -165,14 +165,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
             println("Iteration #$i commencing")
             # initialise the network
-            network = MetaGraph(complete_graph(N[i]))
+            network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
 
             S = state_Totals[1,:]
             I = state_Totals[2,:]
@@ -199,14 +199,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             # initialise the network
             k = [2,3,10,20,100,1000] # degree of connection
 
-            network = MetaGraph(random_regular_graph(N[i], k[i]))
+            network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             #t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
 
             S = state_Totals[1,:]
@@ -254,14 +254,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 # initialise the network
                 k = [2,3,10,20,100,1000] # degree of connection
 
-                network = MetaGraph(random_regular_graph(N[i], k[i]))
+                network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
-                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+                @profiler model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             end
             #
         end
@@ -271,14 +271,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
             println("Iteration #$i commencing")
             # initialise the network
-            network = MetaGraph(complete_graph(N[i]))
+            network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
 
             S = state_Totals[1,:]
             I = state_Totals[2,:]
@@ -305,14 +305,14 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             # initialise the network
             k = [2,3,10,20,100,1000] # degree of connection
 
-            network = MetaGraph(random_regular_graph(N[i], k[i]))
+            network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_dict, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
-            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_dict, network_dict, stateTotals, isState)
+            time = @elapsed t, state_Totals = model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
             #t, state_Totals = gillespieDirect_network!(t_max, network, alpha, beta[i], N[i])
 
             S = state_Totals[1,:]
@@ -336,4 +336,4 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 end
 
 # main(direct, firstReact, nextReact, Display, save, profiling)
-main(false, false, true, true, false, true)
+main(false, true, true, true, false, false)

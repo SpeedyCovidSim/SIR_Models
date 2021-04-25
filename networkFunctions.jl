@@ -1,6 +1,6 @@
 
 module networkFunctions
-    using LightGraphs, MetaGraphs, StatsBase, Distributions, Random, TrackingHeaps
+    using LightGraphs, StatsBase, Distributions, Random, TrackingHeaps#, MetaGraphs
 
     export calcHazard!, incrementInfectedNeighbors!, changeState!,
         incrementStateTotals!, outputStateTotals, calcHazardSir!, updateHazardSir!,
@@ -126,7 +126,7 @@ module networkFunctions
         return nothing
     end
 
-    function calcHazardSir!(network, networkVertex_dict, network_dict, isState) # also for SIRD
+    function calcHazardSir!(network, networkVertex_df, network_dict, isState) # also for SIRD
 
         # preallocate hazards array
         hazards = zeros(network_dict["population"])
@@ -137,10 +137,10 @@ module networkFunctions
         # calculate hazard at i
         # use multithreading to speed up
         #Threads.@threads for i in vertices(network)
-        for i in vertices(network)
-            if isState[i, network_dict["S"]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === "S"
-                hazards[i] = beta * networkVertex_dict[i]["initInfectedNeighbors"]
-            elseif isState[i, network_dict["I"]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === "I"
+        for i::Int64 in vertices(network)
+            if isState[i, network_dict["S"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "S"
+                hazards[i] = beta * networkVertex_df[i, :initInfectedNeighbors]
+            elseif isState[i, network_dict["I"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "I"
                 hazards[i] = copy(alpha)
 
                 #else # person is recovered or deceased and their hazard is zero
@@ -150,7 +150,7 @@ module networkFunctions
     end
 
     function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
-        networkVertex_dict, network_dict, isState) # also works for SIRD
+        networkVertex_df, network_dict, isState) # also works for SIRD
 
         beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
 
@@ -167,10 +167,10 @@ module networkFunctions
 
         # multithread hazard calculation to speed up
         # if num neighbors is low, this will actually slow it down
-        #Threads.@threads for i in neighbors(network, vertexIndex)
-        for i in neighbors(network, vertexIndex)
+        # Threads.@threads for i in neighbors(network, vertexIndex)
+        for i::Int64 in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
-            # if networkVertex_dict[i]["state"] == "S"
+            # if networkVertex_df[i, :state] == "S"
             if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
                 hazards[i] += increment
             end
@@ -179,7 +179,7 @@ module networkFunctions
         return nothing
     end
 
-    function calcHazardFirstReact!(network, networkVertex_dict, network_dict, isState) # also for SIRD
+    function calcHazardFirstReact!(network, networkVertex_df, network_dict, isState) # also for SIRD
 
         # identify the max number of possible events
         maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
@@ -190,7 +190,7 @@ module networkFunctions
         # calculate hazard of events for individual i
         # use multithreading to speed up
         #Threads.@threads for i in vertices(network)
-        for i in vertices(network)
+        for i::Int64 in vertices(network)
 
             # loop through all possible states for a given individual
             stateIndex = 1
@@ -199,10 +199,10 @@ module networkFunctions
                 state = network_dict["states"][stateIndex]::String
 
                 # determine whether the individual is the relevant state
-                if isState[i, network_dict[state]["stateIndex"]::Int64] #networkVertex_dict[i]["state"] === state
+                if isState[i, network_dict[state]["stateIndex"]::Int64] #networkVertex_df[i, :state] === state
 
                     # if there a multiple events for a given state
-                    for j in 1:numEvents
+                    for j::Int64 in 1:numEvents
 
                         # check if there is a multiplier for that event
                         # multiplier = allHazardMult[j]
@@ -212,7 +212,7 @@ module networkFunctions
 
                                 hazards[i + (j-1)*network_dict["population"]::Int64] =
                                     network_dict[state]["eventHazards"][j] *
-                                    networkVertex_dict[i]["initInfectedNeighbors"]
+                                    networkVertex_df[i, :initInfectedNeighbors]
                             end
                         else
                            hazards[i + (j-1)*network_dict["population"]::Int64] = copy(network_dict[state]["eventHazards"][j])
@@ -256,7 +256,7 @@ module networkFunctions
         end
 
         # UPDATE later if events other than S depend on multiple things
-        for i in 1:eventsNewState
+        for i::Int64 in 1:eventsNewState
             hazards[reaction_j[2] + (i-1)*network_dict["population"]::Int64] =
                 copy(network_dict[newState]["eventHazards"][i]::Float64)
         end
@@ -269,12 +269,12 @@ module networkFunctions
         stateIndex2 = Vector{Int64}[]
 
         # numEvents is the number of events for each state, iteratively
-        for numEvents in network_dict["eventsPerState"]::Array{Int64,1}
+        for numEvents::Int64 in network_dict["eventsPerState"]::Array{Int64,1}
 
             state = network_dict["states"][stateIndex]::String
 
             # j is 1:numEvents in a given state
-            for j in 1:numEvents
+            for j::Int64 in 1:numEvents
                 # newState != prevState
                 if prevState === network_dict[state]["hazardMult"][j]
                     push!(stateIndex1, copy([stateIndex, j]))
@@ -289,7 +289,7 @@ module networkFunctions
     end
 
     function updateNeighborHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
-        networkVertex_dict, network_dict, isState)
+        networkVertex_df, network_dict, isState)
 
         # by simple hazards I mean a set of hazards where S is the only thing
         # that depends on other states, and only depends on I
@@ -306,10 +306,10 @@ module networkFunctions
             end
 
             # Threads.@threads for i in neighbors(network, reaction_j[2])
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
 
                 # only update hazards for those that are susceptible
-                #if networkVertex_dict[i]["state"] == "S"
+                #if networkVertex_df[i, :state] == "S"
                 if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
                     hazards[i] += increment
                     # Make sure we don't have a precision error
@@ -325,8 +325,7 @@ module networkFunctions
         # -----------------------------------------------------------------
 
         # extract which states have hazards depending on neighbors
-        stateIndex1::Vector{Int64}, stateIndex2::Vector{Int64} =
-            getDependentStates!(network_dict, prevState, newState)
+        stateIndex1, stateIndex2 = getDependentStates!(network_dict, prevState, newState)
 
         # stateIndex1/2 store stateIndex in position 1 and reaction index
         # in position 2
@@ -336,13 +335,13 @@ module networkFunctions
             # multithread hazard calculation to speed up
             # if num neighbors is low, this will actually slow it down
             #Threads.@threads for i in neighbors(network, vertexIndex)
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
                 # update hazards for relevant states
-                for j in stateIndex1
+                for j::Array{Int64,1} in stateIndex1
 
-                    #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                    #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
-                        hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_dict[i]["state"]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
 
                         # Make sure we don't have a precision error
                         if abs(hazards[i + (j[2]-1)*network_dict["population"]::Int64]) < 1e-10
@@ -358,13 +357,13 @@ module networkFunctions
             # multithread hazard calculation to speed up
             # if num neighbors is low, this will actually slow it down
             #Threads.@threads for i in neighbors(network, vertexIndex)
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
                 # update hazards for relevant states
-                for j in stateIndex2
+                for j::Array{Int64,1} in stateIndex2
 
-                    #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                    #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
-                        hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_dict[i]["state"]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
 
                     end
                 end
@@ -376,7 +375,7 @@ module networkFunctions
     end
 
     function updateHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
-        networkVertex_dict, network_dict, isState)
+        networkVertex_df, network_dict, isState)
 
         # update hazard for individual the event happened to -------------------
         updateIndivHazardFirstReact!(hazards, reaction_j, newState,
@@ -384,7 +383,7 @@ module networkFunctions
 
         # update hazard for neighbors of the individual the event happened to --
         updateNeighborHazardFirstReact!(network, hazards, reaction_j, prevState, newState,
-            networkVertex_dict, network_dict, isState)
+            networkVertex_df, network_dict, isState)
 
         return nothing
     end
@@ -411,7 +410,7 @@ module networkFunctions
 
             # logic for only allowing hazards to be zeroed from events greater
             # than the num events in new state
-            for i in (1 + (eventsPrevState - (eventsPrevState-eventsNewState))):eventsPrevState
+            for i::Int64 in (1 + (eventsPrevState - (eventsPrevState-eventsNewState))):eventsPrevState
                 index = reaction_j[2] + (i-1)*network_dict["population"]::Int64
 
                 hazards[index] = 0.0
@@ -420,7 +419,7 @@ module networkFunctions
         end
 
         # UPDATE later if events other than S depend on multiple things
-        for i in 1:eventsNewState
+        for i::Int64 in 1:eventsNewState
             index = reaction_j[2] + (i-1)*network_dict["population"]::Int64
             hazards[index] = copy(network_dict[newState]["eventHazards"][i]::Float64)
 
@@ -430,7 +429,7 @@ module networkFunctions
     end
 
     function updateNeighborNextReact!(network, hazards, times_heap, currentTime,
-        reaction_j, prevState, newState, networkVertex_dict, network_dict, isState)
+        reaction_j, prevState, newState, networkVertex_df, network_dict, isState)
 
         newHazard::Float64 = 0.0
 
@@ -451,10 +450,10 @@ module networkFunctions
             newHazard = 0.0
 
             # Threads.@threads for i in neighbors(network, reaction_j[2])
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
 
                 # only update hazards for those that are susceptible
-                #if networkVertex_dict[i]["state"] == "S"
+                #if networkVertex_df[i, :state] == "S"
                 if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
 
                     newHazard = hazards[i] + increment
@@ -493,15 +492,15 @@ module networkFunctions
             # multithread hazard calculation to speed up
             # if num neighbors is low, this will actually slow it down
             #Threads.@threads for i in neighbors(network, vertexIndex)
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
                 # update hazards for relevant states
-                for j in stateIndex1
+                for j::Array{Int64,1} in stateIndex1
 
-                    #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                    #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
                         index = i + (j[2]-1)*network_dict["population"]::Int64
 
-                        newHazard = hazards[index] -  network_dict[networkVertex_dict[i]["state"]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds newHazard = hazards[index] -  network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
 
                         # Make sure we don't have a precision error
                         if abs(newHazard) < 1e-10
@@ -525,16 +524,16 @@ module networkFunctions
             # multithread hazard calculation to speed up
             # if num neighbors is low, this will actually slow it down
             #Threads.@threads for i in neighbors(network, vertexIndex)
-            for i in neighbors(network, reaction_j[2])
+            for i::Int64 in neighbors(network, reaction_j[2])
                 # update hazards for relevant states
-                for j in stateIndex2
+                for j::Array{Int64,1} in stateIndex2
 
-                    #if networkVertex_dict[i]["state"]::String === network_dict["states"][j[1]]::String
+                    #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
 
                         index = i + (j[2]-1)*network_dict["population"]::Int64
 
-                        newHazard = hazards[index] + network_dict[networkVertex_dict[i::Int]["state"]::String]["eventHazards"][j[2]::Int]::Float64
+                        @inbounds newHazard = hazards[index] + network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]::Int]::Float64
 
                         if getindex(times_heap, index) === Inf # have to redraw time to reaction
                             update!(times_heap, index, currentTime + rand(Exponential(1.0 /newHazard)) )
@@ -542,7 +541,7 @@ module networkFunctions
                         else
                             update!(times_heap, index, (hazards[index]/newHazard) * (getindex(times_heap,index)-currentTime) + currentTime)
                         end
-                        
+
                         hazards[index] = copy(newHazard)
                     end
                 end
@@ -555,7 +554,7 @@ module networkFunctions
 
 
     function updateNextReact!(network, hazards, times_heap, currentTime, reaction_j, prevState, newState,
-        networkVertex_dict, network_dict, isState) # also works for SIRD
+        networkVertex_df, network_dict, isState) # also works for SIRD
 
         # update hazard for individual the event happened to -------------------
         updateIndivNextReact!(hazards, times_heap, currentTime, reaction_j, newState,
@@ -563,7 +562,7 @@ module networkFunctions
 
         # update hazard for neighbors of the individual the event happened to --
         updateNeighborNextReact!(network, hazards, times_heap, currentTime,
-            reaction_j, prevState, newState, networkVertex_dict, network_dict, isState)
+            reaction_j, prevState, newState, networkVertex_df, network_dict, isState)
 
         return nothing
     end
@@ -633,41 +632,41 @@ module networkFunctions
         return nothing
     end
     =#
-    function incrementInfectedNeighbors!(network, networkVertex_dict, vertexIndex)
+    function incrementInfectedNeighbors!(network, networkVertex_df, vertexIndex)
         #=
         Inputs
         network            : a undirected graph from LightGraphs and MetaGraphs
                              containing our population of interest
-        networkVertex_dict : a dictionary containing each vertex in network,
+        networkVertex_df : a dataframe containing each vertex in network,
                              with their states and numInfectedNeighbors
         vertexIndex        : the individual (vertex) the event occured to
 
         Outputs
-        nothing            : works in place on the networkVertex_dict
+        nothing            : works in place on the networkVertex_df
         =#
 
         #for i in neighbors(network, vertexIndex)
-        Threads.@threads for i in neighbors(network, vertexIndex)
-            networkVertex_dict[i]["initInfectedNeighbors"] += 1
+        Threads.@threads for i::Int64 in neighbors(network, vertexIndex)
+            networkVertex_df[i, :initInfectedNeighbors] += 1
         end
         return nothing
     end
 
-    function changeState!(networkVertex_dict, network_dict, vertexIndex, prevState, newState, isState::BitArray{2})
+    function changeState!(networkVertex_df, network_dict, vertexIndex::Int64, prevState, newState, isState::BitArray{2})
         #=
         Inputs
-        networkVertex_dict     : a dictionary containing our population of interest
+        networkVertex_df     : a dataframe containing our population of interest
         vertexIndex            : the individual (vertex) the state change occured to
         newState               : state to change to (string)
 
         Outputs
-        nothing     : works in place on the networkVertex_dict
+        nothing     : works in place on the networkVertex_df
         =#
 
-        networkVertex_dict[vertexIndex]["state"] = newState
+        networkVertex_df[vertexIndex, :state] = newState
 
-        isState[vertexIndex, network_dict[prevState]["stateIndex"]] = false
-        isState[vertexIndex, network_dict[newState]["stateIndex"]] = true
+        isState[vertexIndex, network_dict[prevState]["stateIndex"]::Int64] = false
+        isState[vertexIndex, network_dict[newState]["stateIndex"]::Int64] = true
 
         # if newState != "S"
         #     isS[vertexIndex] = false
@@ -687,8 +686,8 @@ module networkFunctions
         nothing     : works in place on the network
         =#
 
-        stateTotals[network_dict[prevState]["stateIndex"]]::Int64 -= 1
-        stateTotals[network_dict[newState]["stateIndex"]]::Int64 += 1
+        stateTotals[network_dict[prevState]["stateIndex"]::Int64]::Int64 -= 1
+        stateTotals[network_dict[newState]["stateIndex"]::Int64]::Int64 += 1
 
         return nothing
     end

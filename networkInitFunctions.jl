@@ -1,6 +1,6 @@
 module networkInitFunctions
 
-    using LightGraphs, MetaGraphs, StatsBase
+    using LightGraphs, StatsBase, DataFrames#, MetaGraphs
     using sirModels: gillespieDirect_network!, gillespieFirstReact_network!,
         gillespieNextReact_network!
     using networkFunctions: incrementInfectedNeighbors!
@@ -10,7 +10,7 @@ module networkInitFunctions
     function initialiseNetwork!(network, infectionProp, simType, alpha, beta, gamma = 0)
         #=
         Inputs
-        network       : a undirected graph from LightGraphs and MetaGraphs
+        network       : a undirected graph from LightGraphs
                         containing our population of interest
         infectionProp : proportion of people to be infected [0, 1)
         simType       : type of sim to use. ["SIR", "SIRD"]
@@ -25,29 +25,18 @@ module networkInitFunctions
         states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!,
             eventsPerState = simType!(simType, alpha, beta, gamma)
 
-        # initialise dictionaries and arrays for storing network attributes.
-        # THIS NEEDS TO BE CHANGED FOR SPEED LATER ON. DO NOT DECLARE TYPE "ANY"
-        networkVertex_dict = Dict{Int64, Dict{String, Any}}()
-        network_dict = Dict{String, Any}()
-        stateTotals = convert.(Int, zeros(length(states)))
-
-
         # return num vertices
         numVertices = nv(network)
 
-        # array containing whether or not the individual is "S"
-        isState = convert.(Bool,zeros(numVertices, length(states)))
+        # initialise dictionaries and arrays for storing network attributes.
+        # THIS NEEDS TO BE CHANGED FOR SPEED LATER ON. DO NOT DECLARE TYPE "ANY"
+        network_dict = Dict{String, Any}()
+        stateTotals = convert.(Int, zeros(length(states)))
 
-        # Initialise all states as "S", all numInfectedNeighbors as zero
-        # states[1] will always be S/the initial state
-        # for loop has i as the vertex index
-        for i in vertices(network)
-
-            # use vertex index as the primary key for the dictionary
-            networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
-            isState[i,1] = true
-
-        end
+        # dataframe init -------------------------------------------------------
+        # networkVertex_dict = Dict{Int64, Dict{String, Any}}()
+        networkVertex_df, isState = networkVertexInit(network, numVertices, states)
+        # ----------------------------------------------------------------------
 
         # randomly choose individuals to be infected
         infectedVertices = sample(1:numVertices, Int(ceil(infectionProp *
@@ -55,18 +44,18 @@ module networkInitFunctions
 
         # Set them as infected and increment numInfectedNeighbors for their localNeighbourhood
         # by 1
-        for i in infectedVertices
-            networkVertex_dict[i]["state"] = "I"
+        for i::Int64 in infectedVertices
+            networkVertex_df[i, :state] = "I"
             isState[i,1] = false
             isState[i,2] = true
 
-            incrementInfectedNeighbors!(network, networkVertex_dict, i)
+            incrementInfectedNeighbors!(network, networkVertex_df, i)
 
         end
 
         # count the num of vertices in each state
         for i in vertices(network)
-            stateTotals += states .== networkVertex_dict[i]["state"]
+            stateTotals += states .== networkVertex_df[i, :state]
             #get_prop(network, i, :state)
         end
 
@@ -85,7 +74,43 @@ module networkInitFunctions
             stateIndex +=1
         end
 
-        return networkVertex_dict, network_dict, stateTotals, isState, model!
+        return networkVertex_df, network_dict, stateTotals, isState, model!
+    end
+
+    function networkVertexInit(network, numVertices, states)
+
+        networkVertex_df = DataFrame()
+
+        # dataframe columns init
+        state = Array{String}(undef, numVertices)
+        state .= states[1]
+
+        # faster than converting from zeros
+        connectivity = Array{Int64}(undef, numVertices)
+        connectivity .= 0
+
+        initInfectedNeighbors = Array{Int64}(undef, numVertices)
+        initInfectedNeighbors .= 0
+
+        # array containing whether or not the individual is "S"
+        isState = convert.(Bool,zeros(numVertices, length(states)))
+        isState[:,1] .= true
+
+        # Initialise all states as "S", all numInfectedNeighbors as zero
+        # states[1] will always be S/the initial state
+        # for loop has i as the vertex index
+        for i::Int64 in vertices(network)
+
+            # use vertex index as the primary key for the dictionary
+            # networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
+
+            connectivity[i] = length(neighbors(network, i))
+        end
+        networkVertex_df.connectivity = connectivity
+        networkVertex_df.state = state
+        networkVertex_df.initInfectedNeighbors = initInfectedNeighbors
+
+        return networkVertex_df, isState
     end
 
     function simType!(simType, alpha, beta, gamma)
@@ -153,7 +178,7 @@ module networkInitFunctions
             stateEvents = [["I"],["R"],[nothing]]
             eventHazards = [[beta], [alpha], [0.0]]
             hazardMultipliers = [["I"],[nothing],[nothing]]
-            simpleHazards = false
+            simpleHazards = true
             model! = gillespieNextReact_network!
             eventsPerState = Int64[1,1,1]
 
@@ -163,7 +188,7 @@ module networkInitFunctions
             stateEvents = [["I"],["R","D"],[nothing],[nothing]]
             eventHazards = [[beta], [alpha, gamma], [0.0],[0.0]]
             hazardMultipliers = [["I"],[nothing, nothing],[nothing],[nothing]]
-            simpleHazards = false
+            simpleHazards = true
             model! = gillespieNextReact_network!
             eventsPerState = Int64[1,2,1,1]
         end

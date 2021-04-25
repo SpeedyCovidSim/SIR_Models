@@ -12,7 +12,7 @@ any two simulations.
 #Pkg.add("DifferentialEquations")
 #Pkg.add("Interpolations")
 
-using DifferentialEquations, Dierckx, StatsBase, LightGraphs, MetaGraphs, PyPlot, Seaborn
+using DifferentialEquations, Dierckx, StatsBase, LightGraphs, PyPlot, Seaborn#, MetaGraphs
 #Interpolations, Plots
 
 push!( LOAD_PATH, "./" )
@@ -253,7 +253,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
         gamma = 0
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -268,9 +268,9 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -329,7 +329,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
         gamma = 0
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -344,9 +344,9 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -406,7 +406,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
         gamma = 0
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -421,9 +421,9 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -486,7 +486,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
         simType = "SIRD_direct"
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -502,9 +502,9 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -566,7 +566,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
         simType = "SIRD_firstReact"
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -582,9 +582,9 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -645,7 +645,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
         simType = "SIRD_nextReact"
 
         # initialise the network
-        network = MetaGraph(complete_graph(N))
+        network = complete_graph(N)
         println("Network returned")
 
         println("Beginning simulation of network")
@@ -661,9 +661,9 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_dict, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
 
-            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_dict, network_dict, stateTotals, isS)
+            t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
             # interpolate using linear splines
             splineS = Spline1D(t, state_Totals[1,:], k=1)
@@ -697,11 +697,11 @@ end
 function main(SIR, SIRD)
 
     if SIR
-        mainSIR(false, false, false, true)
+        mainSIR(false, true, false, true)
     end
 
     if SIRD
-        mainSIRD(false, false, true)
+        mainSIRD(true, false, true)
     end
 end
 

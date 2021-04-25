@@ -26,7 +26,6 @@ beta = 0.1
 
 network = MetaGraph(SimpleGraph(n))
 
-
 @profiler for k in 1:50
 
     # graph test

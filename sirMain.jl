@@ -32,7 +32,7 @@ function main(Display = true, save = true)
 
     t_max = 200
     alpha = 0.4
-    beta = 10 ./ N
+    beta = 0 ./ N .+ 10
 
     # Could reduce redundancy here too:
 

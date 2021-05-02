@@ -50,7 +50,6 @@ module networkInitFunctions
             isState[i,2] = true
 
             incrementInfectedNeighbors!(network, networkVertex_df, i)
-
         end
 
         # count the num of vertices in each state
@@ -78,6 +77,13 @@ module networkInitFunctions
     end
 
     function networkVertexInit(network, numVertices, states)
+        #=
+        Initialise the vertices of a non-bipartite network.
+        Returns a dataframe containing vertex attributes and a 2d boolean array
+        with rows corresponding to individuals, columns corresponding to states
+        and values true or false as to whether in a given state. Only one 'true'
+        allowed per row.
+        =#
 
         networkVertex_df = DataFrame()
 
@@ -106,9 +112,9 @@ module networkInitFunctions
 
             connectivity[i] = length(neighbors(network, i))
         end
-        networkVertex_df.connectivity = connectivity
         networkVertex_df.state = state
         networkVertex_df.initInfectedNeighbors = initInfectedNeighbors
+        networkVertex_df.connectivity = connectivity
 
         return networkVertex_df, isState
     end
@@ -133,6 +139,11 @@ module networkInitFunctions
         hazardMultipliers : any relevant multiplier to use on the hazard - i.e.
                             dependence on the number of infected individuals
                             neighbouring the individual == "I". nothing otherwise
+
+
+                            HAZARDMULTIPLIERS should always be considered to be
+                            I/number of local neighbors - it's the proportion of
+                            an infected neighbourhood
         =#
 
         if simType == "SIR_direct"

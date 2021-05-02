@@ -139,7 +139,7 @@ module networkFunctions
         #Threads.@threads for i in vertices(network)
         for i::Int64 in vertices(network)
             if isState[i, network_dict["S"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "S"
-                hazards[i] = beta * networkVertex_df[i, :initInfectedNeighbors]
+                hazards[i] = (beta * networkVertex_df[i, :initInfectedNeighbors]) / networkVertex_df[i, :connectivity]
             elseif isState[i, network_dict["I"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "I"
                 hazards[i] = copy(alpha)
 
@@ -172,7 +172,7 @@ module networkFunctions
             # only update hazards for those that are susceptible
             # if networkVertex_df[i, :state] == "S"
             if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
-                hazards[i] += increment
+                hazards[i] += increment / networkVertex_df[i, :connectivity]
             end
         end
 
@@ -211,8 +211,8 @@ module networkFunctions
                             if network_dict[state]["hazardMult"][j] === "I"
 
                                 hazards[i + (j-1)*network_dict["population"]::Int64] =
-                                    network_dict[state]["eventHazards"][j] *
-                                    networkVertex_df[i, :initInfectedNeighbors]
+                                    (network_dict[state]["eventHazards"][j] *
+                                    networkVertex_df[i, :initInfectedNeighbors]) / networkVertex_df[i, :connectivity]
                             end
                         else
                            hazards[i + (j-1)*network_dict["population"]::Int64] = copy(network_dict[state]["eventHazards"][j])
@@ -311,7 +311,7 @@ module networkFunctions
                 # only update hazards for those that are susceptible
                 #if networkVertex_df[i, :state] == "S"
                 if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
-                    hazards[i] += increment
+                    hazards[i] += increment / networkVertex_df[i, :connectivity]
                     # Make sure we don't have a precision error
                     if abs(hazards[i]) < 1e-10
                         hazards[i] = 0.0
@@ -341,7 +341,10 @@ module networkFunctions
 
                     #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
-                        @inbounds hazards[i + (j[2]-1)*network_dict["population"]::Int64] -= network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds hazards[i +
+                            (j[2]-1)*network_dict["population"]::Int64] -=
+                            network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64 /
+                            networkVertex_df[i, :connectivity]
 
                         # Make sure we don't have a precision error
                         if abs(hazards[i + (j[2]-1)*network_dict["population"]::Int64]) < 1e-10
@@ -363,7 +366,10 @@ module networkFunctions
 
                     #if networkVertex_df[i, :state]::String === network_dict["states"][j[1]]::String
                     if isState[i, j[1]]
-                        @inbounds hazards[i + (j[2]-1)*network_dict["population"]::Int64] += network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds hazards[i +
+                        (j[2]-1)*network_dict["population"]::Int64] +=
+                        network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64 /
+                        networkVertex_df[i, :connectivity]
 
                     end
                 end
@@ -456,7 +462,7 @@ module networkFunctions
                 #if networkVertex_df[i, :state] == "S"
                 if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
 
-                    newHazard = hazards[i] + increment
+                    newHazard = hazards[i] + increment / networkVertex_df[i, :connectivity]
 
                     # Make sure we don't have a precision error
                     if abs(newHazard) < 1e-10
@@ -500,7 +506,9 @@ module networkFunctions
                     if isState[i, j[1]]
                         index = i + (j[2]-1)*network_dict["population"]::Int64
 
-                        @inbounds newHazard = hazards[index] -  network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64
+                        @inbounds newHazard = hazards[index] -
+                            network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]]::Float64 /
+                            networkVertex_df[i, :connectivity]
 
                         # Make sure we don't have a precision error
                         if abs(newHazard) < 1e-10
@@ -533,7 +541,9 @@ module networkFunctions
 
                         index = i + (j[2]-1)*network_dict["population"]::Int64
 
-                        @inbounds newHazard = hazards[index] + network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]::Int]::Float64
+                        @inbounds newHazard = hazards[index] +
+                            network_dict[networkVertex_df[i, :state]::String]["eventHazards"][j[2]::Int]::Float64 /
+                            networkVertex_df[i, :connectivity]
 
                         if getindex(times_heap, index) === Inf # have to redraw time to reaction
                             update!(times_heap, index, currentTime + rand(Exponential(1.0 /newHazard)) )

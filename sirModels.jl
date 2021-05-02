@@ -46,7 +46,7 @@ module sirModels
         while t[end] < t_max && I_total != 0
             # calculate the propensities to transition
             # h1 is propensity for infection, h2 is propensity for recovery
-            h_i = [beta * I_total * S_total, alpha * I_total]
+            h_i = [beta * I_total * S_total / N, alpha * I_total]
             h = sum(h_i)
 
             # time to any event occurring
@@ -79,8 +79,8 @@ module sirModels
         return t, S, I , R
     end # function
 
-    function gillespieDirect2Processes_dist(t_max::Float64, S_total::Int, I_total::Int, R_total::Int, alpha::Float64,
-            beta::Float64, N::Int, t_init = 0.0)
+    function gillespieDirect2Processes_dist(t_max, S_total, I_total, R_total, alpha,
+            beta, N, t_init = 0.0)
         #=
         Note:
         Direct Gillespie Method, Well Mixed
@@ -113,7 +113,7 @@ module sirModels
         while t[end] < t_max && I_total != 0
             # calculate the propensities to transition
             # h1 is propensity for infection, h2 is propensity for recovery
-            h_i = [beta * I_total * S_total, alpha * I_total]
+            h_i = [beta * I_total * S_total / N, alpha * I_total]
             h = sum(h_i)
 
             et = Exponential(1/h)
@@ -179,7 +179,7 @@ module sirModels
         while t[end] < t_max && I_total != 0
             # calculate the propensities to transition
             # h1 is propensity for infection, h2 is propensity for recovery
-            h_i = [beta * I_total * S_total, alpha * I_total]
+            h_i = [beta * I_total * S_total / N, alpha * I_total]
             h = sum(h_i)
 
             # delta t's for each process

@@ -8,7 +8,7 @@ Author: Joel Trent and Josh Looker
 
 module plotsPyPlot
 
-    using PyCall, PyPlot
+    using PyCall, PyPlot, Seaborn
 
     function plotSIRPyPlot(t, SIR, alpha, beta, N, outputFileName="plot", Display=True, save=True)
         #=
@@ -25,9 +25,9 @@ module plotsPyPlot
         png            : plot of SIR model over time [by default]
         =#
 
+        Seaborn.set()
 
-
-        fig = plt.figure()
+        fig = plt.figure(dpi=300)
         plt.plot(t, SIR[1], label="Susceptible", lw = 2, figure=fig)
         plt.plot(t, SIR[2], label="Infected", lw = 2, figure=fig)
         plt.plot(t, SIR[3], label="Recovered", lw=2, figure=fig)

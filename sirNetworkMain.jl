@@ -26,7 +26,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
         t_max = 200
         alpha = 0.4
-        beta = 10 ./ N
+        beta = 0 ./ N .+ 10
         gamma = 0.1
 
         # new inputs to the initialisation
@@ -132,7 +132,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
         t_max = 200
         alpha = 0.4
-        beta = 10 ./ N
+        beta = 0 ./ N .+ 10
         gamma = 0.1
 
         # new inputs to the initialisation
@@ -238,7 +238,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 
         t_max = 200
         alpha = 0.4
-        beta = 10 ./ N
+        beta = 0 ./ N .+ 10
         gamma = 0.1
 
         # new inputs to the initialisation
@@ -336,4 +336,4 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 end
 
 # main(direct, firstReact, nextReact, Display, save, profiling)
-main(false, true, true, true, false, false)
+main(false, false, true, true, false, false)

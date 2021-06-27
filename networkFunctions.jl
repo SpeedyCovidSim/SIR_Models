@@ -101,8 +101,8 @@ module networkFunctions
 
             # calculate hazard at i
             # use multithreading to speed up
-            #Threads.@threads for i in vertices(network)
-            for i in vertices(network)
+            #Threads.@threads for i in 1:network_dict["population"]::Int
+            for i in 1:network_dict["population"]::Int
                 # if multiple hazards for the state, sum them
                 eventHazards = get_prop(network, :eventHazards)[get_prop(network,i, :stateIndex)]
 
@@ -126,6 +126,46 @@ module networkFunctions
         return nothing
     end
 
+    function hazardInfection(vertex, network, networkVertex_df, network_dict, bipartite_bool, beta=0.0)::Float64
+        #=
+        Calculates the infection hazard of a susceptible individual in a
+        bipartite and non-bipartite network
+        =#
+
+        if !bipartite_bool
+            return (beta * networkVertex_df[vertex, :initInfectedNeighbors]) / networkVertex_df[vertex, :connectivity]
+        else
+
+            # contexts is a 1D array. Neighbors is a 1D array of arrays, with
+            # length(contexts) == length(neighbors)
+            contexts = getContexts(network, vertex)
+            numContexts = length(contexts)
+            contextNeighbors = getNeighbors(network, network_dict, vertex)
+            hazard = 0.0
+
+            # proportion of time in contexts will be added at a later date.
+            # use equal time in each for the moment:
+            propTime = ones(numContexts) / length(numContexts)
+
+            # loop through the contexts an individual is in
+            for index::Int64 in 1:numContexts
+
+                beta = copy(networkVertex_df[contexts[index], :beta])
+                connectivity = networkVertex_df[contexts[index], :connectivity] - 1
+
+                # loop through neighbors within a context
+                for neighbor in contextNeighbors[index]
+
+                    if networkVertex_df[neighbor, :state] === "I"
+                        hazard += propTime[index] * beta / connectivity
+                    end
+                end
+            end
+
+            return hazard
+        end
+    end
+
     function calcHazardSir!(network, networkVertex_df, network_dict, isState) # also for SIRD
 
         # preallocate hazards array
@@ -134,12 +174,16 @@ module networkFunctions
         beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
         alpha::Float64 = sum(network_dict["I"]["eventHazards"])
 
+        bipartite_bool = isBipartite(network_dict)
+
         # calculate hazard at i
         # use multithreading to speed up
-        #Threads.@threads for i in vertices(network)
-        for i::Int64 in vertices(network)
+        #Threads.@threads for i in 1:network_dict["population"]::Int
+        for i::Int64 in 1:network_dict["population"]::Int
             if isState[i, network_dict["S"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "S"
-                hazards[i] = (beta * networkVertex_df[i, :initInfectedNeighbors]) / networkVertex_df[i, :connectivity]
+
+                hazards[i] = hazardInfection(i, network, networkVertex_df, network_dict, bipartite_bool, beta)
+
             elseif isState[i, network_dict["I"]["stateIndex"]::Int64] #networkVertex_df[i, :state] === "I"
                 hazards[i] = copy(alpha)
 
@@ -149,14 +193,16 @@ module networkFunctions
         return hazards
     end
 
-    function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
-        networkVertex_df, network_dict, isState) # also works for SIRD
+    function simpleHazardUpdateNeighbor!(network, hazards, vertexIndex, newState,
+        networkVertex_df, network_dict, isState)
+        #=
+        Meant only for SIR and SIRD atm
+        Simple hazards are ones where S only depends on I
+        Can be used by Direct and First React methods
+        Meant for non-bipartite
+        =#
 
         beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
-
-        # change hazard of affected individual
-        hazards[vertexIndex] = sum(network_dict[newState]["eventHazards"])
-
         increment::Float64 = 0.0
 
         if newState === "I"
@@ -165,18 +211,71 @@ module networkFunctions
             increment = -1.0 * beta
         end
 
-        # multithread hazard calculation to speed up
-        # if num neighbors is low, this will actually slow it down
         # Threads.@threads for i in neighbors(network, vertexIndex)
         for i::Int64 in neighbors(network, vertexIndex)
             # only update hazards for those that are susceptible
             # if networkVertex_df[i, :state] == "S"
             if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
-                hazards[i] += increment / networkVertex_df[i, :connectivity]
+                @inbounds hazards[i] += increment / networkVertex_df[i, :connectivity]::Int64
+                # Make sure we don't have a precision error
+                if abs(hazards[i]) < 1e-10
+                    hazards[i] = 0.0
+                end
             end
         end
-
         return nothing
+    end
+
+
+    function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
+        networkVertex_df, network_dict, isState) # also works for SIRD
+
+
+        # change hazard of affected individual
+        hazards[vertexIndex] = sum(network_dict[newState]["eventHazards"])
+
+        # change hazard of neighbors
+        if !isBipartite(network_dict)
+
+            # implicit assumption that hazards are 'simple'
+            # will update this function later to incorporate non-simple as
+            # is in the first and next react methods
+            simpleHazardUpdateNeighbor!(network, hazards, vertexIndex, newState,
+                networkVertex_df, network_dict, isState)
+
+
+            return nothing
+        else
+
+            contexts = getContexts(network, vertexIndex)
+            numContexts = length(contexts)
+            contextNeighbors = getNeighbors(network, network_dict, vertexIndex)
+
+
+            # this is only for SIR or SIRD
+            if newState === "I"
+                increment = 1.0
+            else
+                increment = -1.0
+            end
+
+            for index in 1:numContexts
+
+                beta = copy(networkVertex_df[contexts[index], :beta])
+                connectivity = networkVertex_df[contexts[index], :connectivity] - 1
+
+                for neighbor in contextNeighbors[index]
+                    if isState[neighbor, 1]
+
+                        # local proportion of time in a context for a neighbor
+                        hazards[neighbor] += increment * (1.0/networkVertex_df[neighbor, :connectivity]) * beta / connectivity
+                    end
+                end
+            end
+
+            return nothing
+        end
+
     end
 
     function calcHazardFirstReact!(network, networkVertex_df, network_dict, isState) # also for SIRD
@@ -187,18 +286,21 @@ module networkFunctions
         # preallocate hazards array
         hazards = zeros(network_dict["population"]::Int64 * maxEvents)
 
+        bipartite_bool = isBipartite(network_dict)
+
         # calculate hazard of events for individual i
         # use multithreading to speed up
-        #Threads.@threads for i in vertices(network)
-        for i::Int64 in vertices(network)
+        #Threads.@threads for i in 1:network_dict["population"]::Int
+        for i::Int64 in 1:network_dict["population"]::Int
 
-            # loop through all possible states for a given individual
+            # loop through all possible states for a given individual, one at a time
             stateIndex = 1
             for numEvents in network_dict["eventsPerState"]::Array{Int64,1}
 
                 state = network_dict["states"][stateIndex]::String
 
                 # determine whether the individual is the relevant state
+                # if not we don't do anything.
                 if isState[i, network_dict[state]["stateIndex"]::Int64] #networkVertex_df[i, :state] === state
 
                     # if there a multiple events for a given state
@@ -210,11 +312,12 @@ module networkFunctions
                         if !isnothing(network_dict[state]["hazardMult"][j])
                             if network_dict[state]["hazardMult"][j] === "I"
 
-                                hazards[i + (j-1)*network_dict["population"]::Int64] =
-                                    (network_dict[state]["eventHazards"][j] *
-                                    networkVertex_df[i, :initInfectedNeighbors]) / networkVertex_df[i, :connectivity]
+                                @inbounds hazards[i + (j-1)*network_dict["population"]::Int64] =
+                                    hazardInfection(i, network, networkVertex_df, network_dict, bipartite_bool, network_dict[state]["eventHazards"][j]::Float64)
                             end
                         else
+                            # this line could be wrong if the copied value is a non-zero value
+                            # and the hazard is meant to be 0
                            hazards[i + (j-1)*network_dict["population"]::Int64] = copy(network_dict[state]["eventHazards"][j])
                         end
 
@@ -226,7 +329,6 @@ module networkFunctions
         end # vertices loop
 
         return hazards
-
     end
 
     function updateIndivHazardFirstReact!(hazards, reaction_j, newState,
@@ -294,31 +396,34 @@ module networkFunctions
         # by simple hazards I mean a set of hazards where S is the only thing
         # that depends on other states, and only depends on I
         simpleHazards = network_dict["simpleHazards"]::Bool
-        if simpleHazards
+        if simpleHazards && (prevState === "I" || newState === "I")
 
-            beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
+            simpleHazardUpdateNeighbor!(network, hazards, reaction_j[2], newState,
+                networkVertex_df, network_dict, isState)
 
-            # sneaky way of doing it
-            if newState === "I"
-                increment = 1.0 * beta
-            else
-                increment = -1.0 * beta
-            end
-
-            # Threads.@threads for i in neighbors(network, reaction_j[2])
-            for i::Int64 in neighbors(network, reaction_j[2])
-
-                # only update hazards for those that are susceptible
-                #if networkVertex_df[i, :state] == "S"
-                if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
-                    hazards[i] += increment / networkVertex_df[i, :connectivity]
-                    # Make sure we don't have a precision error
-                    if abs(hazards[i]) < 1e-10
-                        hazards[i] = 0.0
-                    end
-                end
-
-            end
+            # beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
+            #
+            # # sneaky way of doing it
+            # if newState === "I"
+            #     increment = 1.0 * beta
+            # else
+            #     increment = -1.0 * beta
+            # end
+            #
+            # # Threads.@threads for i in neighbors(network, reaction_j[2])
+            # for i::Int64 in neighbors(network, reaction_j[2])
+            #
+            #     # only update hazards for those that are susceptible
+            #     #if networkVertex_df[i, :state] == "S"
+            #     if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
+            #         hazards[i] += increment / networkVertex_df[i, :connectivity]
+            #         # Make sure we don't have a precision error
+            #         if abs(hazards[i]) < 1e-10
+            #             hazards[i] = 0.0
+            #         end
+            #     end
+            #
+            # end
             return nothing
         end
 
@@ -442,7 +547,7 @@ module networkFunctions
         # by simple hazards I mean a set of hazards where S is the only thing
         # that depends on other states, and only depends on I
         simpleHazards = network_dict["simpleHazards"]::Bool
-        if simpleHazards
+        if simpleHazards && (prevState === "I" || newState === "I")
 
             beta::Float64 = network_dict["S"]["eventHazards"][1]::Float64
 
@@ -462,7 +567,7 @@ module networkFunctions
                 #if networkVertex_df[i, :state] == "S"
                 if isState[i, 1] #network_dict["S"]["stateIndex"]::Int64]
 
-                    newHazard = hazards[i] + increment / networkVertex_df[i, :connectivity]
+                    newHazard = @inbounds hazards[i] + increment / @inbounds networkVertex_df[i, :connectivity]::Int64
 
                     # Make sure we don't have a precision error
                     if abs(newHazard) < 1e-10
@@ -562,7 +667,6 @@ module networkFunctions
         return nothing
     end
 
-
     function updateNextReact!(network, hazards, times_heap, currentTime, reaction_j, prevState, newState,
         networkVertex_df, network_dict, isState) # also works for SIRD
 
@@ -577,6 +681,33 @@ module networkFunctions
         return nothing
     end
 
+    function getContexts(network, vertex)
+        return neighbors(network, vertex)
+    end
+
+    function getNeighbors(network, network_dict, vertex)
+        if !isBipartite(network_dict)
+            return neighbors(network, vertex)
+        else
+            # bipartite network, find contexts vertex is part of
+            contexts = getContexts(network, vertex)
+
+            contextNeighbors = Array{Int64,1}[]
+            contextVertexes = Array{Int64,1}[]
+
+            for context in contexts
+                # MUST COPY: deleting will produce unintended consequences
+                # don't want to return the vertex as part of a context's
+                # neighbors
+                contextVertices = copy(neighbors(network, context))
+                filteredVertices = deleteat!(contextVertices, findfirst(x->x==vertex,contextVertices))
+
+                push!(contextNeighbors, filteredVertices)
+            end
+
+            return contextNeighbors
+        end
+    end
 
     #=
     function calcHazardOld!(network, alpha, beta, updateOnly = false, hazards = [],
@@ -627,7 +758,7 @@ module networkFunctions
 
             # calculate hazard at i
             # use multithreading to speed up
-            Threads.@threads for i in vertices(network)
+            Threads.@threads for i in 1:network_dict["population"]::Int
                 if get_prop(network, i, :state) == "S"
                     hazards[i] = beta * get_prop(network, i, :initInfectedNeighbors)
                 elseif get_prop(network, i, :state) == "I"
@@ -700,6 +831,10 @@ module networkFunctions
         stateTotals[network_dict[newState]["stateIndex"]::Int64]::Int64 += 1
 
         return nothing
+    end
+
+    function isBipartite(network_dict::Dict)
+        return network_dict["bipartite"]::Bool
     end
 
 end

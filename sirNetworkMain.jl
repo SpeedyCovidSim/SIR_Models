@@ -6,7 +6,6 @@ Author: Joel Trent and Josh Looker
 =#
 using Random, Conda, PyCall, LightGraphs, GraphPlot#, MetaGraphs
 
-
 # import required modules
 push!( LOAD_PATH, "./" )    #Set path to current
 using networkInitFunctions: initialiseNetwork!
@@ -45,7 +44,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i], infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
@@ -62,7 +61,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i], infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -96,7 +95,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i], infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -151,7 +150,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
@@ -168,7 +167,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -202,7 +201,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -257,7 +256,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
                 network = random_regular_graph(N[i], k[i])
                 println("Network #$i returned")
 
-                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
                 println("Network #$i has been initialised")
 
@@ -274,7 +273,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = complete_graph(N[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -308,7 +307,7 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
             network = random_regular_graph(N[i], k[i])
             println("Network #$i returned")
 
-            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, infectionProp, simType, alpha, beta[i], gamma)
+            networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
 
             println("Network #$i has been initialised")
 
@@ -336,4 +335,4 @@ function main(direct, firstReact, nextReact, Display = true, save = true, profil
 end
 
 # main(direct, firstReact, nextReact, Display, save, profiling)
-main(false, false, true, true, false, false)
+main(true, true, true, true, false, false)

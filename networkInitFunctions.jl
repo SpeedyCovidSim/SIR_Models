@@ -7,7 +7,7 @@ module networkInitFunctions
 
     export initialiseNetwork!
 
-    function initialiseNetwork!(network, infectionProp, simType, alpha, beta, gamma = 0)
+    function initialiseNetwork!(network, popSize, infectionProp, simType, alpha, beta, gamma = 0, bipartite = false, vertex_df=DataFrame())
         #=
         Inputs
         network       : a undirected graph from LightGraphs
@@ -35,12 +35,16 @@ module networkInitFunctions
 
         # dataframe init -------------------------------------------------------
         # networkVertex_dict = Dict{Int64, Dict{String, Any}}()
-        networkVertex_df, isState = networkVertexInit(network, numVertices, states)
+        if !bipartite
+            networkVertex_df, isState = networkVertexInit(network, numVertices, states)
+        else
+            networkVertex_df, isState = networkVertexInit(network, numVertices, states, popSize, vertex_df)
+        end
         # ----------------------------------------------------------------------
 
         # randomly choose individuals to be infected
-        infectedVertices = sample(1:numVertices, Int(ceil(infectionProp *
-            numVertices)), replace = false)
+        infectedVertices = sample(1:popSize, Int(ceil(infectionProp *
+            popSize)), replace = false)
 
         # Set them as infected and increment numInfectedNeighbors for their localNeighbourhood
         # by 1
@@ -49,19 +53,21 @@ module networkInitFunctions
             isState[i,1] = false
             isState[i,2] = true
 
-            incrementInfectedNeighbors!(network, networkVertex_df, i)
+            # only use if non-bipartite
+            if !bipartite; incrementInfectedNeighbors!(network, networkVertex_df, i)
+            end
         end
 
         # count the num of vertices in each state
-        for i in vertices(network)
+        for i::Int in 1:popSize::Int
             stateTotals += states .== networkVertex_df[i, :state]
             #get_prop(network, i, :state)
         end
 
         # add attributes to the network_dict
-        network_dict = Dict("states"=>states, "population"=>numVertices,
+        network_dict = Dict("states"=>states, "population"=>popSize,
             "simpleHazards"=>simpleHazards, "eventsPerState"=>eventsPerState,
-            "allMultipliers"=>hazardMultipliers)
+            "allMultipliers"=>hazardMultipliers, "bipartite"=>bipartite)
 
         stateIndex = 1
         for state in states
@@ -119,6 +125,52 @@ module networkInitFunctions
         return networkVertex_df, isState
     end
 
+    function networkVertexInit(network, numVertices, states, popSize, networkVertex_df)
+        #=
+        Initialise the vertices of a bipartite network.
+        Returns a dataframe containing vertex attributes and a 2d boolean array
+        with rows corresponding to individuals, columns corresponding to states
+        and values true or false as to whether in a given state. Only one 'true'
+        allowed per row.
+        =#
+
+        # dataframe already exists
+        # networkVertex_df = DataFrame()
+
+        # dataframe columns init
+        state = Array{String}(undef, numVertices)
+        state[1:popSize] .= states[1]
+        # group node
+        state[(popSize+1):numVertices] .= "G"
+
+        # faster than converting from zeros
+        connectivity = Array{Int64}(undef, numVertices)
+        connectivity .= 0
+
+        initInfectedNeighbors = Array{Int64}(undef, numVertices)
+        initInfectedNeighbors .= 0
+
+        # array containing whether or not the individual is "S"
+        isState = convert.(Bool,zeros(popSize, length(states)))
+        isState[:,1] .= true
+
+        # Initialise all states as "S", all numInfectedNeighbors as zero
+        # states[1] will always be S/the initial state
+        # for loop has i as the vertex index
+        for i::Int64 in vertices(network)
+
+            # use vertex index as the primary key for the dictionary
+            # networkVertex_dict[i] = Dict("state"=>states[1], "initInfectedNeighbors"=>0)
+
+            connectivity[i] = length(neighbors(network, i))
+        end
+        networkVertex_df.state = state
+        networkVertex_df.initInfectedNeighbors = initInfectedNeighbors
+        networkVertex_df.connectivity = connectivity
+
+        return networkVertex_df, isState
+    end
+
     function simType!(simType, alpha, beta, gamma)
         #=
         Inputs
@@ -154,7 +206,6 @@ module networkInitFunctions
             simpleHazards = true
             model! = gillespieDirect_network!
             eventsPerState = Int64[1,1,1]
-
 
         elseif simType == "SIRD_direct"
             states = ["S","I","R","D"]
@@ -202,10 +253,12 @@ module networkInitFunctions
             simpleHazards = true
             model! = gillespieNextReact_network!
             eventsPerState = Int64[1,2,1,1]
+        else
+            @warn "That simType has not been implemented yet"
+            return
         end
 
         return states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!, eventsPerState
     end
-
 
 end

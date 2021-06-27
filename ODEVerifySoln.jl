@@ -155,7 +155,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 10000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
 
     # initial SIR totals
     u0 = Int[N*0.95,N*0.05,0]
@@ -223,7 +223,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 1000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
 
     # initial SIR totals
     u0 = [N*0.95,N*0.05,0]
@@ -268,7 +268,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, gamma)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -299,7 +299,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 1000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
 
     # initial SIR totals
     u0 = [N*0.95,N*0.05,0]
@@ -344,7 +344,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, gamma)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -375,7 +375,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 1000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
 
     # initial SIR totals
     u0 = [N*0.95,N*0.05,0]
@@ -421,7 +421,7 @@ function mainSIR(wellMixed, NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, gamma)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, gamma)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -456,7 +456,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 1000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
     mu = Alpha * 0.25
 
     # initial SIRD totals
@@ -502,7 +502,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, mu)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -536,7 +536,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
     N = 1000
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
     mu = Alpha * 0.25
 
     # initial SIR totals
@@ -582,7 +582,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, mu)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -615,7 +615,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
     # --------------------------------------------------------------------------
 
     Alpha = 0.15
-    beta = 1.5 / N
+    beta = 1.5
     mu = Alpha * 0.25
 
     # initial SIR totals
@@ -661,7 +661,7 @@ function mainSIRD(NetworkDirect, NetworkFirstReact, NetworkNextReact)
 
             # Verifying the well mixed network solution
 
-            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, infectionProp, simType, Alpha, beta, mu)
+            networkVertex_df, network_dict, stateTotals, isS, model! = initialiseNetwork!(network, N,infectionProp, simType, Alpha, beta, mu)
 
             t, state_Totals = model!(t_max, network, Alpha, beta, N, networkVertex_df, network_dict, stateTotals, isS)
 
@@ -697,12 +697,12 @@ end
 function main(SIR, SIRD)
 
     if SIR
-        mainSIR(false, true, false, true)
+        mainSIR(false, true, true, true)
     end
 
     if SIRD
-        mainSIRD(true, false, true)
+        mainSIRD(true, true, true)
     end
 end
 
-main(true, true)
+main(true, false)

@@ -44,7 +44,7 @@ def main():
         
 
 
-    if False:
+    if True:
         start = time.time()
         for i in range(10):
             print(f"Beginning simulation {i+1}")
@@ -63,7 +63,7 @@ def main():
 
         print(f"Avg. time taken for attr sims: {(end-start)/10}")
 
-    if False:
+    if True:
         start = time.time()
         for i in range(10):
             print(f"Beginning simulation {i+1}")
@@ -90,7 +90,7 @@ def main():
         end = time.time()
         print(end -start)
 
-    if True:
+    if False:
         x = np.random.rand(10000)
         start = time.time()
         for i in range(5000):

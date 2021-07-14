@@ -5,7 +5,7 @@ using StatsBase
 using LightGraphs, GraphPlot, NetworkLayout
 using BenchmarkTools
 using TrackingHeaps
-
+using DataStructures
 
 # import required modules
 push!( LOAD_PATH, "./" )
@@ -72,13 +72,19 @@ mutable struct branchModel
     reproduction_k::Float64 # Superspreading k a la Lloyd-Smith
     stochasticRi::Bool
 
-    #
-    t_generation_shape::Float64
+    # Weibull distribution for time to an infection event being caused by an
+    # active individual
+    t_generation_shape::Float64 #
     t_generation_scale::Float64
 
     ###### isolation parameters to add later ####
     t_onset_shape::Float64
     t_onset_scale::Float64
+    t_onset_to_isol::Float64
+    stochasticIsol::Bool
+
+    p_test::Float64 # ∈ [0,1]
+
     #############################################
 
     recovery_time::Float64 # time taken for recovery (no randomness in this)
@@ -99,7 +105,7 @@ end
 
 function getRi(model::branchModel, sub_Clin_Case::BitArray{1})
     #=
-    Reproduction number follows a gamma distribution
+    Reproduction number is scaled by a gamma distribution
     =#
 
     Ri = ones(model.max_cases)
@@ -112,6 +118,38 @@ function getRi(model::branchModel, sub_Clin_Case::BitArray{1})
     Ri = Ri .* model.reproduction_number .* (1 .- model.sub_clin_scaling.*sub_Clin_Case)
 
     return Ri
+end
+
+function getOnsetDelay(model::branchModel)
+    #=
+    Onset delay for symptoms is gamma distributed if using stochastic sim
+    Otherwise it is the mean of the gamma distribution defined
+    =#
+
+    if model.stochasticIsol
+        return rand(Gamma(model.t_onset_shape, model.t_onset_scale), model.max_cases)
+    end
+
+    return zeros(model.max_cases) .+ mean(Gamma(model.t_onset_shape, model.t_onset_scale))
+end
+
+function getOnsetToIsolDelay(model::branchModel, num_rand)
+    #=
+    Delay between symptom onset and isolation is exponentially distributed if using
+    stochastic sim. Otherwise it is the mean of the exponential distribution defined
+    =#
+    if model.stochasticIsol
+        return rand(Exponential(model.t_onset_to_isol), num_rand)
+    end
+    return zeros(num_rand) .+ model.t_onset_to_isol
+end
+
+function getTimeIsolated(model::branchModel, detected_cases::Union{SubDataFrame,DataFrameRow})
+    #=
+    The time that a clinical case is isolated, if they are detected
+    =#
+    return detected_cases.time_infected .+ detected_cases.time_onset_delay .+
+        getOnsetToIsolDelay(model, length(detected_cases.active))
 end
 
 function initDataframe(model::branchModel)
@@ -140,6 +178,9 @@ function initDataframe(model::branchModel)
 
     reproduction_number = getRi(model, sub_Clin_Case)
 
+    time_onset_delay = getOnsetDelay(model)
+    time_isolated = ones(model.max_cases) .* Inf
+
     population_df.parentID = parentID
     population_df.caseID = caseID
     population_df.active = active
@@ -148,6 +189,20 @@ function initDataframe(model::branchModel)
     population_df.num_offspring = num_offspring
     population_df.time_infected = time_infected
     population_df.time_recovery = active .* model.recovery_time
+    population_df.time_onset_delay = time_onset_delay
+    population_df.time_isolated = time_isolated
+
+    population_df.detected = convert.(Bool,zeros(model.max_cases))
+    clin_cases = filter(row -> row.sub_Clin_Case==false, population_df, view=true)
+    clin_cases.detected .= rand(Bernoulli(model.p_test), length(clin_cases.active))
+
+    if model.p_test > 0
+        detected_cases = filter(row -> row.detected==true, clin_cases, view=true)
+        detected_cases.time_isolated .= getTimeIsolated(model, detected_cases)
+    end
+
+    # need to init isolation times for these guys^
+
 
     return population_df
 end
@@ -256,7 +311,7 @@ function initStateTotals(model::branchModel, times_length::Int64)::Array{Int64, 
     return state_totals_all
 end
 
-function makeVectorFromFrequency(f::Array{Int64,1}, ID::SubArray{Int64,1})::Array{Int64,1}
+function makeVectorFromFrequency(f::Union{SubArray{Int64,1},Array{Int64,1}}, ID::Union{SubArray{Int64,1},Array{Int64,1}})::Array{Int64,1}
     #=
     Code from Michael Plank with some edits for my chosen code structure
 
@@ -291,7 +346,7 @@ function makeVectorFromFrequency(f::Array{Int64,1}, ID::SubArray{Int64,1})::Arra
 end
 
 function initNewCases!(population_df::DataFrame, active_df::SubDataFrame,
-    model::branchModel, t::Array{Float64,1}, current_step::Int, num_cases::Int,
+    model::branchModel, t::Union{Array{Float64,1},Array{Int64,1}}, current_step::Int, num_cases::Int,
     num_new_infections::Int, num_off::Array{})
     #=
     Initialises all new cases that occured within a given time step
@@ -304,6 +359,11 @@ function initNewCases!(population_df::DataFrame, active_df::SubDataFrame,
     new_cases_rows.active .= true
     new_cases_rows.time_infected .= t[current_step]
     new_cases_rows.time_recovery .= t[current_step] + model.recovery_time
+
+    if model.p_test > 0
+        detected_cases = filter(row -> row.detected==true, new_cases_rows, view=true)
+        detected_cases.time_isolated .= getTimeIsolated(model, detected_cases)
+    end
 
     active_df[:,:num_offspring] .+= num_off
 
@@ -330,6 +390,10 @@ function initNewCase!(population_df::DataFrame, model::branchModel, infection_ti
     new_case_row.time_infected = infection_time * 1
     new_case_row.time_recovery = infection_time + model.recovery_time
 
+    if new_case_row.detected
+        new_case_row.time_isolated = getTimeIsolated(model, new_case_row)[1]
+    end
+
     population_df[parentID, :num_offspring] += 1
 end
 
@@ -354,6 +418,111 @@ function areaUnderCurve(area_under_curve::Array{Float64,1}, index::Array{Int64,1
     end
 
     return area_under_curve_i
+end
+
+function initDataframe_thin(model::branchModel)
+
+    population_df = DataFrame()
+
+    # dataframe columns init
+    parentID = Array{Int64}(undef, model.max_cases) .* 0
+    parentID[1:model.state_totals[2]] .= -1 # they are a root node
+
+    # num_offspring = Array{Int64}(undef, model.max_cases) .* 0
+
+    # arguably this is just the row value so technically unneeded
+    caseID = convert.(Int,cumsum(ones(model.max_cases)))
+
+    generation_number = Array{Int64}(undef, model.max_cases) .* 0
+
+    # init whether a given case is subClin or not.
+    sub_Clin_Case = rand(model.max_cases) .< model.sub_clin_prop
+
+    reproduction_number = getRi(model, sub_Clin_Case)
+
+    population_df.parentID = parentID
+    population_df.caseID = caseID
+    population_df.generation_number = generation_number
+    population_df.reproduction_number = reproduction_number
+    # population_df.num_offspring = num_offspring
+
+    return population_df
+end
+
+function branchingProcess!(population_df::DataFrame, model::branchModel)
+    generation::Int64 = 1
+
+    num_cases::Int64 = model.state_totals[2]*1
+    generationRange = 1:num_cases
+    newGenerationRange = [generationRange[1], generationRange[2]]
+    population_df[generationRange, :generation_number] .= copy(generation)
+
+    population_df.num_offspring = rand.(Poisson.(population_df.reproduction_number))
+    hitMaxCases = false
+
+    while num_cases < model.max_cases
+
+        # determine number of offspring
+        num_off = @view population_df[generationRange, :num_offspring]
+
+        total_off = sum(num_off)
+        if total_off == 0
+            break
+        end
+
+        # new generation
+        generation+=1
+        newGenerationRange = [num_cases+1, total_off+num_cases]
+
+        ########## Logic from discrete
+        if newGenerationRange[2]>model.max_cases >= model.max_cases
+            hitMaxCases = true
+            newGenerationRange[2] = model.max_cases
+
+            amount_above_limit = num_cases + total_off - model.max_cases
+
+            # allow up to the model's limit's cases to be added
+            total_off = model.max_cases - num_cases
+
+            if amount_above_limit > 0
+                for i::Int64 in 1:length(num_off::SubArray{Int64,1})
+
+                    if num_off[i] > amount_above_limit
+                        num_off[i] -= amount_above_limit
+                        amount_above_limit = 0
+                    else
+                        amount_above_limit -= num_off[i]
+                        num_off[i]=0
+                    end
+
+                    if amount_above_limit == 0
+                        break
+                    end
+                end
+            end
+        end
+        #######################
+
+        range = newGenerationRange[1]:newGenerationRange[2]
+
+        population_df[range, :generation_number] .= copy(generation)
+        population_df[range, :parentID] .= makeVectorFromFrequency(num_off, collect(generationRange))
+
+        num_cases += total_off
+        if hitMaxCases
+            population_df[range, :num_offspring] .= 0
+        end
+
+        generationRange = copy(range)
+
+        # try
+        # catch LoadError
+        #     println(length(population_df[newGenerationRange, :parentID]))
+        #     println(length(makeVectorFromFrequency(num_off, collect(generationRange))))
+        #     break
+        # end
+
+    end
 end
 
 function discrete_branch(population_df::DataFrame, model::branchModel, time_step::Number)
@@ -382,12 +551,12 @@ function discrete_branch(population_df::DataFrame, model::branchModel, time_step
 
     current_step = 1
     # filter df on active infections
-    active_df = filter(row -> row.active, population_df::DataFrame, view=true)
+    active_df = filter(row -> row.active, population_df, view=true)
     hitMaxCases::Bool = (num_cases >= model.max_cases)
 
     for current_step::Int in 2:(num_steps+1)
 
-        # make inactive any individuals whose time of recovery occurs during by end of time step
+        # make inactive any individuals whose time of recovery occurs during or by end of time step
         if t[current_step] >= model.recovery_time
 
             inactive_df = filter(row-> row.time_recovery < t[current_step], active_df, view=true)
@@ -401,7 +570,10 @@ function discrete_branch(population_df::DataFrame, model::branchModel, time_step
         end
 
         # filter df on active infections
-        active_df = filter(row -> row.active, population_df::DataFrame, view=true)
+        active_df = filter(row -> row.active, population_df, view=true)
+
+        # determine which cases are isolating (if any)
+        case_isolated = active_df.time_isolated .< t[current_step]
 
         # if reached max cases / other stopping criterion
         # MAX CASE CRITERION WILL NEVER GET HIT - WILL BREAK DATAFRAME FIRST
@@ -415,9 +587,9 @@ function discrete_branch(population_df::DataFrame, model::branchModel, time_step
         end
 
         # Determine number offspring for each active individual in current_step
-        # num_new_infections
         exp_off = (model.state_totals[1]/model.population_size) .*
-            active_df.reproduction_number .* areaUnderCurve(area_under_curve, convert.(Int64, round.((t[current_step].-active_df.time_infected)/time_step)))
+            active_df.reproduction_number .* (1 .- (1-model.isolation_infectivity).*case_isolated) .*
+            areaUnderCurve(area_under_curve, convert.(Int64, round.((t[current_step].-active_df.time_infected)/time_step)))
 
         num_off = rand.(Poisson.(exp_off))
         num_new_infections = sum(num_off)
@@ -474,7 +646,7 @@ function firstReact_branch(population_df::DataFrame, model::branchModel)
     while t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases
 
         # filter df on active infections
-        active_df = filter(row -> row.active, population_df, view=true)
+        active_df = filter(row -> row.active, population_df[1:num_cases, :], view=true)
 
         active_time_left = active_df.time_recovery .- t[end]
         active_time_spent = round.(model.recovery_time .- active_time_left, digits=9)
@@ -545,9 +717,9 @@ function firstReact_branch(population_df::DataFrame, model::branchModel)
     return t, state_totals_all[1:num_events,:], num_cases
 end
 
-function nextReact_branch(population_df::DataFrame, model::branchModel)
+function nextReact_branch_trackedHeap(population_df::DataFrame, model::branchModel)
 
-    num_cases = model.state_totals[2]*1
+    num_cases::Int64 = model.state_totals[2]*1
     num_events = 1
     t = Float64[copy(model.t_init)]
 
@@ -555,11 +727,11 @@ function nextReact_branch(population_df::DataFrame, model::branchModel)
     infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
 
     # filter df on active infections
-    active_df = filter(row -> row.active, population_df, view=true)
+    active_df = filter(row -> row.active, population_df[1:num_cases, :], view=true)
 
     num_tau_events = model.max_cases * (model.reproduction_number*1.2 + 1)
     tau_i = [event(model.t_max+i,false,0,0) for i=1:num_tau_events]
-    tau_heap = TrackingHeap(event, S=NoTrainingWheels, O=MinHeapOrder, N = 4, init_val_coll=tau_i)
+    tau_heap = TrackingHeap(event, S=NoTrainingWheels, O=MinHeapOrder, N = 2, init_val_coll=tau_i)
 
     next_unused_index = 1
     sSaturation = (model.state_totals[1]/model.population_size)
@@ -583,12 +755,12 @@ function nextReact_branch(population_df::DataFrame, model::branchModel)
     while t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases
 
         # returns a pair
-        reaction = top(tau_heap)
+        reaction = pop!(tau_heap)
         infection_time = reaction[2].time
 
         if reaction[2].isRecovery
             recovery_branch!(population_df, model, reaction[2].parentID)
-            pop!(tau_heap)
+            # pop!(tau_heap)
 
             num_events += 1
             state_totals_all[num_events, :] .= copy(model.state_totals)
@@ -597,30 +769,127 @@ function nextReact_branch(population_df::DataFrame, model::branchModel)
         else # infection event
 
             sSaturation = (model.state_totals[1]/model.population_size)
-            # rejection step
-            if rand() < sSaturation/reaction[2].sSaturation # placeholder
+            # rejection step for population saturation
+            if rand() < sSaturation/reaction[2].sSaturation
 
-                num_cases += 1
-                initNewCase!(population_df, model, infection_time, reaction[2].parentID, num_cases)
+                # rejection step for detection and subsequent isolation (short circuit OR)
+                if !population_df[reaction[2].parentID,:detected] ||
+                    infection_time < population_df[reaction[2].parentID,:time_isolated] ||
+                    rand() < model.isolation_infectivity
 
-                update!(tau_heap, reaction[1], event(population_df[num_cases,:time_recovery], true, population_df[num_cases,:caseID], sSaturation))
+                    num_cases += 1
+                    initNewCase!(population_df, model, infection_time, reaction[2].parentID, num_cases)
 
-                # determine num offspring
-                expOff = sSaturation * population_df[num_cases, :reproduction_number]
-                num_off = rand(Poisson(expOff))
-
-                # new infections
-                for j in 1:num_off
-                    update!(tau_heap, next_unused_index, event(infection_time+rand(infection_time_dist), false, population_df[num_cases,:caseID], sSaturation))
+                    update!(tau_heap, next_unused_index, event(population_df[num_cases,:time_recovery], true, population_df[num_cases,:caseID], sSaturation))
                     next_unused_index += 1
-                end
 
-                num_events += 1
-                state_totals_all[num_events, :] .= copy(model.state_totals)
-                push!(t, infection_time*1)
-            else
+                    # determine num offspring
+                    expOff = sSaturation * population_df[num_cases, :reproduction_number]
+                    num_off = rand(Poisson(expOff))
+
+                    # new infections
+                    for j in 1:num_off
+                        update!(tau_heap, next_unused_index, event(infection_time+rand(infection_time_dist), false, population_df[num_cases,:caseID], sSaturation))
+                        next_unused_index += 1
+                    end
+
+                    num_events += 1
+                    state_totals_all[num_events, :] .= copy(model.state_totals)
+                    push!(t, infection_time*1)
+                end
+            # else
                 # get rid of infection event (didn't happen)
-                pop!(tau_heap)
+                # pop!(tau_heap)
+
+            end
+        end
+
+    end
+
+    if t[end] < model.t_max
+        num_events += 1
+        push!(t, model.t_max)
+        state_totals_all[num_events, :] .= copy(model.state_totals)
+    end
+
+    return t, state_totals_all[1:num_events,:], num_cases
+end
+
+function nextReact_branch(population_df::DataFrame, model::branchModel)
+
+    num_cases::Int64 = model.state_totals[2]*1
+    num_events = 1
+    t = Float64[copy(model.t_init)]
+
+    state_totals_all = initStateTotals(model, 1+(model.max_cases-num_cases)*2)
+    infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
+
+    # filter df on active infections
+    active_df = filter(row -> row.active, population_df[1:num_cases, :], view=true)
+
+    # num_tau_events = model.max_cases * (model.reproduction_number*1.2 + 1)
+    # tau_i = [event(model.t_max+i,false,0,0) for i=1:num_tau_events]
+    tau_heap = MutableBinaryHeap{event, DataStructures.FasterForward}()
+
+    sSaturation = (model.state_totals[1]/model.population_size)
+
+    expOff = (model.state_totals[1]/model.population_size) .* active_df.reproduction_number
+    num_off = rand.(Poisson.(expOff))
+
+    for i in 1:length(active_df.time_infected)
+        # insert recovery events
+        push!(tau_heap, event(active_df[i,:time_recovery], true, active_df[i,:caseID], sSaturation))
+
+        # insert infection events
+        for j in 1:num_off[i]
+            push!(tau_heap, event(t[end]+rand(infection_time_dist), false, active_df[i,:caseID], sSaturation))
+        end
+    end
+
+
+    while t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases
+
+        # returns a event
+        reaction = pop!(tau_heap)
+        infection_time = reaction.time
+
+        if reaction.isRecovery
+            recovery_branch!(population_df, model, reaction.parentID)
+            # pop!(tau_heap)
+
+            num_events += 1
+            state_totals_all[num_events, :] .= copy(model.state_totals)
+            push!(t, infection_time*1)
+
+        else # infection event
+
+            sSaturation = (model.state_totals[1]/model.population_size)
+            # rejection step for population saturation
+            if rand() < sSaturation/reaction.sSaturation
+
+                # rejection step for detection and subsequent isolation (short circuit OR)
+                if !population_df[reaction.parentID,:detected] ||
+                    infection_time < population_df[reaction.parentID,:time_isolated] ||
+                    rand() < model.isolation_infectivity
+
+                    num_cases += 1
+                    initNewCase!(population_df, model, infection_time, reaction.parentID, num_cases)
+
+                    push!(tau_heap, event(population_df[num_cases,:time_recovery], true, population_df[num_cases,:caseID], sSaturation))
+
+                    # determine num offspring
+                    expOff = sSaturation * population_df[num_cases, :reproduction_number]
+                    num_off = rand(Poisson(expOff))
+
+                    # new infections
+                    for j in 1:num_off
+                        push!(tau_heap, event(infection_time+rand(infection_time_dist), false, population_df[num_cases,:caseID], sSaturation))
+                    end
+
+                    num_events += 1
+                    state_totals_all[num_events, :] .= copy(model.state_totals)
+                    push!(t, infection_time*1)
+                end
             end
         end
 
@@ -653,13 +922,20 @@ function init_model_pars(t_init::Number, t_max::Number, population_size::Int, ma
     reproduction_k = 0.5 # Superspreading k a la Lloyd-Smith
     stochasticRi = true
 
-    #
+    # Weibull distributed
     t_generation_shape = 2.826
     t_generation_scale = 5.665
 
     ###### isolation parameters to add later ####
-    t_onset_shape = 0
-    t_onset_scale = 0
+    # gamma distributed
+    t_onset_shape = 5.8
+    t_onset_scale = 0.95
+
+    # Exponentially distributed
+    t_onset_to_isol = 2.2
+    stochasticIsol = true
+    p_test = 0#0.75
+
     #############################################
 
     recovery_time = 30 # time taken for recovery (no randomness in this)
@@ -668,8 +944,8 @@ function init_model_pars(t_init::Number, t_max::Number, population_size::Int, ma
 
     model = branchModel(t_init, t_max, population_size, max_cases, state_totals, states,
         sub_clin_prop, sub_clin_scaling, reproduction_number, reproduction_k, stochasticRi,
-        t_generation_shape, t_generation_scale, t_onset_shape, t_onset_scale, recovery_time,
-        isolation_infectivity)
+        t_generation_shape, t_generation_scale, t_onset_shape, t_onset_scale, t_onset_to_isol,
+        stochasticIsol, p_test, recovery_time, isolation_infectivity)
 
     return model
 end
@@ -1012,9 +1288,9 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
         println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
 
-        title = "First React Solution vs Discrete Solution, Simulation. Discrete timestep = $time_step"
+        title = "First React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/FirstVsDiscrete"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, true, true, false)
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, true, true, true)
     end
 
     println("Test #6: Epidemic curves (Next vs Discrete)")
@@ -1082,9 +1358,9 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
         println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
 
-        title = "Next React Solution vs Discrete Solution, Simulation. Discrete timestep = $time_step"
+        title = "Next React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscrete"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, false)
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
     end
 
     println("Test #7: Epidemic curves (Next vs Discrete - 1 Day timestep)")
@@ -1152,7 +1428,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
         println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
 
-        title = "Next React Solution vs Discrete Solution, Simulation. Discrete timestep = $time_step"
+        title = "Next React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscrete1Day"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
     end
@@ -1172,9 +1448,168 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
         title = "Discrete solution for fixed inputs when varying time step"
         outputFileName = "./verifiedBranch/DiscreteVariedTimeStep"
-        branchTimeStepPlot(discrete_mean_1, discrete_mean_2, discrete_mean_3, times1, times2, times3, title, outputFileName, true, false)
+        branchTimeStepPlot(discrete_mean_1, discrete_mean_2, discrete_mean_3, times1, times2, times3, title, outputFileName, true, true)
     end
 
+    println("Test #9: Epidemic curves (Next vs Discrete, Isolation)")
+    if 9 in testRange
+        println("Beginning simulation of Discrete Case")
+
+        # time span to sim on
+        tspan = (0.0,100.0)
+        time_step = 0.01
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(300 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(400 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
+        outputFileName = "./verifiedBranch/NextvsDiscreteIsolationg"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+    end
+
+    println("Test #10: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep)")
+    if 10 in testRange
+        println("Beginning simulation of Discrete Case")
+
+        # time span to sim on
+        tspan = (0.0,100.0)
+        time_step = 1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(200 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(200 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
+        outputFileName = "./verifiedBranch/NextvsDiscreteIsol1Day"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+    end
 end
 
 function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
@@ -1207,97 +1642,67 @@ function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64
     return hcat(Smean, Imean, Rmean), times
 end
 
+function compilationInit()
+    # discrete
+    model = init_model_pars(0, 100, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+    population_df = initDataframe(model);
+    time_step = 1;
+    @time t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
 
-# ------------------------------
-# model = init_model_pars(0, 20, 5*10^7, 100, [5*10^7-10,10,0])
-#
-# population_df = initDataframe(model)
-#
-# @time t, state_totals_all, num_cases = firstReact_branch(population_df, model)
-# #
-# # # ------------------------------
-# # model = init_model_pars(0, 40, 5*10^7, 100, [5*10^7-10,10,0])
-# #
-# # population_df = initDataframe(model)
-# # t, state_totals_all, num_cases = firstReact_branch(population_df, model)
-#
-# #------------------------------
-# model = init_model_pars(0, 100, 5*10^3, 100, [5*10^3-10,10,0]);
-#
-# population_df = initDataframe(model);
-# @time t, state_totals_all, num_cases= firstReact_branch(population_df, model)
+    # first
+    model = init_model_pars(0, 20, 5*10^7, 100, [5*10^7-10,10,0])
+    population_df = initDataframe(model)
+    @time t, state_totals_all, num_cases = firstReact_branch(population_df, model)
 
+    # next
+    model = init_model_pars(0, 100, 5*10^3, 5*10^3, [5*10^3-10,10,0])
+    population_df = initDataframe(model);
+    @time t, state_totals_all, num_cases= nextReact_branch(population_df, model)
+end
 
-model = init_model_pars(0, 100, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+compilationInit()
+
+# verifySolutions(1, [[5,6,7,9,10]])
+
+model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
+time_step = 1;
+# model.p_test = 1.0
+# model.sub_clin_prop = 0
+# model.stochasticIsol = false
+# model.t_onset_shape = 5.8
+# model.t_onset_to_isol = 0
 
 population_df = initDataframe(model);
-@profiler t, state_totals_all, num_cases= nextReact_branch(population_df, model)
-# outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
-# subtitle = "Next React model"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, true)
-# #
-# inactive_df = filter(row -> row.active==false && row.parentID!=0 || row.time_recovery < t[end]+10, population_df[1:num_cases, :], view=true)
-#
-# print(mean(inactive_df.num_offspring))
-# print("\n")
-# print(mean(inactive_df.reproduction_number))
-
-
-# root_node = randRootNode(population_df)
-# simpleGraph_branch(population_df, 1000, false)
-# simpleGraph_branch(population_df, 200, true, root_node)
-
-
-# t, num_steps = initTime(model, 1)
-# initStateTotals(model, t)
-#
-#
-# initTime_infection(model, 1)
-#
-# infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
-#
-# t_infection = initTime_infection(model, 1)
-# area_under_curve = diff(cdf.(infection_time_dist, t_infection))
-#
-# active_df = filter(row -> row.active, population_df::DataFrame, view=true)
-#
-# t = [1,2]
-# current_step = 1
-#
-# exp_off = (model.state_totals[1]/model.population_size) .*
-#     active_df.reproduction_number .*
-#
-# areaUnderCurve(area_under_curve, round.(t[current_step] .- active_df.time_infected))
-#
-# convert.(Int64, round.(t[current_step] .- active_df.time_infected))
-
-# model = init_model_pars(0, 100, 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-# model = init_model_pars(0, 100, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-#
-# population_df = initDataframe(model);
-# time_step = .1;
-# t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
-# outputFileName = "juliaGraphs/branchDiscrete/branch_model_$(model.population_size)"
+@time t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
+outputFileName = "juliaGraphs/branchDiscrete/branch_model_$(model.population_size)"
 # subtitle = "Discrete model with timestep of $time_step days"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, true)
-#
-#
-# model = init_model_pars(0, 100, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-#
-# population_df = initDataframe(model);
-# time_step = .1;
-# t, state_totals_all, num_cases = discrete_branch(population_df, model, time_step)
-# outputFileName = "juliaGraphs/branchDiscrete/branch_model_$(model.population_size)"
-# subtitle = "Discrete model with timestep of $time_step days"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, true)
-#
-# inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-#
-# print("\n")
-# print(mean(inactive_df.num_offspring))
-# print("\n")
-# print(mean(inactive_df.reproduction_number))
+# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+
+# # next tracked heap
+model = init_model_pars(0, 200, 5*10^6, 5*10^3, [5*10^6-10,10,0]);
+population_df = initDataframe(model);
+@time t, state_totals_all, num_cases = nextReact_branch_trackedHeap(population_df, model)
+outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
+subtitle = "Next react model"
+plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+
+# # next, regular heap
+model = init_model_pars(0, 200, 5*10^6, 5*10^3, [5*10^6-10,10,0]);
+population_df = initDataframe(model);
+@time t, state_totals_all, num_cases = nextReact_branch(population_df, model)
+outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
+subtitle = "Next react model"
+plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 
 
-verifySolutions(1, 7)
+
+model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+population_df = initDataframe_thin(model);
+@time branchingProcess!(population_df, model)
+
+# print(population_df)
+
+simpleGraph_branch(population_df, 1000, true, 2)
+
+population_df

@@ -29,13 +29,13 @@ module BranchVerifySoln
         Seaborn.set()
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
-        plt.plot(times, Smean, "k-", label="S - $typeSim Simulation Mean", lw=2.5, figure=fig)
-        plt.plot(times, Imean, "b-", label="I - $typeSim Simulation Mean", lw=2.5, figure=fig)
-        plt.plot(times, Rmean, "r-", label="R - $typeSim Simulation Mean", lw=2.5, figure=fig)
+        plt.plot(times, Smean, "k-", label="S - $typeSim", lw=2.5, figure=fig)
+        plt.plot(times, Imean, "b-", label="I - $typeSim", lw=2.5, figure=fig)
+        plt.plot(times, Rmean, "r-", label="R - $typeSim", lw=2.5, figure=fig)
 
-        plt.plot(times, discreteArray[:,1], "g-.", label="S - Discrete Simulation Mean", lw=1.5, figure=fig, alpha = 1)
-        plt.plot(times, discreteArray[:,2], "w-.", label="I - Discrete Simulation Mean", lw=1.5, figure=fig, alpha = 1)
-        plt.plot(times, discreteArray[:,3], "k-.", label="R - Discrete Simulation Mean", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,1], "g-.", label="S - Discrete", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,2], "w-.", label="I - Discrete", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,3], "k-.", label="R - Discrete", lw=1.5, figure=fig, alpha = 1)
 
 
         plt.xlabel("Time")

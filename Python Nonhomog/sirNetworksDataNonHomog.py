@@ -14,7 +14,7 @@ def setNetwork(network, prop_i=0.05):
     iTotal      : number of infected
     sTotal      : number of susceptible
     rTotal      : number of recovered
-    numInfNei   : number of infected neighbour of each vertex
+    numSusNei   : number of susceptible neighbours of each vertex
     rates       : hazard rate of each vertex
     susceptible : boolean array if vertex is susceptible or not
     '''
@@ -31,23 +31,23 @@ def setNetwork(network, prop_i=0.05):
     rTotal = 0
 
     # adding in hazards/rates
-    numInfNei = initHazards(network, infecteds, N)
-    return iTotal, sTotal, rTotal, numInfNei, susceptible
+    numSusNei = initHazards(network, infecteds, N)
+    return iTotal, sTotal, rTotal, numSusNei, susceptible
 
 def initHazards(network, infecteds, N):
     '''
-    inits numInfNei array
+    inits numSusNei array
     Inputs
     network     : igraph network object
     infecteds   : array of infected vertices
     N           : total number of vertices
     Outputs
-    numInfNei   : number of infected neighbours for each vertex
+    numSusNei   : number of susceptible neighbours for each vertex
     '''
     numInfNei = np.zeros(N)
     # loop over all infected vertices
     for inf_vert in network.vs(infecteds):
-        # Increase number of infected neighbours for neighbouring vertices
+        # Increase number of susceptible neighbours for neighbouring vertices
         neighbours = network.neighbors(inf_vert)
         for n in neighbours:
             numInfNei[n] += 1
@@ -180,7 +180,7 @@ def main():
         print("Beginning Ernos-Renyi simulations")
         start = time.time()
 
-        for i in range(10):
+        for i in range(1):
             print(f"Iteration {i} commencing")
             network = ig.Graph.Erdos_Renyi(100,0.1)
             iTotal, sTotal, rTotal, numInfNei, susceptible = setNetwork(network)

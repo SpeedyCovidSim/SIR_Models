@@ -32,7 +32,7 @@ def setNetwork(network, prop_i=0.05):
 
     # adding in hazards/rates
     numInfNei = initHazards(network, infecteds, N)
-    return iTotal, sTotal, rTotal, numInfNei, susceptible
+    return iTotal, sTotal, rTotal, numInfNei, susceptible, infecteds
 
 def initHazards(network, infecteds, N):
     '''
@@ -55,7 +55,7 @@ def initHazards(network, infecteds, N):
     numInfNei[infecteds] = 0
     return numInfNei
 
-def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, maxalpha, maxbeta, rate_function, tInit = 0.0):
+def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, maxalpha, maxbeta, rate_function, infecteds, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -89,19 +89,20 @@ def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, s
 
     # initialise random variate generation with set seed
     rng = random.default_rng(123)
-    rates = rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha)
+    rates = rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha, infecteds)
 
     while t[-1] < tMax and iTotal != 0:
         # get sum of maximum bounds
         H = S[i-1]*np.max(numInfNei)*maxbeta+I[i-1]*maxalpha
         deltaT = rng.exponential(1/H)
-        eventIndex = random.choice(a=N,p=rates/np.sum(rates))
-        if (rng.uniform() <= rates[eventIndex]/H):
-            # update local neighbourhood attributes
-            if susceptible[eventIndex]:  # (S->I)
-                # change state and entry time
+        tempIndex = random.choice(a=2*len(infecteds),p=rates/np.sum(rates))
+        if (rng.uniform() <= rates[tempIndex]/H):
+            if tempIndex < len(infecteds):
+                infector = infecteds[tempIndex]
+                eventIndex = random.choice(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(infector)))
                 susceptible[eventIndex] = 0
-                entry_times[eventIndex] = t[i-1]+deltaT
+                entry_times[eventIndex] =  t[i-1]+deltaT
+                infecteds.append(eventIndex)
                 # get neighbouring vertices
                 neighbors = network.neighbors(eventIndex)
                 # update numfInfNei of neighbours
@@ -111,12 +112,14 @@ def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, s
                 # update network totals
                 sTotal -= 1
                 iTotal += 1
-
-            else: # (I->R)
+            else:
+                tempIndex = tempIndex - len(infecteds)
+                eventIndex = infecteds[tempIndex]
                 # change individual state
                 susceptible[eventIndex] = -1
                 # get neighbouring vertices
                 neighbors = network.neighbors(eventIndex)
+                infecteds.remove(eventIndex)
                 # update numInfNei of neighbours
                 for n in neighbors:
                     if susceptible[n]:
@@ -126,7 +129,7 @@ def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, s
                 rTotal += 1
         # update rates
         sim_time += deltaT
-        rates = rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha)
+        rates = rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha, infecteds)
 
         # add totals
         if i < maxI:
@@ -165,13 +168,12 @@ def main():
     alpha = 0.4
     beta = 10 / N
     
-    def rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha):
-        temp = np.zeros(len(susceptible))
-        rates = np.zeros(len(susceptible))
-        for i in range(len(susceptible)):
-            if (susceptible[i]==0):
-                rates[np.intersect1d(np.nonzero(susceptible==1),network.neighbors(i))] += max(maxbeta*1e-4,maxbeta/10*abs(sim_time-entry_times[i]-5)+maxbeta)
-                rates[i] = maxalpha
+    def rate_function(susceptible, network, entry_times, sim_time, maxbeta, maxalpha, Inf):
+        temp = np.zeros(2*len(Inf))
+        rates = np.zeros(2*len(Inf))
+        for i in range(len(Inf)):
+            rates[i] = len(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(Inf[i])))*max(maxbeta*1e-4,maxbeta/10*abs(sim_time-entry_times[i]-5)+maxbeta)
+            rates[i+len(Inf)] = maxalpha
         return rates
 
 
@@ -183,9 +185,9 @@ def main():
         for i in range(10):
             print(f"Iteration {i} commencing")
             network = ig.Graph.Erdos_Renyi(100,0.1)
-            iTotal, sTotal, rTotal, numInfNei, susceptible = setNetwork(network)
+            iTotal, sTotal, rTotal, numInfNei, susceptible, infecteds = setNetwork(network)
             print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, alpha, beta, rate_function)
+            t, S, I, R = gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, alpha, beta, rate_function, infecteds)
         end = time.time()
         print(f"Avg. time taken for Lumped hazards simulation: {(end-start)/10}")
 

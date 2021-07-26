@@ -3,9 +3,9 @@ from numpy import random
 from plots import plotSIR, plotSIRK
 import time
 
-def inverseMethod(updateFunction, timeLimit=100):
+def firstInverseMethod(updateFunction, timeLimit=100):
     '''
-    Simulates a nonhomogeneous Poisson Process from a given time update function
+    Simulates competing non-Markovian jump processes from a vector of rate functions and max rates
     Using analytical inversion of the distribution function
     Inputs
     updateFunction   : function that returns next event time given last event time and a uniform variable
@@ -29,40 +29,10 @@ def inverseMethod(updateFunction, timeLimit=100):
 
     return eventTimes
 
-def thinningExactMethod(rateFunction, rateMax, timeLimit=100):
+def firstThinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     '''
-    Simulates a nonhomogeneous Poisson Process from a given rate function and max rate
-    Using an exact thinning algorithm on future rates
-    Inputs
-    rateFunction : rate function of the nonhomogeneous process
-    rateLimit    : max bound on the rate function
-    Output
-    eventTime    : time of events
-    '''
-    # initialise system
-    t = 0
-    i = 0
-    eventTimes = np.zeros(1000)
-    rng = random.default_rng(123)
-    # run till max sim time is reached
-    while t < timeLimit:
-        #draw inter-event time
-        delT = rng.exponential(1/rateMax)
-        #update simulation time
-        t += delT
-        # thin process
-        u = rng.uniform()
-        if u <= (rateFunction(t)/rateMax):
-            eventTimes[i] = t
-        # update index
-        i += 1
-
-    return eventTimes
-
-def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
-    '''
-    Simulates a nonhomogeneous Poisson Process from a given rate function and max rate
-    Using an approx thinning algorithm on instantaneous rates
+    Simulates competing non-Markovian jump processes from a vector of rate functions and max rates
+    Using an approximate thinning algorithm on instantaneous rates
     Inputs
     rateMax : rate function of the nonhomogeneous process
     rateLimit    : max bound on the rate function
@@ -90,6 +60,20 @@ def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     return eventTimes
 
 
+
+def gillespieMax(rateFunction, rateMax, timeLimit=100):
+    pass
+
+def nMGA():
+    pass
+
+def firstMax():
+    pass
+
+def maxFirst():
+    pass
+
+
 def main():
     '''
     Main loop for testing within this Python file
@@ -101,7 +85,7 @@ def main():
   
     timeLimit = 100
     
-    def rate_function(ti, u):
+    def updateFunction(ti, u):
         tip1 = np.sqrt((ti^2+25*u)/(1-u))
         return tip1
 

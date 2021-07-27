@@ -43,10 +43,15 @@ module sirModels
         I = [copy(I_total)]
         R = [copy(R_total)]
 
+        h_i = [0.0, 0.0]
+
         while t[end] < t_max && I_total != 0
             # calculate the propensities to transition
             # h1 is propensity for infection, h2 is propensity for recovery
-            h_i = [beta * I_total * S_total / N, alpha * I_total]
+            h_i[1] = beta * I_total * S_total / N
+            h_i[2] = alpha * I_total
+
+            # h_i = [beta * I_total * S_total / N, alpha * I_total]
             h = sum(h_i)
 
             # time to any event occurring

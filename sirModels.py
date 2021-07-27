@@ -32,10 +32,12 @@ def gillespieDirect2Processes(t_max, S_total, I_total, R_total, alpha, beta, N, 
     I = [I_total]
     R = [R_total]
 
+    # h_i = np.array([0,0])
+
     while t[-1] < t_max and I_total != 0:
         # calculate the propensities to transition
         # h1 is propensity for infection, h2 is propensity for recovery
-        h_i = np.array([beta * I_total * S_total, alpha * I_total])
+        h_i = np.array([beta * I_total * S_total / N, alpha * I_total])
         h = sum(h_i)
 
         # time to any event occurring

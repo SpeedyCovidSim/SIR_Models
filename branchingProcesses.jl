@@ -869,6 +869,73 @@ function dataframeClean!(sorted_df::DataFrame, range_to_clean::UnitRange)
     return nothing
 end
 
+function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
+    model::branchModel, gen_range_dict, num_cases::Int64, saturationDepend::Bool,
+    isolationDepend::Bool, prob_accept::Float64)
+    #=
+    Thins events from the population_df dataframe, by setting a boolean column
+    to true for that row
+
+    One single thinning iteration.
+
+    Continue thinning until sSaturation <= lower bound (0.1 atm)
+    =#
+
+    sSaturation = (model.state_totals[1]/model.population_size)
+    # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
+    caseSaturation = zeros(num_cases) # corresponds to the sorted indexes
+    caseSaturation[gen_range_dict[1]] .= sSaturation*1
+
+    caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
+    unthinned_caseID = 0
+
+    increment = 1.0/model.population_size
+    thinned = BitArray(undef, num_cases) .* false#true
+    # thinned[gen_range_dict[1]] .= false
+    population_df.thinned = thinned
+
+    # offspring_simmed = BitArray(undef, num_cases) .* true
+    # offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
+    # population_df.offspring_simmed = offspring_simmed
+    numSeedCases = length(gen_range_dict[1])
+
+    # do not thin seed cases
+    # for i in collect(gen_range_dict[1])
+    #     if false
+    #         println()
+    #     end
+    # end
+
+    total_thinned = 0
+
+    # thinning of child cases
+    for i in numSeedCases+1:nrow(sorted_df)
+        parentIndex = caseIDs_to_index[sorted_df[i, :parentID]]
+        if sorted_df[parentIndex, :thinned] || rand()>sSaturation#/sSaturation_upper
+            sorted_df[i, :thinned] = true
+            total_thinned+=1
+            sorted_df[parentIndex, :num_offspring]-=1
+
+            caseSaturation[i] = caseSaturation[i-1]*1
+        else
+            caseSaturation[i] = sSaturation*1
+            sSaturation-=increment
+            # sorted_df[i, :thinned] = false
+
+        end
+
+        if sSaturation <= 0.1
+            println("Hit saturation lower bound")
+            break
+        end
+
+    end
+
+    println("Total thinned is $total_thinned")
+
+    return filterInfections(sorted_df, model, true)
+end
+
 function bp_thinnedHereAndNow!(population_df::DataFrame, sorted_df::SubDataFrame,
     model::branchModel, gen_range_dict, num_cases::Int64, saturationDepend::Bool,
     isolationDepend::Bool, prob_accept::Float64)
@@ -1239,15 +1306,17 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Boo
     # thinned_hereAndNow=true
     if thinning
 
-        createThinningTree(population_df)
+        # createThinningTree(population_df)
 
         # do thinning
         sDepend=true
         isolDepend=false
 
         prob_accept = 0.9
-        sorted_df = bp_thinnedHereAndNow!(population_df, sorted_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
+        # sorted_df = bp_thinnedHereAndNow!(population_df, sorted_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
+        sorted_df = bp_SingleThin!(population_df, sorted_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
     end
+
 
 
     # sorted_df = filterInfections(sorted_df, model, thinning)
@@ -2428,26 +2497,26 @@ end
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 
-model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
-population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, true, false, true)
-outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"
-subtitle = "Simple Branching Process"
-plotSimpleBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
-#
-model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
-population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, false, false)
-outputFileName = "juliaGraphs/branchSimpleRandITimes/branch_model_$(model.population_size)"
-subtitle = "Simple Branching Process, Random Infection Times"
-plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
-
-# model = init_model_pars(0, 200, 5*10^6, 15*10^6, [5*10^6-10,10,0]);
+# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
 # population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
-# outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Branching Process, Random Infection Times, S saturation thinning"
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, true, false, true)
+# outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"
+# subtitle = "Simple Branching Process"
+# plotSimpleBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+# #
+# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+# population_df = initDataframe_thin(model);
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, false)
+# outputFileName = "juliaGraphs/branchSimpleRandITimes/branch_model_$(model.population_size)"
+# subtitle = "Simple Branching Process, Random Infection Times"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+
+model = init_model_pars(0, 200, 5*10^6, 15*10^6, [5*10^6-10,10,0]);
+population_df = initDataframe_thin(model);
+@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
+outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
+subtitle = "Branching Process, Random Infection Times, S saturation thinning"
+plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
 # population_df = initDataframe_thin(model);
@@ -2461,14 +2530,14 @@ plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, sub
 
 # simpleGraph_branch(population_df, 1000, true, 2)
 
-# population_df
-deptree = 1
-tree = 1
-population_df = sort(population_df,  [:caseID], view=false)
-
-time=@elapsed tree = createThinningTree(population_df, 10);
-println(time)
-@profiler tree = createThinningTree(population_df, 10);
-population_df[11:12,:]
-
-time=@elapsed deptree = createDependencyTree(population_df, nrow(population_df))
+# # population_df
+# deptree = 1
+# tree = 1
+# population_df = sort(population_df,  [:caseID], view=false)
+#
+# time=@elapsed tree = createThinningTree(population_df, 10);
+# println(time)
+# @profiler tree = createThinningTree(population_df, 10);
+# population_df[11:12,:]
+#
+# time=@elapsed deptree = createDependencyTree(population_df, nrow(population_df))

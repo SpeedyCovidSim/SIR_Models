@@ -693,6 +693,15 @@ function createThinningTree(population_df::DataFrame, numSeedCases)
     return tree
 end
 
+function getTimeInfected_relativeArray(model::branchModel, num_cases)
+    #=
+    Returns an array of num_cases infection times
+    =#
+
+    infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
+    return rand(infection_time_dist, num_cases)
+end
+
 function getTimeInfected_relative!(population_df::DataFrame, model::branchModel, gen_range_dict, num_cases::Int64)
     #=
     Returns the time that an individual is infected by their parent. This is a
@@ -936,6 +945,7 @@ function bp_ThinTree!(population_df::DataFrame,
     # sorted_df = copy(sorted_df)
 
     total_thinned = 0
+    new_model = deepcopy(model) # for creating new dataframes
 
     while !isempty(search)
         currentNode = pop!(search)
@@ -954,9 +964,38 @@ function bp_ThinTree!(population_df::DataFrame,
             # offspring not simmed
             if !population_df[currentNode.caseID, :offspring_simmed]
                 population_df[currentNode.caseID, :sSaturation_upper] = sSaturation*1
-                # Simulate offspring for a few generations
+                # Simulate offspring for a few generations (one?)
                 # simulate at sSaturation_upper/sSaturation
 
+                # sim numOff
+                expOff = population_df[currentNode.caseID, :reproduction_number] * sSaturation
+                numOff = rand(Poisson(expOff))
+                if numOff != 0
+                    # add rows to df
+
+                    new_model.max_cases = numOff
+                    new_model.state_totals[2] = 0
+                    new_rows = initDataframe_thin(new_model)
+
+                    new_rows.parentID .= currentNode.parent[].caseID
+                    new_rows.caseID .+= nrow(population_df)
+                    new_rows.generation_number .= population_df[currentNode.caseID, :generation_number]+1
+                    new_rows.num_offspring = Array{Int64}(undef, numOff) .* 0
+                    new_rows.time_infected_rel = Array{Int64}(undef, numOff) .* 0
+                    new_rows.time_infected = getTimeInfected_relativeArray(model, numOff) .+ population_df[currentNode.caseID, :time_infected]
+                    getTimeRecovered!(new_rows, model)
+                    new_rows.sSaturation_upper = ones(numOff)
+                    new_rows.thinned = BitArray(undef, numOff) .* false
+                    new_rows.thinned .= true
+                    new_rows.offspring_simmed = BitArray(undef, numOff) .* false
+
+                    append!(population_df, new_rows)
+                    # population_df = vcat(population_df, new_rows)
+
+                    current_range = nrow(population_df)-numOff+1:nrow(population_df)
+
+                    currentNode.children = [Node(i, population_df[i, :time_infected], Ref(currentNode), []) for i in current_range]
+                end
             end
 
             # add children to search
@@ -967,7 +1006,7 @@ function bp_ThinTree!(population_df::DataFrame,
     end
     total_thinned = sum(population_df.thinned .== true)
     println()
-    println("Total thinned is $total_thinned")
+    println("Total thinned is $total_thinned, out of $(nrow(population_df)) events")
 
     filtered_df = filterInfections(population_df, model, true, false)
 
@@ -2631,24 +2670,24 @@ end
 # subtitle = "Simple Branching Process, Random Infection Times"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# model = init_model_pars(0, 200, 5*10^5, 5*10^6, [5*10^5-10,10,0]);
+# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
 # population_df = initDataframe_thin(model);
 # @time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
 # outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
 # subtitle = "Branching Process, Random Infection Times, S saturation thinning"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# model = init_model_pars(0, 200, 5*10^5, 30*10^5, [5*10^5-10,10,0]);
-# population_df = initDataframe_thin(model);
-# @profiler bpMain!(population_df, model, false, true, false)
-
-
-model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
 population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
-outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
-subtitle = "Branching Process, Random Infection Times, S saturation thinning"
-plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+@profiler bpMain!(population_df, model, false, true, false)
+
+
+# model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+# population_df = initDataframe_thin(model);
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
+# outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
+# subtitle = "Branching Process, Random Infection Times, S saturation thinning"
+# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 
 # print(population_df)

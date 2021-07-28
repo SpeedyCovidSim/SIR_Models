@@ -111,6 +111,25 @@ struct Tree
     rootNodes::Array{Node,1}
 end
 
+function Base.isequal(x::Node, y::Node); x.caseID === y.caseID; end
+
+function deleteChildNode!(childNode::Node)
+    #=
+    Given a child node, delete the child from it's parent's children array
+    =#
+
+    parent = childNode.parent[]
+
+    for i in 1:length(parent.children)
+        if isequal(parent.children[i], childNode)
+            deleteat!(parent.children, i)
+            break
+        end
+    end
+
+    return nothing
+end
+
 function caseIDsort(x::Node, y::Node)::Bool
     x.caseID < y.caseID
 end
@@ -119,6 +138,12 @@ struct IDOrdering <: Base.Order.Ordering
 end
 
 function Base.Order.lt(o::IDOrdering, a::Node, b::Node); return caseIDsort(a,b); end
+
+struct TimeOrdering <: Base.Order.Ordering
+end
+
+function Base.Order.lt(o::TimeOrdering, a::Node, b::Node); return a.infection_time < b.infection_time; end
+
 
 function Base.isless(x::Node, y::Node)::Bool
     return  x.infection_time < y.infection_time
@@ -744,24 +769,24 @@ function getTimeRecovered!(population_df::DataFrame, model::branchModel)
     population_df.time_recovery = population_df.time_infected .+ model.recovery_time
 end
 
-function sortInfections(population_df::DataFrame, model::branchModel)
+function sortInfections(population_df::Union{SubDataFrame,DataFrame}, model::branchModel, viewBool::Bool=true)
     #=
     Returns a sorted view of a population_df dataframe.
 
     It is sorted by infection time
     =#
 
-    return sort(population_df, [:time_infected], view=true)
+    return sort(population_df, [:time_infected], view=viewBool)
 end
 
-function filterInfections(sorted_df::Union{SubDataFrame,DataFrame}, model::branchModel, thinning::Bool)
+function filterInfections(sorted_df::Union{SubDataFrame,DataFrame}, model::branchModel, thinning::Bool, viewBool::Bool=false)
     #=
     Returns a filtered sorted_df dataframe, removing any cases that never got
     used.
     It is filtered by whether an infection is thinned
     =#
     if thinning
-        return filter(row -> !row.thinned, sorted_df, view=false)
+        return filter(row -> !row.thinned, sorted_df, view=viewBool)
     end
     return sorted_df
 end
@@ -869,7 +894,88 @@ function dataframeClean!(sorted_df::DataFrame, range_to_clean::UnitRange)
     return nothing
 end
 
-function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
+function bp_ThinTree!(population_df::DataFrame,
+    model::branchModel, gen_range_dict, num_cases::Int64, saturationDepend::Bool,
+    isolationDepend::Bool, prob_accept::Float64, thinningTree::Tree)
+    #=
+    Thins events from the population_df dataframe, by setting a boolean column
+    to true for that row
+
+    Continue thinning until sSaturation <= lower bound (0.1 atm)
+    =#
+
+
+    search = BinaryHeap{Node, TimeOrdering}()
+    # push all children of rootNodes into heap. They will be sorted by infection time
+    for rootNode in thinningTree.rootNodes
+        for child in rootNode.children
+            push!(search, child)
+        end
+    end
+
+    sSaturation = (model.state_totals[1]/model.population_size)
+    # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
+    sSaturation_upper = ones(num_cases)
+    population_df.sSaturation_upper = sSaturation_upper
+
+    # caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
+    # unthinned_caseID = 0
+
+    increment = 1.0/model.population_size
+    thinned = BitArray(undef, num_cases) .* false
+    thinned[gen_range_dict[1][end]+1:end] .= true
+    # thinned[gen_range_dict[1]] .= false
+    population_df.thinned = thinned
+
+    offspring_simmed = BitArray(undef, num_cases) .* false
+    offspring_simmed .= true
+    offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
+    population_df.offspring_simmed = offspring_simmed
+    # numSeedCases = length(gen_range_dict[1])
+
+    # sorted_df = copy(sorted_df)
+
+    total_thinned = 0
+
+    while !isempty(search)
+        currentNode = pop!(search)
+        # index = caseIDs_to_index[currentNode.caseID]
+        # parentIndex = caseIDs_to_index[sorted_df[currentNode.caseID, :parentID]]
+
+        if rand(Float64)>sSaturation/population_df[currentNode.parent[].caseID::Int64, :sSaturation_upper]
+            # you are thinned
+            deleteChildNode!(currentNode)
+            population_df[currentNode.parent[].caseID::Int64, :num_offspring]-=1
+            # total_thinned+=1
+        else
+            population_df[currentNode.caseID, :thinned] = false
+            sSaturation-=increment
+
+            # offspring not simmed
+            if !population_df[currentNode.caseID, :offspring_simmed]
+                population_df[currentNode.caseID, :sSaturation_upper] = sSaturation*1
+                # Simulate offspring for a few generations
+                # simulate at sSaturation_upper/sSaturation
+
+            end
+
+            # add children to search
+            for child in currentNode.children
+                push!(search, child)
+            end
+        end
+    end
+    total_thinned = sum(population_df.thinned .== true)
+    println()
+    println("Total thinned is $total_thinned")
+
+    filtered_df = filterInfections(population_df, model, true, false)
+
+    return sortInfections(filtered_df, model, false)
+end
+
+
+function bp_SingleThin!(population_df::DataFrame,
     model::branchModel, gen_range_dict, num_cases::Int64, saturationDepend::Bool,
     isolationDepend::Bool, prob_accept::Float64)
     #=
@@ -881,6 +987,8 @@ function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
     Continue thinning until sSaturation <= lower bound (0.1 atm)
     =#
 
+    sorted_df = sortInfections(population_df, model)
+
     sSaturation = (model.state_totals[1]/model.population_size)
     # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
     caseSaturation = zeros(num_cases) # corresponds to the sorted indexes
@@ -890,7 +998,8 @@ function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
     unthinned_caseID = 0
 
     increment = 1.0/model.population_size
-    thinned = BitArray(undef, num_cases) .* false#true
+    thinned = BitArray(undef, num_cases) .* false
+    thinned[gen_range_dict[1][end]+1:end] .= true
     # thinned[gen_range_dict[1]] .= false
     population_df.thinned = thinned
 
@@ -912,7 +1021,7 @@ function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
     for i in numSeedCases+1:nrow(sorted_df)
         parentIndex = caseIDs_to_index[sorted_df[i, :parentID]]
         if sorted_df[parentIndex, :thinned] || rand()>sSaturation#/sSaturation_upper
-            sorted_df[i, :thinned] = true
+            # sorted_df[i, :thinned] = true
             total_thinned+=1
             sorted_df[parentIndex, :num_offspring]-=1
 
@@ -920,7 +1029,7 @@ function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
         else
             caseSaturation[i] = sSaturation*1
             sSaturation-=increment
-            # sorted_df[i, :thinned] = false
+            sorted_df[i, :thinned] = false
 
         end
 
@@ -936,7 +1045,7 @@ function bp_SingleThin!(population_df::DataFrame, sorted_df::SubDataFrame,
     return filterInfections(sorted_df, model, true)
 end
 
-function bp_thinnedHereAndNow!(population_df::DataFrame, sorted_df::SubDataFrame,
+function bp_thinnedHereAndNow!(population_df::DataFrame,
     model::branchModel, gen_range_dict, num_cases::Int64, saturationDepend::Bool,
     isolationDepend::Bool, prob_accept::Float64)
     #=
@@ -945,6 +1054,8 @@ function bp_thinnedHereAndNow!(population_df::DataFrame, sorted_df::SubDataFrame
 
     Continue thinning until sSaturation / sSaturation_upper <= prob_accept
     =#
+
+    sorted_df = sortInfections(population_df, model)
 
     sSaturation = (model.state_totals[1]/model.population_size)
     sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
@@ -959,7 +1070,8 @@ function bp_thinnedHereAndNow!(population_df::DataFrame, sorted_df::SubDataFrame
     thinned = BitArray(undef, num_cases) .* false
     population_df.thinned = thinned
 
-    offspring_simmed = BitArray(undef, num_cases) .* true
+    offspring_simmed = BitArray(undef, num_cases) .* false
+    offspring_simmed .= true
     offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
     population_df.offspring_simmed = offspring_simmed
     numSeedCases = length(gen_range_dict[1])
@@ -1301,25 +1413,33 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Boo
     getTimeRecovered!(population_df, model)
 
 
-    sorted_df = sortInfections(population_df, model)
+    sorted_df = DataFrame() #sortInfections(population_df, model)
 
     # thinned_hereAndNow=true
     if thinning
 
-        # createThinningTree(population_df)
+        # thinType = "firstReactThin"
+        thinType = "thinningTree"
+
+        @assert thinType in ["thinningTree", "firstReactThin", "singleThin"]
 
         # do thinning
         sDepend=true
         isolDepend=false
 
         prob_accept = 0.9
-        # sorted_df = bp_thinnedHereAndNow!(population_df, sorted_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
-        sorted_df = bp_SingleThin!(population_df, sorted_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
+
+        if thinType == "thinningTree"
+            tree = createThinningTree(population_df, length(gen_range_dict[1]))
+            sorted_df = bp_ThinTree!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept, tree)
+        end
+        if thinType == "firstReactThin"
+            sorted_df = bp_thinnedHereAndNow!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
+        end
+        if thinType == "singleThin"
+            sorted_df = bp_SingleThin!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
+        end
     end
-
-
-
-    # sorted_df = filterInfections(sorted_df, model, thinning)
 
     thinned_waitAndSee=false
 
@@ -2511,19 +2631,24 @@ end
 # subtitle = "Simple Branching Process, Random Infection Times"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-model = init_model_pars(0, 200, 5*10^6, 15*10^6, [5*10^6-10,10,0]);
-population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
-outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
-subtitle = "Branching Process, Random Infection Times, S saturation thinning"
-plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
-
-# model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+# model = init_model_pars(0, 200, 5*10^5, 5*10^6, [5*10^5-10,10,0]);
 # population_df = initDataframe_thin(model);
 # @time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
 # outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
 # subtitle = "Branching Process, Random Infection Times, S saturation thinning"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+
+# model = init_model_pars(0, 200, 5*10^5, 30*10^5, [5*10^5-10,10,0]);
+# population_df = initDataframe_thin(model);
+# @profiler bpMain!(population_df, model, false, true, false)
+
+
+model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+population_df = initDataframe_thin(model);
+@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
+outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
+subtitle = "Branching Process, Random Infection Times, S saturation thinning"
+plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 
 # print(population_df)

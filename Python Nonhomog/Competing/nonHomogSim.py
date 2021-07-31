@@ -3,12 +3,12 @@ from numpy import random
 from plots import plotSIR, plotSIRK
 import time
 
-def firstInverseMethod(updateFunction, timeLimit=100):
+def firstInverseMethod(updateFunction, numProcesses, timeLimit=100):
     '''
     Simulates competing non-Markovian jump processes from a vector of rate functions and max rates
     Using analytical inversion of the distribution function
     Inputs
-    updateFunction   : function that returns next event time given last event time and a uniform variable
+    updateFunction   : function that returns next event time vector given last event time vector and a vector of uniform variables
     timeLimit        : max simulation time
     Outputs
     eventTimes       : time of events
@@ -17,25 +17,29 @@ def firstInverseMethod(updateFunction, timeLimit=100):
     t = 0
     i = 0
     eventTimes = np.zeros(1000)
+    reactionType = np.zeros(1000)
     rng = random.default_rng(123)
 
     # run till max sim time is reached
     while t < timeLimit:
         # draw next event time and record
-        t = updateFunction(t,rng.uniform())
+        nextEventTimes = updateFunction(t,rng.uniform(size=numProcesses))
+        delT = np.min(nextEventTimes)
+        reactionType[i] = np.argmin(nextEventTimes)
+        t += delT
         eventTimes[i] = t
         # update index
         i += 1
 
-    return eventTimes
+    return eventTimes, reactionType
 
 def firstThinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     '''
     Simulates competing non-Markovian jump processes from a vector of rate functions and max rates
     Using an approximate thinning algorithm on instantaneous rates
     Inputs
-    rateMax : rate function of the nonhomogeneous process
-    rateLimit    : max bound on the rate function
+    rateFunction      : function that returns vector of rate functions at inputted time
+    rateLimit         : max bound on the rate function
     Output
     eventTime    : time of events
     '''
@@ -43,35 +47,64 @@ def firstThinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     t = 0
     i = 0
     eventTimes = np.zeros(1000)
+    reactionType = np.zeros(1000)
     rng = random.default_rng(123)
     # run till max sim time is reached
     while t < timeLimit:
-        #draw inter-event time
-        delT = rng.exponential(1/rateMax)
-        #update simulation time
+        #draw inter-event times
+        delTs = rng.exponential(1/rateMax)
+        reactType = np.argmin(delTs)
+        delT = np.min(delTs)
+        #thin
+        r = rng.uniform()
+        if r <= rateFunction(reactType, t)/rateMax[reactType]:
+            reactionType[i] = reactType
+            eventTimes[i] = t + delT
+        # update sim time
         t += delT
-        # thin process
-        u = rng.uniform()
-        if u <= (rateFunction(t)/rateMax):
-            eventTimes[i] = t
         # update index
         i += 1
 
-    return eventTimes
+    return eventTimes, reactionType
 
 
 
 def gillespieMax(rateFunction, rateMax, timeLimit=100):
-    pass
+    '''
+    Simulates competing non-Markovian jump processes from a passed function of rate functions and max rates
+    Using a thinned Gillespie Direct algorithm
+    Inputs
+    rateFunction      : function that returns the rate of inputted reaction type at inputted time
+    rateLimit         : max bound on the rate function
+    Output
+    eventTime    : time of events
+    '''
+    # initialise system
+    t = 0
+    i = 0
+    eventTimes = np.zeros(1000)
+    reactionType = np.zeros(1000)
+    rng = random.default_rng(123)
+    sumH = np.sum(rateMax)
+    N = np.size(rateMax)
+    probs = rateMax/sumH
+    # run till max sim time is reached
+    while t < timeLimit:
+        delT = rng.exponential(1/sumH)
+        reactType = random.choice(a=N,p=probs)
+        r = rng.uniform()
+        if r <= rateFunction(reactType, t)/rateMax[reactType]:
+            reactionType[i] = reactType
+            eventTimes[i] = t + delT
+        t += delT
+        # update index
+        i += 1
+
+    return eventTimes, reactionType
 
 def nMGA():
     pass
 
-def firstMax():
-    pass
-
-def maxFirst():
-    pass
 
 
 def main():

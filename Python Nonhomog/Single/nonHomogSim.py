@@ -35,7 +35,7 @@ def thinningExactMethod(rateFunction, rateMax, timeLimit=100):
     Using an exact thinning algorithm on future rates
     Inputs
     rateFunction : rate function of the nonhomogeneous process
-    rateLimit    : max bound on the rate function
+    rateMax      : max bound on the rate function
     Output
     eventTime    : time of events
     '''
@@ -64,8 +64,8 @@ def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     Simulates a nonhomogeneous Poisson Process from a given rate function and max rate
     Using an approx thinning algorithm on instantaneous rates
     Inputs
-    rateMax : rate function of the nonhomogeneous process
-    rateLimit    : max bound on the rate function
+    rateFunction : rate function of the nonhomogeneous process
+    rateMax      : max bound on the rate function
     Output
     eventTime    : time of events
     '''
@@ -78,13 +78,12 @@ def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     while t < timeLimit:
         #draw inter-event time
         delT = rng.exponential(1/rateMax)
-        #update simulation time
-        t += delT
         # thin process
         u = rng.uniform()
         if u <= (rateFunction(t)/rateMax):
             eventTimes[i] = t
-        # update index
+        # update index and time
+        t += delT
         i += 1
 
     return eventTimes

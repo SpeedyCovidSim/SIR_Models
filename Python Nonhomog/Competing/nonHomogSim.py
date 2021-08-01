@@ -102,8 +102,45 @@ def gillespieMax(rateFunction, rateMax, timeLimit=100):
 
     return eventTimes, reactionType
 
-def nMGA():
-    pass
+def nMGA(rateFunction, minBounds, timeLimit=100):
+    '''
+    Simulates competing non-Markovian jump processes from a passed function of rate functions
+    and approximate minimum bounds using the approximate nMGA method
+    Inputs
+    rateFunction      : function that returns the rate of inputted reaction type at inputted time
+    minBounds         : vector of minimum bounds on hazard for finite inter-event calculation
+    Output
+    eventTime    : time of events
+    '''
+    # initialise system
+    t = 0
+    i = 0
+    eventTimes = np.zeros(1000)
+    reactionType = np.zeros(1000)
+    rng = random.default_rng(123)
+    N = np.size(minBounds)
+    minProb = minBounds/np.sum(minBounds)
+    # run till max sim time is reached
+    while t < timeLimit:
+        instRates = rateFunction(t)
+        sumRates = np.sum(instRates)
+        if (0-sumRates)<1e-6:
+            sumRates = np.sum(minBounds)
+            delT = rng.exponential(1/sumRates)
+            reactType = random.choice(a=N, prob=minProb)
+            reactionType[i] = reactType
+            t += delT
+            eventTimes[i] = t
+        else:
+            delT = rng.exponential(1/sumRates)
+            reactType = random.choice(a=N,p=(instRates/sumRates))
+            reactionType[i] = reactType
+            t += delT
+            eventTimes[i] = t
+        # update index
+        i += 1
+
+    return eventTimes, reactionType
 
 
 

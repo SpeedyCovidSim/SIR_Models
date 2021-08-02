@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import random
-from plots import plotSIR, plotSIRK
 import time
+from matplotlib import pyplot as plt
 
 def firstInverseMethod(updateFunction, numProcesses, timeLimit=100):
     '''
@@ -26,12 +26,12 @@ def firstInverseMethod(updateFunction, numProcesses, timeLimit=100):
         nextEventTimes = updateFunction(t,rng.uniform(size=numProcesses))
         delT = np.min(nextEventTimes)
         reactionType[i] = np.argmin(nextEventTimes)
-        t += delT
+        t = delT
         eventTimes[i] = t
         # update index
         i += 1
 
-    return eventTimes, reactionType
+    return eventTimes[0:(i-1)], reactionType[0:(i-1)]
 
 def firstThinningApproxMethod(rateFunction, rateMax, timeLimit=100):
     '''
@@ -60,12 +60,12 @@ def firstThinningApproxMethod(rateFunction, rateMax, timeLimit=100):
         if r <= rateFunction(reactType, t)/rateMax[reactType]:
             reactionType[i] = reactType
             eventTimes[i] = t + delT
+            # update index
+            i += 1
         # update sim time
         t += delT
-        # update index
-        i += 1
 
-    return eventTimes, reactionType
+    return eventTimes[0:(i-1)], reactionType[0:(i-1)]
 
 
 
@@ -96,11 +96,11 @@ def gillespieMax(rateFunction, rateMax, timeLimit=100):
         if r <= rateFunction(reactType, t)/rateMax[reactType]:
             reactionType[i] = reactType
             eventTimes[i] = t + delT
+            # update index
+            i += 1
         t += delT
-        # update index
-        i += 1
 
-    return eventTimes, reactionType
+    return eventTimes[0:(i-1)], reactionType[0:(i-1)]
 
 def nMGA(rateFunction, minBounds, timeLimit=100):
     '''
@@ -124,10 +124,10 @@ def nMGA(rateFunction, minBounds, timeLimit=100):
     while t < timeLimit:
         instRates = rateFunction(t)
         sumRates = np.sum(instRates)
-        if (0-sumRates)<1e-6:
+        if abs(0-sumRates)<1e-6:
             sumRates = np.sum(minBounds)
             delT = rng.exponential(1/sumRates)
-            reactType = random.choice(a=N, prob=minProb)
+            reactType = random.choice(a=N, p=minProb)
             reactionType[i] = reactType
             t += delT
             eventTimes[i] = t
@@ -140,7 +140,7 @@ def nMGA(rateFunction, minBounds, timeLimit=100):
         # update index
         i += 1
 
-    return eventTimes, reactionType
+    return eventTimes[0:(i-1)], reactionType[0:(i-1)]
 
 
 
@@ -150,34 +150,112 @@ def main():
     '''
     # testing the output of the two simulation functions
     # note random seed set within simulation functions to standardise output
-
-    N = 100
   
     timeLimit = 100
     
     def updateFunction(ti, u):
-        tip1 = np.sqrt((ti^2+25*u)/(1-u))
+        tip1 = [
+            np.sqrt((1+ti**2-u**(2/4))/(u**(2/4))), 
+            np.sqrt((25+ti**2-25*u**(2/20))/(u**(2/20))),
+            np.sqrt((81+ti**2-81*u**(2/40))/(u**(2/40))), 
+            np.sqrt((169+ti**2-169*u**(2/60))/(u**(2/60)))]
         return tip1
 
+    def rateFunctionSing(reactType, t): 
+        if reactType == 0: 
+            return (4*t)/(1+t**2) 
+        elif reactType == 1: 
+            return (20*t)/(25+t**2) 
+        elif reactType == 2: 
+            return (40*t)/(81+t**2) 
+        else:
+            return (60*t)/(169+t**2)
 
-    # iterate through populations for complete graphs
-    if True:
-        print("Beginning Ernos-Renyi simulations")
-        start = time.time()
+    def rateFunctionVect(t):
+        rates = [(4*t)/(1+t**2),(20*t)/(25+t**2),(40*t)/(81+t**2),(60*t)/(169+t**2)]
+        return rates
 
-        for i in range(1):
-            print(f"Iteration {i} commencing")
-            network = ig.Graph.Erdos_Renyi(100,0.1)
-            iTotal, sTotal, rTotal, numInfNei, susceptible = setNetwork(network)
-            print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, alpha, beta, rate_function)
-        end = time.time()
-        print(f"Avg. time taken for Lumped hazards simulation: {(end-start)/10}")
+    # system params
+    numProcesses = 4
+    rateMax = np.array([2,2,2.23,2.31])
+    minBounds = np.array([0.4,0.2,0.1,0.1])
 
-        print(f"Exporting last simulation {i}")
-        # plot and export the simulation
-        outputFileName = f"pythonGraphs/nonMarkovSim/SIR_Model_Pop_{N}"
-        plotSIR(t, [S, I, R], alpha, beta, N, outputFileName, Display=False)
+    # run each simulation type
+    invEventTimes, invReactTypes = firstInverseMethod(updateFunction, numProcesses, timeLimit=40)
+    firstMaxEventTimes, firstMaxReactTypes = firstThinningApproxMethod(rateFunctionSing, rateMax, timeLimit=40)
+    MaxEventTimes, MaxReactTypes = gillespieMax(rateFunctionSing, rateMax, timeLimit=40)
+    nMGAEventTimes, nMGAReactTypes = nMGA(rateFunctionVect, minBounds, timeLimit=40)
+    
+    # get event counts and plot each simulation
+    inv0 = np.cumsum(invReactTypes==0)
+    inv1 = np.cumsum(invReactTypes==1)
+    inv2 = np.cumsum(invReactTypes==2)
+    inv3 = np.cumsum(invReactTypes==3)
+
+    fig = plt.figure()
+    plt.plot(invEventTimes, inv0, label="Event Type 0",color="#82c7a5",lw = 2, figure=fig)
+    plt.plot(invEventTimes, inv1, label="Event Type 1",color="#f15e22",lw = 2, figure=fig)
+    plt.plot(invEventTimes, inv2, label="Event Type 2",color="#7890cd",lw = 2, figure=fig)
+    plt.plot(invEventTimes, inv3, label="Event Type 3",color="#ffd966",lw = 2, figure=fig)
+    plt.legend(fontsize=20)
+    plt.xlabel("Time", fontsize=20)
+    plt.ylabel("Cum. Number of Events", fontsize=16)
+    plt.title(f"Inv. Simulation of 4 Competing Poisson Processes", fontsize=20)
+    plt.show()
+
+
+    first0 = np.cumsum(firstMaxReactTypes==0)
+    first1 = np.cumsum(firstMaxReactTypes==1)
+    first2 = np.cumsum(firstMaxReactTypes==2)
+    first3 = np.cumsum(firstMaxReactTypes==3)
+
+    fig = plt.figure()
+    plt.plot(firstMaxEventTimes, first0, label="Event Type 0",color="#82c7a5",lw = 2, figure=fig)
+    plt.plot(firstMaxEventTimes, first1, label="Event Type 1",color="#f15e22",lw = 2, figure=fig)
+    plt.plot(firstMaxEventTimes, first2, label="Event Type 2",color="#7890cd",lw = 2, figure=fig)
+    plt.plot(firstMaxEventTimes, first3, label="Event Type 3",color="#ffd966",lw = 2, figure=fig)
+    plt.legend(fontsize=20)
+    plt.xlabel("Time", fontsize=20)
+    plt.ylabel("Cum. Number of Events", fontsize=16)
+    plt.title(f"FirstMax Simulation of 4 Competing Poisson Processes", fontsize=20)
+    plt.show()
+
+
+    max0 = np.cumsum(MaxReactTypes==0)
+    max1 = np.cumsum(MaxReactTypes==1)
+    max2 = np.cumsum(MaxReactTypes==2)
+    max3 = np.cumsum(MaxReactTypes==3)
+
+    fig = plt.figure()
+    plt.plot(MaxEventTimes, max0, label="Event Type 0",color="#82c7a5",lw = 2, figure=fig)
+    plt.plot(MaxEventTimes, max1, label="Event Type 1",color="#f15e22",lw = 2, figure=fig)
+    plt.plot(MaxEventTimes, max2, label="Event Type 2",color="#7890cd",lw = 2, figure=fig)
+    plt.plot(MaxEventTimes, max3, label="Event Type 3",color="#ffd966",lw = 2, figure=fig)
+    plt.legend(fontsize=20)
+    plt.xlabel("Time", fontsize=20)
+    plt.ylabel("Cum. Number of Events", fontsize=16)
+    plt.title(f"Gillespie Max Simulation of 4 Competing Poisson Processes", fontsize=20)
+    plt.show()
+
+
+    nMGA0 = np.cumsum(nMGAReactTypes==0)
+    nMGA1 = np.cumsum(nMGAReactTypes==1)
+    nMGA2 = np.cumsum(nMGAReactTypes==2)
+    nMGA3 = np.cumsum(nMGAReactTypes==3)
+
+    fig = plt.figure()
+    plt.plot(nMGAEventTimes, nMGA0, label="Event Type 0",color="#82c7a5",lw = 2, figure=fig)
+    plt.plot(nMGAEventTimes, nMGA1, label="Event Type 1",color="#f15e22",lw = 2, figure=fig)
+    plt.plot(nMGAEventTimes, nMGA2, label="Event Type 2",color="#7890cd",lw = 2, figure=fig)
+    plt.plot(nMGAEventTimes, nMGA3, label="Event Type 3",color="#ffd966",lw = 2, figure=fig)
+    plt.legend(fontsize=20)
+    plt.xlabel("Time", fontsize=20)
+    plt.ylabel("Cum. Number of Events", fontsize=16)
+    plt.title(f"nMGA Simulation of 4 Competing Poisson Processes", fontsize=20)
+    plt.show()
+
+
+    print('done')
 
 if __name__=="__main__":
     main()

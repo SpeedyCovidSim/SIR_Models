@@ -16,7 +16,7 @@ module BranchVerifySoln
     export branchVerifyPlot, meanAbsError, initSIRArrays, multipleSIRMeans,
         multipleLinearSplines, branchTimeStepPlot
 
-    function branchVerifyPlot(Smean, Imean, Rmean, discreteArray, times, title, outputFileName, First=true, Display=true, save=false)
+    function branchVerifyPlot(Smean, Imean, Rmean, discreteArray, times, title, outputFileName, First=true, Display=true, save=false, Discrete=true)
 
         #PyPlot.rcParams["figure.dpi"] = 300
         typeSim = ""
@@ -26,6 +26,13 @@ module BranchVerifySoln
             typeSim = "Next"
         end
 
+        typeSim2 = ""
+        if Discrete
+            typeSim2 = "Discrete"
+        else
+            typeSim2 = "Simple BP"
+        end
+
         Seaborn.set()
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
@@ -33,9 +40,9 @@ module BranchVerifySoln
         plt.plot(times, Imean, "b-", label="I - $typeSim", lw=2.5, figure=fig)
         plt.plot(times, Rmean, "r-", label="R - $typeSim", lw=2.5, figure=fig)
 
-        plt.plot(times, discreteArray[:,1], "g-.", label="S - Discrete", lw=1.5, figure=fig, alpha = 1)
-        plt.plot(times, discreteArray[:,2], "w-.", label="I - Discrete", lw=1.5, figure=fig, alpha = 1)
-        plt.plot(times, discreteArray[:,3], "k-.", label="R - Discrete", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,1], "g-.", label="S - $typeSim2", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,2], "w-.", label="I - $typeSim2", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,3], "k-.", label="R - $typeSim2", lw=1.5, figure=fig, alpha = 1)
 
 
         plt.xlabel("Time")

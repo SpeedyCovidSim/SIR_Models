@@ -57,6 +57,15 @@ function weibullParGridSearch(alpha_par, scale_par)
     sqrt(var(Weibull(a_best, s_best)))
 end
 
+struct ThinNone; end
+struct ThinSingle; end
+struct ThinTree; end
+struct ThinFirst; end
+
+struct ThinFunction
+    name::Union{ThinNone, ThinSingle, ThinTree, ThinFirst}
+end
+
 mutable struct branchModel
     t_init::Number
     t_max::Number
@@ -134,8 +143,9 @@ function caseIDsort(x::Node, y::Node)::Bool
     x.caseID < y.caseID
 end
 
-struct IDOrdering <: Base.Order.Ordering
-end
+function DataFrames.nrow(dfr::DataFrameRow); return 1; end
+
+struct IDOrdering <: Base.Order.Ordering; end
 
 function Base.Order.lt(o::IDOrdering, a::Node, b::Node); return caseIDsort(a,b); end
 
@@ -143,7 +153,6 @@ struct TimeOrdering <: Base.Order.Ordering
 end
 
 function Base.Order.lt(o::TimeOrdering, a::Node, b::Node); return a.infection_time < b.infection_time; end
-
 
 function Base.isless(x::Node, y::Node)::Bool
     return  x.infection_time < y.infection_time
@@ -214,13 +223,16 @@ function initDataframe_isolation!(population_df::DataFrame, model::branchModel)
     Acts in place on population_df
     =#
 
-    time_onset_delay = getOnsetDelay(model)
-    time_isolated = ones(model.max_cases) .* Inf
+    new_model = deepcopy(model)
+    new_model.max_cases = nrow(population_df)
+
+    time_onset_delay = getOnsetDelay(new_model)
+    time_isolated = ones(new_model.max_cases) .* Inf
 
     population_df.time_onset_delay = time_onset_delay
     population_df.time_isolated = time_isolated
 
-    population_df.detected = convert.(Bool,zeros(model.max_cases))
+    population_df.detected = convert.(Bool,zeros(new_model.max_cases))
 
     if model.p_test > 0
         clin_cases = filter(row -> row.sub_Clin_Case==false, population_df, view=true)
@@ -531,15 +543,18 @@ function initDataframe_thin(model::branchModel)
     return population_df
 end
 
-function newDataframe_rows(model::branchModel, nrows::Int64, maxCaseID::Int64)
+function newDataframe_rows(model::branchModel, nrows::Int64, maxCaseID::Int64, no_offspring::Bool)
     new_model = deepcopy(model)
     new_model.max_cases = nrows # amount_above_limit
     new_model.state_totals = [0,0,0]
     new_population_df = initDataframe_thin(new_model)
     new_population_df.parentID .= 0
     new_population_df.caseID .+= maxCaseID
-    new_population_df.num_offspring = rand.(Poisson.(new_population_df.reproduction_number))
-
+    if no_offspring
+        new_population_df.num_offspring = Array{Int64}(undef, new_model.max_cases) .* 0
+    else
+        new_population_df.num_offspring = rand.(Poisson.(new_population_df.reproduction_number))
+    end
 
     return new_population_df
 end
@@ -569,6 +584,7 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
 
         total_off = sum(num_off)
         if total_off == 0
+            population_df[num_case+1:end, :num_offspring] .= 0
             break
         end
 
@@ -579,6 +595,7 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
         ########## Logic from discrete
         if gen_range_dict[generation][end] >= model.max_cases
             hitMaxCases = true
+            # println("hit max cases")
         end
 
         if hitMaxCases && !full_final_gen
@@ -610,9 +627,13 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
             # have a full final gen but hit max cases. population_df is only of
             # length max cases. Therefore, concatenate a new dataframe on top of it
 
-            new_population_df = newDataframe_rows(model, abs(num_cases + total_off - model.max_cases), model.max_cases)
+            # println("I occurred")
+
+            new_population_df = newDataframe_rows(model, abs(num_cases + total_off - model.max_cases), model.max_cases, true)
 
             population_df = vcat(population_df, new_population_df, cols=:orderequal)
+
+            population_df[gen_range_dict[generation], :num_offspring] .= 0
         end
         #######################
 
@@ -622,9 +643,9 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
         population_df[gen_range_dict[generation], :parentID] .= parentIDs
 
         num_cases += total_off
-        if hitMaxCases && !full_final_gen
-            population_df[gen_range_dict[generation], :num_offspring] .= 0
-        end
+        # if hitMaxCases && !full_final_gen
+        #     population_df[gen_range_dict[generation], :num_offspring] .= 0
+        # end
     end
     #
     # println()
@@ -710,6 +731,13 @@ function createThinningTree(population_df::DataFrame, numSeedCases)
         current_range = current_range[end]+1:current_range[end]+current_offspring
 
         currentNode.children = [Node(i, population_df[i, :time_infected], Ref(currentNode), []) for i in current_range]
+        # try
+        # catch BoundsError
+        #     println("Current range is $current_range")
+        #     println("childrenDeque has $(length(childrenDeque)) elements remaining")
+        #     # @error "BoundsError occurred"
+        #     BoundsError
+        # end
 
         for node in currentNode.children
             if population_df[node.caseID, :num_offspring] != 0
@@ -874,11 +902,11 @@ function mergeArrays_events(time_infected::Array{Float64,1}, time_recovery::Unio
     # Not going to store additional recovery events due to thinning
     # Store remaining elements
     # of second array
-    # while rec_ind <= n2
-    #     t[t_ind] = time_recovery[rec_ind]
-    #     stateTotals[t_ind, :] .= [0,-1,1]
-    #     t_ind+=1; rec_ind+=1
-    # end
+    while rec_ind <= n2
+        t[t_ind] = time_recovery[rec_ind]
+        stateTotals[t_ind, :] .= [0,-1,1]
+        t_ind+=1; rec_ind+=1
+    end
 
     t = t[1:t_ind-1]
     stateTotals = stateTotals[1:t_ind-1,:]
@@ -969,7 +997,7 @@ function simChildren_ThinTree!(population_df::DataFrame, model::branchModel,
             initDataframe_isolation!(new_rows, new_model)
         end
 
-        append!(population_df, new_rows)
+        append!(population_df, new_rows, cols=:setequal)
         # population_df = vcat(population_df, new_rows)
 
         current_range = nrow(population_df)-numOff+1:nrow(population_df)
@@ -1004,19 +1032,19 @@ function bp_ThinTree!(population_df::DataFrame,
 
     sSaturation = (model.state_totals[1]/model.population_size)
     # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
-    sSaturation_upper = ones(num_cases)
+    sSaturation_upper = ones(nrow(population_df))
     population_df.sSaturation_upper = sSaturation_upper
 
     # caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
     # unthinned_caseID = 0
 
     increment = 1.0/model.population_size
-    thinned = BitArray(undef, num_cases) .* false
+    thinned = BitArray(undef, nrow(population_df)) .* false
     thinned[gen_range_dict[1][end]+1:end] .= true
     # thinned[gen_range_dict[1]] .= false
     population_df.thinned = thinned
 
-    offspring_simmed = BitArray(undef, num_cases) .* false
+    offspring_simmed = BitArray(undef, nrow(population_df)) .* false
     offspring_simmed .= true
     offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
     population_df.offspring_simmed = offspring_simmed
@@ -1072,8 +1100,8 @@ function bp_ThinTree!(population_df::DataFrame,
         end
     end
     total_thinned = sum(population_df.thinned .== true)
-    println()
-    println("Total thinned is $total_thinned, out of $(nrow(population_df)) events")
+    # println()
+    # println("Total thinned is $total_thinned, out of $(nrow(population_df)) events")
 
     # filtered_df = filterInfections(population_df, model, true, false)
 
@@ -1093,7 +1121,12 @@ function bp_SingleThin!(population_df::DataFrame,
     Continue thinning until sSaturation <= lower bound (0.1 atm)
     =#
 
-    sorted_df = sortInfections(population_df, model)
+    # println(sum(population_df.parentID .== 0))
+
+    # sorted_df = filter(row->row.parentID != 0, population_df, view=false)
+    # sorted_df = sortInfections(sorted_df, model, false)
+
+    sorted_df = sortInfections(population_df, model, false)
 
     sSaturation = (model.state_totals[1]/model.population_size)
     # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
@@ -1104,10 +1137,10 @@ function bp_SingleThin!(population_df::DataFrame,
     unthinned_caseID = 0
 
     increment = 1.0/model.population_size
-    thinned = BitArray(undef, num_cases) .* false
+    thinned = BitArray(undef, nrow(sorted_df)) .* false
     thinned[gen_range_dict[1][end]+1:end] .= true
     # thinned[gen_range_dict[1]] .= false
-    population_df.thinned = thinned
+    sorted_df.thinned = thinned
 
     # offspring_simmed = BitArray(undef, num_cases) .* true
     # offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
@@ -1122,10 +1155,11 @@ function bp_SingleThin!(population_df::DataFrame,
     # end
 
     total_thinned = 0
+    parentIndex = 0
 
     # thinning of child cases
-    for i in numSeedCases+1:nrow(sorted_df)
-        parentIndex = caseIDs_to_index[sorted_df[i, :parentID]]
+    for i::Int64 in numSeedCases+1:nrow(sorted_df)
+        parentIndex::Int64 = caseIDs_to_index[sorted_df[i, :parentID]]*1
         # saturationThin
         if saturationDepend && (sorted_df[parentIndex, :thinned] || rand()>sSaturation)#/sSaturation_upper
             # sorted_df[i, :thinned] = true
@@ -1155,9 +1189,13 @@ function bp_SingleThin!(population_df::DataFrame,
             break
         end
 
-    end
+        # if sorted_df[i, :time_infected] > model.t_max
+        #     break
+        # end
 
-    println("Total thinned is $total_thinned")
+    end
+    # println()
+    # println("Total thinned is $total_thinned")
 
     return filterInfections(sorted_df, model, true)
 end
@@ -1387,7 +1425,7 @@ function bp_thinnedHereAndNow!(population_df::DataFrame,
 
             rem_rows = sorted_df_len - active_range[end]
             if rem_rows < total_off
-                new_sorted_df = newDataframe_rows(model, abs(rem_rows - total_off), maximum(sorted_df.caseID))
+                new_sorted_df = newDataframe_rows(model, abs(rem_rows - total_off), maximum(sorted_df.caseID), false)
                 new_sorted_df.thinned = BitArray(undef, nrow(new_sorted_df)) .* false
                 new_sorted_df.time_infected = Array{Float64}(undef, nrow(new_sorted_df)) .* 0
                 new_sorted_df.time_infected_rel = Array{Float64}(undef, nrow(new_sorted_df)) .* 0
@@ -1473,6 +1511,8 @@ function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchMo
 
     num_cases = nrow(sorted_df)
     numSeedCases = length(gen_range_dict[1])
+    # println(num_cases)
+    # println(num_cases*2 - numSeedCases+1)
 
     # twice as long array to allow for recovery events too
     t = zeros(num_cases*2 - numSeedCases+1)
@@ -1523,7 +1563,9 @@ function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchMo
     return t, stateTotals
 end
 
-function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Bool, thinning::Bool, full_final_gen::Bool=false, sDepend::Bool=true, isolDepend::Bool=false)
+function bpMain!(population_df::DataFrame, model::branchModel, noTimingDepend::Bool,
+    thinMethod::ThinFunction=ThinFunction(ThinTree()),
+    full_final_gen::Bool=false, sDepend::Bool=true, isolDepend::Bool=false)
     #=
     No longer works in place on population_df. Instead has to pass a copy round
     of population_df due to the actions of function: branchingProcess, which
@@ -1532,9 +1574,17 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Boo
 
     @assert model.max_cases > model.state_totals[2] "The number of allowable cases must be greater than the number of seed cases"
 
+    if thinMethod.name == ThinTree() || thinMethod.name == ThinSingle()
+        full_final_gen = true
+    end
+
     gen_range_dict, num_cases, population_df = branchingProcess(population_df, model, full_final_gen)
 
-    if noTimingInfo
+    # println(model.max_cases)
+    # println(gen_range_dict[maximum(keys(gen_range_dict))])
+    # println(maximum(keys(gen_range_dict)))
+
+    if noTimingDepend
         generations, state_totals_all = casesOverGenerations(gen_range_dict)
         return generations, state_totals_all, population_df
     end
@@ -1549,7 +1599,8 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Boo
 
     sorted_df = DataFrame() #sortInfections(population_df, model)
 
-    if thinning && (sDepend || isolDepend)
+
+    if thinMethod.name != ThinNone && (sDepend || isolDepend)
 
         # do thinning
         # sDepend=true
@@ -1562,22 +1613,26 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingInfo::Boo
 
         # thinType = "firstReactThin"
         thinType = "thinningTree"
+        # thinType = "singleThin"
 
         @assert thinType in ["thinningTree", "firstReactThin", "singleThin"] "Thinning function $thinType does not exist"
 
 
         prob_accept = 0.9
 
-        if thinType == "thinningTree"
+        if thinMethod.name == ThinTree()
+            # need full_final_gen = true for this kind of thinning
             tree = createThinningTree(population_df, length(gen_range_dict[1]))
             sorted_df = bp_ThinTree!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend, tree)
         end
-        if thinType == "firstReactThin"
+        if thinMethod.name == ThinFirst()
             sorted_df = bp_thinnedHereAndNow!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend, prob_accept)
         end
-        if thinType == "singleThin"
+        if thinMethod.name == ThinSingle()
             sorted_df = bp_SingleThin!(population_df, model, gen_range_dict, num_cases, sDepend, isolDepend)
         end
+    else
+        sorted_df = sortInfections(population_df, model)
     end
 
     thinned_waitAndSee=false
@@ -2671,6 +2726,316 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         outputFileName = "./verifiedBranch/NextvsDiscreteIsol1Day"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
     end
+
+    println("Test #11: Epidemic curves (Next vs Simple BP, S Saturation Thinning)")
+    if 11 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,100.0)
+        time_step = 0.02
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+
+            # Simple branch, random infection times, s saturation thinning
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), true, true, false)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Simple Branch with Saturation Thinning"
+        outputFileName = "./verifiedBranch/NextvsSimpleBP"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+    end
+
+    println("Test #12: Epidemic curves (Next vs Simple BP, S Saturation & Isolation Thinning)")
+    if 12 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,100.0)
+        time_step = 0.01
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            # Simple branch, random infection times, s saturation and isolation thinning
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe_thin(model);
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, true, true)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Simple BP with Isolation and S Saturation"
+        outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+    end
+
+    println("Test #13: Initial Epidemic curves (Next vs Simple BP, S Saturation Single Thin)")
+    if 13 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,20.0)
+        time_step = 0.02
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 1*10^3, [5*10^3-10,10,0]);
+
+            # Simple branch, random infection times, s saturation thinning
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, false)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            if !isnothing(firstDupe)
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+            end
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Simple Branch with Saturation (Single) Thinning"
+        outputFileName = "./verifiedBranch/NextvsSimpleBP_SingleThin"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+    end
+
+    println("Test #14: Initial Epidemic curves (Next vs Simple BP, S Saturation & Isolation Single Thin)")
+    if 14 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,20.0)
+        time_step = 0.02
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            # Simple branch, random infection times, s saturation and isolation thinning
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 1*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe_thin(model);
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinSingle()), false, true, true)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+        println("Beginning simulation of Next Case")
+        numSims = convert(Int, round(600 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+            model.p_test = 1.0
+            model.sub_clin_prop = 0
+            model.stochasticIsol = false
+            # model.t_onset_shape = 5.8
+            model.t_onset_to_isol = 0
+
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+
+            # clean duplicate values of t which occur on the first recovery time
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
+
+            if !isnothing(firstDupe)
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+            end
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+        title = "Next React vs Simple BP with Isolation and S Saturation (Single) Thinning"
+        outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
+        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+    end
+
 end
 
 function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
@@ -2719,11 +3084,29 @@ function compilationInit()
     model = init_model_pars(0, 100, 5*10^3, 5*10^3, [5*10^3-10,10,0])
     population_df = initDataframe(model);
     @time t, state_totals_all, num_cases= nextReact_branch!(population_df, model)
+
+    # Simple branch, random infection times, isolation thinning
+    model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+    model.p_test = 1.0
+    model.sub_clin_prop = 0
+    model.stochasticIsol = false
+    model.t_onset_to_isol = 0
+    population_df = initDataframe_thin(model);
+    @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), true, true, true)
+
+    # Simple branch, random infection times, isolation thinning
+    model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+    model.p_test = 1.0
+    model.sub_clin_prop = 0
+    model.stochasticIsol = false
+    model.t_onset_to_isol = 0
+    population_df = initDataframe_thin(model);
+    @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, true)
 end
 
-# compilationInit()
+compilationInit()
 
-# verifySolutions(1, [[5,6,7,9,10]])
+verifySolutions(1, [11, 12, 13, 14])
 
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
 # time_step = 1;
@@ -2758,7 +3141,7 @@ end
 # Simple branch
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
 # population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, true, false, true)
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true)
 # outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"
 # subtitle = "Simple Branching Process"
 # plotSimpleBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
@@ -2766,7 +3149,7 @@ end
 # Simple branch, random infection times
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
 # population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, false)
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()))
 # outputFileName = "juliaGraphs/branchSimpleRandITimes/branch_model_$(model.population_size)"
 # subtitle = "Simple Branching Process, Random Infection Times"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
@@ -2774,33 +3157,39 @@ end
 # Simple branch, random infection times, s saturation thinning
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
 # population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false)
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false)
 # outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
 # subtitle = "Branching Process, Random Infection Times, S saturation thinning"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # Simple branch, random infection times, isolation thinning
-model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-model.p_test = 1.0
-model.sub_clin_prop = 0
-model.stochasticIsol = false
-# model.t_onset_shape = 5.8
-model.t_onset_to_isol = 0
-population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false, false, true)
-outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
-subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
-plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+# model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+# model.p_test = 1.0
+# model.sub_clin_prop = 0
+# model.stochasticIsol = false
+# # model.t_onset_shape = 5.8
+# model.t_onset_to_isol = 0
+# population_df = initDataframe_thin(model);
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, false, true)
+# outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
+# subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
+# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # Simple branch, random infection times, s saturation and isolation thinning
-model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-model.p_test = 1.0
-model.sub_clin_prop = 0
-model.stochasticIsol = false
-# model.t_onset_shape = 5.8
-model.t_onset_to_isol = 0
-population_df = initDataframe_thin(model);
-@time t, state_totals_all, population_df = bpMain!(population_df, model, false, true, false, true, true)
-outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
-subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
-plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+# model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+# model.p_test = 1.0;
+# model.sub_clin_prop = 0;
+# model.stochasticIsol = false;
+# # model.t_onset_shape = 5.8
+# model.t_onset_to_isol = 0;
+# population_df = initDataframe_thin(model);
+# @profiler bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, true);
+# outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
+# subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
+# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+
+# tspan = [0,100];
+# model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+# Simple branch, random infection times, s saturation thinning
+# population_df = initDataframe_thin(model);
+# t, state_totals_all, population_df = bpMain!(population_df, model, false, true, true, true, false)

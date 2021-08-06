@@ -155,10 +155,10 @@ def main():
     
     def updateFunction(ti, u):
         tip1 = [
-            np.sqrt((1+ti**2-u**(2/4))/(u**(2/4))), 
-            np.sqrt((25+ti**2-25*u**(2/20))/(u**(2/20))),
-            np.sqrt((81+ti**2-81*u**(2/40))/(u**(2/40))), 
-            np.sqrt((169+ti**2-169*u**(2/60))/(u**(2/60)))]
+            np.sqrt((1+ti**2-u[0]**(2/4))/(u[0]**(2/4))), 
+            np.sqrt((25+ti**2-25*u[1]**(2/20))/(u[1]**(2/20))),
+            np.sqrt((81+ti**2-81*u[2]**(2/40))/(u[2]**(2/40))), 
+            np.sqrt((169+ti**2-169*u[3]**(2/60))/(u[3]**(2/60)))]
         return tip1
 
     def rateFunctionSing(reactType, t): 
@@ -255,7 +255,38 @@ def main():
     plt.show()
 
 
-    print('done')
+    invEventTimes, invReactTypes = firstInverseMethod(updateFunction, numProcesses, timeLimit=40)
+    firstMaxEventTimes, firstMaxReactTypes = firstThinningApproxMethod(rateFunctionSing, rateMax, timeLimit=40)
+    MaxEventTimes, MaxReactTypes = gillespieMax(rateFunctionSing, rateMax, timeLimit=40)
+    nMGAEventTimes, nMGAReactTypes = nMGA(rateFunctionVect, minBounds, timeLimit=40)
+
+    simSizes = [1,10,100,1000,10000]
+    for i in range(len(simSizes)):
+        for i in range(10):
+            start = time.time()
+            invEventTimes, invReactTypes = firstInverseMethod(updateFunction, numProcesses, timeLimit=40)
+            end = time.time()
+    
+    for i in range(len(simSizes)):
+        for i in range(10):
+            start = time.time()
+            firstMaxEventTimes, firstMaxReactTypes = firstThinningApproxMethod(rateFunctionSing, rateMax, timeLimit=40)
+            end = time.time()
+
+    for i in range(len(simSizes)):
+        for i in range(10):
+            start = time.time()
+            MaxEventTimes, MaxReactTypes = gillespieMax(rateFunctionSing, rateMax, timeLimit=40)
+            end = time.time()
+
+    for i in range(len(simSizes)):
+        for i in range(10):
+            start = time.time()
+            nMGAEventTimes, nMGAReactTypes = nMGA(rateFunctionVect, minBounds, timeLimit=40)
+            end = time.time()
+    
+    
+
 
 if __name__=="__main__":
     main()

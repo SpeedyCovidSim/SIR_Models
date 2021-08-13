@@ -255,10 +255,12 @@ def gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, s
 
     while t[-1] < tMax and iTotal != 0:
         # get sum of maximum bounds
-        H = S[i-1]*np.max(numInfNei)*maxbeta+I[i-1]*maxalpha
+        rateMax = maxbeta*numInfNei*susceptible+maxalpha*(1-susceptible)
+        H = np.sum(rateMax)
         deltaT = rng.exponential(1/H)
-        eventIndex = random.choice(a=N,p=rates/np.sum(rates))
-        if (rng.uniform() <= rates[eventIndex]/H):
+        eventIndex = random.choice(a=N,p=rateMax/H)
+        r = rng.uniform()
+        if r <= rateFunction(susceptible[eventIndex], numInfNei[eventIndex], entry_times[eventIndex],  maxbeta, maxalpha, sim_time)/rateMax[eventIndex]:
             # update local neighbourhood attributes
             if susceptible[eventIndex]:  # (S->I)
                 # change state and entry time
@@ -339,9 +341,9 @@ def setNetwork(network, prop_i=0.05):
 
     # adding in hazards/rates
     numInfNei = initHazards(network, infecteds, N)
-    return iTotal, sTotal, rTotal, numInfNei, susceptible, infecteds
+    return iTotal, sTotal, rTotal, numInfNei, susceptible
 
-def initHazards(network, susceptible, N):
+def initHazards(network, infecteds, N):
     '''
     inits numInfNei array
     Inputs
@@ -353,7 +355,7 @@ def initHazards(network, susceptible, N):
     '''
     numInfNei = np.zeros(N)
     # loop over all infected vertices
-    for inf_vert in network.vs(susceptible):
+    for inf_vert in network.vs(infecteds):
         # Increase number of susceptible neighbours for neighbouring vertices
         neighbours = network.neighbors(inf_vert)
         for n in neighbours:
@@ -395,7 +397,7 @@ def main():
         for i in range(1):
             print(f"Iteration {i} commencing")
             network = ig.Graph.Erdos_Renyi(100,0.1)
-            iTotal, sTotal, rTotal, numInfNei, susceptible, infecteds = setNetwork(network)
+            iTotal, sTotal, rTotal, numInfNei, susceptible = setNetwork(network)
             print(f"Beginning simulation {i}")
             t, S, I, R = gillespieNonHomogNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, susceptible, alpha, beta, rate_function)
         end = time.time()

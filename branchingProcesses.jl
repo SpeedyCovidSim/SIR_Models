@@ -128,7 +128,6 @@ function deleteChildNode!(childNode::Node)
     =#
 
     parent = childNode.parent[]
-
     for i in 1:length(parent.children)
         if isequal(parent.children[i], childNode)
             deleteat!(parent.children, i)
@@ -154,13 +153,9 @@ end
 
 function Base.Order.lt(o::TimeOrdering, a::Node, b::Node); return a.infection_time < b.infection_time; end
 
-function Base.isless(x::Node, y::Node)::Bool
-    return  x.infection_time < y.infection_time
-end
+function Base.isless(x::Node, y::Node)::Bool; return  x.infection_time < y.infection_time; end
 
-function Base.isless(x::event, y::event)::Bool
-    return  x.time < y.time
-end
+function Base.isless(x::event, y::event)::Bool; return  x.time < y.time; end
 
 Base.deepcopy(m::branchModel) = branchModel([ deepcopy(getfield(m, k)) for k = 1:length(fieldnames(branchModel)) ]...)
 
@@ -362,8 +357,6 @@ function initTime(model::branchModel, time_step::Number)
     So time step 50 refers to period 49->50 and is the final step (if reached)
     =#
 
-    # t = Float64[copy(model.t_init)]
-
     # if timestep does not divide perfectly, stop before max_time
     # however we will run sims only where it does.
 
@@ -375,17 +368,12 @@ function initTime(model::branchModel, time_step::Number)
 
     num_steps = convert(Int, floor((model.t_max - model.t_init) / time_step))
 
-    # t = zeros(num_steps+1)
-    #
-    # t[1] = model.t_init
-    # t[2:end] .= t[1] .+ cumsum(ones(num_steps)) .* time_step
-
     return t::Array{}, num_steps::Int
 end
 
 function initTime_infection(model::branchModel, time_step::Number)
-    num_steps = convert(Int, ceil(model.recovery_time / time_step))
 
+    num_steps = convert(Int, ceil(model.recovery_time / time_step))
     t = zeros(num_steps+1)
     t[2:end] .= collect(1:num_steps) .* time_step
 
@@ -397,7 +385,6 @@ function initStateTotals(model::branchModel, times_length::Int64)::Array{Int64, 
     initialise a 2d array of state totals for each discrete time
     =#
 
-    # state_totals_all = convert.(Int64, zeros(times_length, length(model.state_totals)))
     state_totals_all = Array{Int64}(undef, times_length, length(model.state_totals)) .* 0
     state_totals_all[1,:] .= copy(model.state_totals)
 
@@ -462,6 +449,8 @@ function initNewCases!(population_df::DataFrame, active_df::SubDataFrame,
 
     model.state_totals[1] -= num_new_infections
     model.state_totals[2] += num_new_infections
+
+    return nothing
 end
 
 function initNewCase!(population_df::DataFrame, model::branchModel, infection_time::Union{Float64,Int64}, parentID::Int64, num_cases::Int64)
@@ -470,9 +459,6 @@ function initNewCase!(population_df::DataFrame, model::branchModel, infection_ti
 
     Works in place on the population dataframe
     =#
-
-    # else, set the next case to active with relevant parentID, infectionTime
-    # and increment num_offspring for case that did infection
 
     model.state_totals[1] -=1
     model.state_totals[2] +=1
@@ -488,6 +474,8 @@ function initNewCase!(population_df::DataFrame, model::branchModel, infection_ti
     end
 
     population_df[parentID, :num_offspring] += 1
+
+    return nothing
 end
 
 function recovery_branch!(population_df::DataFrame, model::branchModel, caseID::Int64)
@@ -582,61 +570,54 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
         # determine number of offspring
         num_off = @view population_df[gen_range_dict[generation], :num_offspring]
 
-        total_off = sum(num_off)
-        if total_off == 0
-            population_df[num_case+1:end, :num_offspring] .= 0
-            break
-        end
-
         # new generation
+        total_off = sum(num_off)
         generation+=1
         gen_range_dict[generation] = num_cases+1:total_off+num_cases
+        if total_off == 0
+            population_df[num_cases+1:end, :num_offspring] .= 0
+            gen_range_dict[generation] = num_cases+1:nrow(population_df)
+            break
+        end
 
         ########## Logic from discrete
         if gen_range_dict[generation][end] >= model.max_cases
             hitMaxCases = true
-            # println("hit max cases")
-        end
+            if !full_final_gen
+                gen_range_dict[generation] = gen_range_dict[generation][1]:model.max_cases
 
-        if hitMaxCases && !full_final_gen
-            gen_range_dict[generation] = gen_range_dict[generation][1]:model.max_cases
+                amount_above_limit = num_cases + total_off - model.max_cases
 
-            amount_above_limit = num_cases + total_off - model.max_cases
+                # allow up to the model's limit's cases to be added
+                total_off = model.max_cases - num_cases
 
-            # allow up to the model's limit's cases to be added
-            total_off = model.max_cases - num_cases
+                if amount_above_limit > 0
+                    for i::Int64 in 1:length(num_off::SubArray{Int64,1})
 
-            if amount_above_limit > 0
-                for i::Int64 in 1:length(num_off::SubArray{Int64,1})
+                        if num_off[i] > amount_above_limit
+                            num_off[i] -= amount_above_limit
+                            amount_above_limit = 0
+                        else
+                            amount_above_limit -= num_off[i]
+                            num_off[i]=0
+                        end
 
-                    if num_off[i] > amount_above_limit
-                        num_off[i] -= amount_above_limit
-                        amount_above_limit = 0
-                    else
-                        amount_above_limit -= num_off[i]
-                        num_off[i]=0
-                    end
-
-                    if amount_above_limit == 0
-                        break
+                        if amount_above_limit == 0
+                            break
+                        end
                     end
                 end
+
+            elseif full_final_gen # technically no longer required (could just be else rather than elseif)
+                # have a full final gen but hit max cases. population_df is only of
+                # length max cases. Therefore, concatenate a new dataframe on top of it
+
+                new_population_df = newDataframe_rows(model, abs(num_cases + total_off - model.max_cases), model.max_cases, true)
+                population_df = vcat(population_df, new_population_df, cols=:orderequal)
+                population_df[gen_range_dict[generation], :num_offspring] .= 0
             end
-
-        elseif hitMaxCases && full_final_gen
-            # have a full final gen but hit max cases. population_df is only of
-            # length max cases. Therefore, concatenate a new dataframe on top of it
-
-            # println("I occurred")
-
-            new_population_df = newDataframe_rows(model, abs(num_cases + total_off - model.max_cases), model.max_cases, true)
-
-            population_df = vcat(population_df, new_population_df, cols=:orderequal)
-
-            population_df[gen_range_dict[generation], :num_offspring] .= 0
         end
         #######################
-
 
         population_df[gen_range_dict[generation], :generation_number] .= copy(generation)
         parentIDs = makeVectorFromFrequency(num_off, collect(gen_range_dict[generation-1]))
@@ -647,11 +628,6 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
         #     population_df[gen_range_dict[generation], :num_offspring] .= 0
         # end
     end
-    #
-    # println()
-    # println(sum(population_df.parentID .== 0))
-    # println(length(population_df.parentID))
-    # println(num_cases)
 
     return gen_range_dict, num_cases, population_df
 end
@@ -709,8 +685,6 @@ function createThinningTree(population_df::DataFrame, numSeedCases)
 
     tree = Tree([Node(i, population_df[i, :time_infected], Ref(nothing), []) for i in 1:numSeedCases])
 
-    # childrenHeap = MutableBinaryHeap{Node, IDOrdering}(tree.rootNodes)
-
     childrenDeque = Deque{Node}()
     for node in tree.rootNodes
         if population_df[node.caseID, :num_offspring] != 0
@@ -719,8 +693,6 @@ function createThinningTree(population_df::DataFrame, numSeedCases)
     end
 
     current_range = numSeedCases:numSeedCases
-
-    # currentRange = currentRange[end]+1:currentRange[end]+num_off[i]
 
     # insert children
     while !isempty(childrenDeque)
@@ -731,20 +703,12 @@ function createThinningTree(population_df::DataFrame, numSeedCases)
         current_range = current_range[end]+1:current_range[end]+current_offspring
 
         currentNode.children = [Node(i, population_df[i, :time_infected], Ref(currentNode), []) for i in current_range]
-        # try
-        # catch BoundsError
-        #     println("Current range is $current_range")
-        #     println("childrenDeque has $(length(childrenDeque)) elements remaining")
-        #     # @error "BoundsError occurred"
-        #     BoundsError
-        # end
 
         for node in currentNode.children
             if population_df[node.caseID, :num_offspring] != 0
                 push!(childrenDeque, node)
             end
         end
-
     end
 
     return tree
@@ -762,7 +726,9 @@ end
 function getTimeInfected_relative!(population_df::DataFrame, model::branchModel, gen_range_dict, num_cases::Int64)
     #=
     Returns the time that an individual is infected by their parent. This is a
-    time relative to the when the parent's infection occurred
+    time relative to the when the parent's infection occurred.
+
+    Works in place on population_df, adding a new column
     =#
 
     infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
@@ -779,38 +745,34 @@ function getTimeInfected_abs!(population_df::DataFrame, model::branchModel,
     gen_range_dict::Dict, num_cases::Int64)
     #=
     Returns the actual time that an individual is infected by their parent
+
+    Works in place on population_df, adding a new column
     =#
+
     numSeedCases = length(gen_range_dict[1])
     time_infected = zeros(nrow(population_df))
-    # time_infected3 = zeros(model.max_cases)
-
-    # for i in numSeedCases+1:num_cases
-    #     time_infected[i] = population_df[i, :time_infected_rel] + time_infected[population_df[i, :parentID]]
-    # end
 
     for gen in 2:maximum(keys(gen_range_dict))
         infect_range = gen_range_dict[gen]
 
-        # num_zeros = sum(population_df[infect_range, :parentID] .== 0)
-        # if num_zeros > 0
-        #     println(num_zeros)
-        #     println(gen)
-        #     println(infect_range)
-        # end
-
         time_infected[infect_range] .= population_df[infect_range, :time_infected_rel] .+ time_infected[population_df[infect_range, :parentID]]
     end
 
-    # infect_range = numSeedCases+1:num_cases
-
     population_df.time_infected = time_infected
-    # population_df.time_infected3 = time_infected3
+    return nothing
 end
 
 function getTimeInfected_abs_tree!(population_df::DataFrame, model::branchModel,
     gen_range_dict::Dict, num_cases::Int, dependency_tree::SimpleDiGraph)
+    #=
+    Returns the actual time that an individual is infected by their parent
 
-    # numSeedCases = length(gen_range_dict[1])
+    Uses a dependency tree of infections to iterate through cases
+
+    Works in place on population_df, adding a new column
+    =#
+
+
     time_infected = zeros(model.max_cases)
 
     # iterate to the second to last generation
@@ -823,7 +785,9 @@ function getTimeInfected_abs_tree!(population_df::DataFrame, model::branchModel,
         end
     end
 
-    population_df.time_infected2 = time_infected
+    population_df.time_infected = time_infected
+
+    return nothing
 end
 
 function getTimeRecovered!(population_df::DataFrame, model::branchModel)
@@ -833,11 +797,13 @@ function getTimeRecovered!(population_df::DataFrame, model::branchModel)
     =#
 
     population_df.time_recovery = population_df.time_infected .+ model.recovery_time
+
+    return nothing
 end
 
 function sortInfections(population_df::Union{SubDataFrame,DataFrame}, model::branchModel, viewBool::Bool=true)
     #=
-    Returns a sorted view of a population_df dataframe.
+    Returns a sorted view (if viewBool==true) of a population_df dataframe
 
     It is sorted by infection time
     =#
@@ -861,9 +827,12 @@ function mergeArrays_events(time_infected::Array{Float64,1}, time_recovery::Unio
     t::Array{Float64,1}, stateTotals::Array{Int64,2})
     #=
     This is a modified version of: https://www.geeksforgeeks.org/merge-two-sorted-arrays/
-    This is method 2.
+    This is method 2. I.e. a merge sort on two sorted arrays
 
     Works in place on t and stateTotals arrays, ignoring the very first index.
+    Creates the stateTotals array by initialising each row with the cumulative
+    effect, and then performing a cumsum across these rows to get the overall
+    change in totals over time.
 
     Length of combined infection and recovery arrays should be 1 less than length
     of t: n1+n2+1 == length(t)
@@ -950,6 +919,10 @@ function findlastID_unthinned(sorted_df::Union{DataFrame,SubDataFrame}, numSeedC
 end
 
 function dataframeClean!(sorted_df::DataFrame, range_to_clean::UnitRange)
+    #=
+    Sets all relevant columns of a dataframe to 0 (0.0 if Float and false if Bool)
+    =#
+
     sorted_df[range_to_clean, :num_offspring] .= 0
     sorted_df[range_to_clean, :time_infected] .= 0.0
     sorted_df[range_to_clean, :time_infected_rel] .= 0.0
@@ -961,18 +934,45 @@ function dataframeClean!(sorted_df::DataFrame, range_to_clean::UnitRange)
 end
 
 function simChildren_ThinTree!(population_df::DataFrame, model::branchModel,
-    currentNode::Node, new_model::branchModel, sSaturation::Float64, isolationDepend::Bool)
+    currentNode::Node, new_model::branchModel, sSaturation::Float64, isolationDepend::Bool, thinnedToReuse::Deque{Node})
     #=
     Simulate the children of a given node.
 
     May add support for multiple generations simulated
     =#
 
-    # sim numOff
-
     expOff = population_df[currentNode.caseID, :reproduction_number] * sSaturation
     numOff = rand(Poisson(expOff))
-    population_df[currentNode.caseID, :num_offspring] = numOff
+    population_df[currentNode.caseID, :num_offspring] = numOff * 1
+
+    newGenNumber = population_df[currentNode.caseID, :generation_number]+1
+    current_time_infected = population_df[currentNode.caseID, :time_infected]
+
+    while numOff != 0 && !isempty(thinnedToReuse)
+        newChild = pop!(thinnedToReuse)
+
+        population_df[newChild.caseID, :parentID] = currentNode.caseID
+        population_df[newChild.caseID, :generation_number] = newGenNumber
+        population_df[newChild.caseID, :time_infected_rel] = getTimeInfected_relativeArray(model, 1)[1]
+        population_df[newChild.caseID, :time_infected] = population_df[newChild.caseID, :time_infected_rel] + current_time_infected
+        population_df[newChild.caseID, :time_recovery] = population_df[newChild.caseID, :time_infected] + model.recovery_time
+
+        newChild.infection_time = population_df[newChild.caseID, :time_infected]
+        newChild.parent = Ref(currentNode)
+
+        # update gen number, time_infected and time_isolated (if applicable)
+        if isolationDepend
+
+            if population_df[newChild.caseID, :detected]
+                population_df[newChild.caseID, :time_isolated] = getTimeIsolated(model, population_df[newChild.caseID, :])[1]
+            end
+
+        end
+
+        push!(currentNode.children, newChild)
+
+        numOff -= 1
+    end
 
     if numOff != 0
         # add rows to df
@@ -981,17 +981,18 @@ function simChildren_ThinTree!(population_df::DataFrame, model::branchModel,
         new_model.state_totals[2] = 0
         new_rows = initDataframe_thin(new_model)
 
-        new_rows.parentID .= currentNode.parent[].caseID
+        new_rows.parentID .= currentNode.caseID
         new_rows.caseID .+= nrow(population_df)
-        new_rows.generation_number .= population_df[currentNode.caseID, :generation_number]+1
+        new_rows.generation_number .= newGenNumber
         new_rows.num_offspring = Array{Int64}(undef, numOff) .* 0
-        new_rows.time_infected_rel = Array{Int64}(undef, numOff) .* 0
-        new_rows.time_infected = getTimeInfected_relativeArray(model, numOff) .+ population_df[currentNode.caseID, :time_infected]
+        new_rows.time_infected_rel = getTimeInfected_relativeArray(model, numOff)
+        new_rows.time_infected = new_rows.time_infected_rel .+ current_time_infected
         getTimeRecovered!(new_rows, model)
         new_rows.sSaturation_upper = ones(numOff)
         new_rows.thinned = BitArray(undef, numOff) .* false
         new_rows.thinned .= true
         new_rows.offspring_simmed = BitArray(undef, numOff) .* false
+        new_rows.reused = BitArray(undef, numOff) .* false
 
         if isolationDepend
             initDataframe_isolation!(new_rows, new_model)
@@ -1002,7 +1003,7 @@ function simChildren_ThinTree!(population_df::DataFrame, model::branchModel,
 
         current_range = nrow(population_df)-numOff+1:nrow(population_df)
 
-        currentNode.children = [Node(i, population_df[i, :time_infected], Ref(currentNode), []) for i in current_range]
+        push!(currentNode.children, [Node(i, population_df[i, :time_infected], Ref(currentNode), []) for i in current_range]...)
     end
 
     return nothing
@@ -1013,9 +1014,18 @@ function bp_ThinTree!(population_df::DataFrame,
     isolationDepend::Bool, thinningTree::Tree)
     #=
     Thins events from the population_df dataframe, by setting a boolean column
-    to true for that row
+    to true for that row.
 
-    Continue thinning until sSaturation <= lower bound (0.1 atm)
+    Performs this by iterating through a directed tree in order of infection
+    time and only considering a node's children if it has not been thinned.
+
+    Thins based on saturation factors and isolation of cases. Could also add
+    support for alert level changes (as in Mike et. al.)
+
+    Stopping conditions are:
+        if search (no children left) becomes empty
+        if hit max cases / population size
+        if hit t_max
     =#
 
     popsortvector = Array{Int64}(undef, model.max_cases) .* 0
@@ -1023,6 +1033,10 @@ function bp_ThinTree!(population_df::DataFrame,
     popsortindex = gen_range_dict[1][end]
 
     search = BinaryHeap{Node, TimeOrdering}()
+    thinnedToReuse = Deque{Node}()
+    reused = BitArray(undef, nrow(population_df)) .* false
+    population_df.reused = reused
+
     # push all children of rootNodes into heap. They will be sorted by infection time
     for rootNode in thinningTree.rootNodes
         for child in rootNode.children
@@ -1030,47 +1044,49 @@ function bp_ThinTree!(population_df::DataFrame,
         end
     end
 
+    # saturation factors
     sSaturation = (model.state_totals[1]/model.population_size)
-    # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
     sSaturation_upper = ones(nrow(population_df))
     population_df.sSaturation_upper = sSaturation_upper
-
-    # caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
-    # unthinned_caseID = 0
-
     increment = 1.0/model.population_size
+
+    # thinned column
     thinned = BitArray(undef, nrow(population_df)) .* false
     thinned[gen_range_dict[1][end]+1:end] .= true
-    # thinned[gen_range_dict[1]] .= false
     population_df.thinned = thinned
 
+    # offspring simmed column (only haven't simmed offspring from final generation)
     offspring_simmed = BitArray(undef, nrow(population_df)) .* false
     offspring_simmed .= true
     offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
     population_df.offspring_simmed = offspring_simmed
-    # numSeedCases = length(gen_range_dict[1])
-
-    # sorted_df = copy(sorted_df)
 
     total_thinned = 0
     new_model = deepcopy(model) # for creating new dataframes
 
     while !isempty(search)
         currentNode = pop!(search)
-        # index = caseIDs_to_index[currentNode.caseID]
-        # parentIndex = caseIDs_to_index[sorted_df[currentNode.caseID, :parentID]]
 
         if saturationDepend && rand(Float64)>sSaturation/population_df[currentNode.parent[].caseID::Int64, :sSaturation_upper]
             # you are thinned
             deleteChildNode!(currentNode)
             population_df[currentNode.parent[].caseID::Int64, :num_offspring]-=1
-            # total_thinned+=1
+
+            currentNode.parent = Ref(nothing)
+            push!(thinnedToReuse, currentNode)
+            population_df[currentNode.caseID, :reused] = true
+
         elseif isolationDepend && population_df[currentNode.parent[].caseID, :detected] &&
             population_df[currentNode.parent[].caseID,:time_isolated] < currentNode.infection_time &&
             model.isolation_infectivity < rand()
 
             deleteChildNode!(currentNode)
             population_df[currentNode.parent[].caseID::Int64, :num_offspring]-=1
+
+            currentNode.parent = Ref(nothing)
+            push!(thinnedToReuse, currentNode)
+            population_df[currentNode.caseID, :reused] = true
+
         else
 
             popsortindex+=1
@@ -1089,8 +1105,31 @@ function bp_ThinTree!(population_df::DataFrame,
                 population_df[currentNode.caseID, :sSaturation_upper] = sSaturation*1
                 # Simulate offspring for a few generations (one?)
                 # simulate at sSaturation_upper/sSaturation
-                simChildren_ThinTree!(population_df, model, currentNode, new_model, sSaturation, isolationDepend)
+                simChildren_ThinTree!(population_df, model, currentNode, new_model, sSaturation, isolationDepend, thinnedToReuse)
+            end
 
+            # reused an event. Need to rescale t_infect and t_isolated for their children. Both in df and in the Node tree
+            if population_df[currentNode.caseID, :reused]
+                if !isempty(currentNode.children)
+
+                    child1 = currentNode.children[1]
+
+                    old_parent_t_infect = population_df[child1.caseID, :time_infected] - population_df[child1.caseID, :time_infected_rel]
+                    t_diff = currentNode.infection_time - old_parent_t_infect
+                    newGen = population_df[currentNode.caseID, :generation_number] + 1
+
+                    for child in currentNode.children
+                        child.infection_time += t_diff
+                        population_df[child.caseID, :generation_number] = newGen
+                        population_df[child.caseID, :time_infected] += t_diff
+                        population_df[child.caseID, :time_recovery] += t_diff
+                        population_df[child.caseID, :reused] = true
+
+                        if isolationDepend
+                            population_df[child.caseID, :time_isolated] += t_diff
+                        end
+                    end
+                end
             end
 
             # add children to search
@@ -1099,13 +1138,7 @@ function bp_ThinTree!(population_df::DataFrame,
             end
         end
     end
-    total_thinned = sum(population_df.thinned .== true)
-    # println()
-    # println("Total thinned is $total_thinned, out of $(nrow(population_df)) events")
 
-    # filtered_df = filterInfections(population_df, model, true, false)
-
-    # return sortInfections(filtered_df, model, false)
     return population_df[popsortvector[1:popsortindex], :]
 end
 
@@ -1121,38 +1154,21 @@ function bp_SingleThin!(population_df::DataFrame,
     Continue thinning until sSaturation <= lower bound (0.1 atm)
     =#
 
-    # println(sum(population_df.parentID .== 0))
-
-    # sorted_df = filter(row->row.parentID != 0, population_df, view=false)
-    # sorted_df = sortInfections(sorted_df, model, false)
-
     sorted_df = sortInfections(population_df, model, false)
 
     sSaturation = (model.state_totals[1]/model.population_size)
-    # sSaturation_upper = 1.0 #(model.state_totals[1]/model.population_size)
     caseSaturation = zeros(num_cases) # corresponds to the sorted indexes
     caseSaturation[gen_range_dict[1]] .= sSaturation*1
+    increment = 1.0/model.population_size
 
     caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
     unthinned_caseID = 0
 
-    increment = 1.0/model.population_size
     thinned = BitArray(undef, nrow(sorted_df)) .* false
     thinned[gen_range_dict[1][end]+1:end] .= true
-    # thinned[gen_range_dict[1]] .= false
     sorted_df.thinned = thinned
 
-    # offspring_simmed = BitArray(undef, num_cases) .* true
-    # offspring_simmed[gen_range_dict[maximum(keys(gen_range_dict))]] .= false
-    # population_df.offspring_simmed = offspring_simmed
     numSeedCases = length(gen_range_dict[1])
-
-    # do not thin seed cases
-    # for i in collect(gen_range_dict[1])
-    #     if false
-    #         println()
-    #     end
-    # end
 
     total_thinned = 0
     parentIndex = 0
@@ -1161,8 +1177,7 @@ function bp_SingleThin!(population_df::DataFrame,
     for i::Int64 in numSeedCases+1:nrow(sorted_df)
         parentIndex::Int64 = caseIDs_to_index[sorted_df[i, :parentID]]*1
         # saturationThin
-        if saturationDepend && (sorted_df[parentIndex, :thinned] || rand()>sSaturation)#/sSaturation_upper
-            # sorted_df[i, :thinned] = true
+        if sorted_df[parentIndex, :thinned] || (saturationDepend && rand()>sSaturation)#/sSaturation_upper
             total_thinned+=1
             sorted_df[parentIndex, :num_offspring]-=1
 
@@ -1181,11 +1196,10 @@ function bp_SingleThin!(population_df::DataFrame,
             caseSaturation[i] = sSaturation*1
             sSaturation-=increment
             sorted_df[i, :thinned] = false
-
         end
 
         if sSaturation <= 0.1
-            println("Hit saturation lower bound")
+            # println("Hit saturation lower bound")
             break
         end
 
@@ -1194,7 +1208,6 @@ function bp_SingleThin!(population_df::DataFrame,
         # end
 
     end
-    # println()
     # println("Total thinned is $total_thinned")
 
     return filterInfections(sorted_df, model, true)
@@ -1218,7 +1231,6 @@ function bp_thinnedHereAndNow!(population_df::DataFrame,
     caseSaturation[gen_range_dict[1]] .= sSaturation*1
 
     caseIDs_to_index = sparsevec(sorted_df.caseID, collect(1:nrow(sorted_df)))
-    # caseIDs_to_index = sparsevec()
     unthinned_caseID = 0
 
     increment = 1.0/model.population_size
@@ -1231,17 +1243,9 @@ function bp_thinnedHereAndNow!(population_df::DataFrame,
     population_df.offspring_simmed = offspring_simmed
     numSeedCases = length(gen_range_dict[1])
 
-    # do not thin seed cases
-    # for i in collect(gen_range_dict[1])
-    #     if false
-    #         println()
-    #     end
-    # end
-
     total_thinned = 0
     it_count = 1
 
-    # we do need to do it in generation order
     while it_count < 10000
         it_count+=1
         # thinning of child cases
@@ -1479,22 +1483,17 @@ function bp_thinnedHereAndNow!(population_df::DataFrame,
 
         end
 
-
-        # Heuristic two - we thin all cases after unthinned_caseID at caseSaturation[sorted_df[unthinned_caseID, :caseID]]
-        # then simulate new generations from final generation simple BP style
-
         if rem(it_count, 100) == 0
             println("Iteration number $it_count")
         end
     end
-    # population_df.thinned = thinned
+
     println("Total thinned is $total_thinned")
 
     return filter(row->row.time_recovery > 0.1, sorted_df, view=false)
-    # return filterInfections(sorted_df, model, thinning)
 end
 
-function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchModel, gen_range_dict::Dict, thinned_waitAndSee::Bool)
+function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchModel, gen_range_dict::Dict)
     #=
     Generates the state totals for a complex SIR branching process where an infected
     individual, i, infects R_i people on average. May or may not include thinning
@@ -1511,8 +1510,6 @@ function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchMo
 
     num_cases = nrow(sorted_df)
     numSeedCases = length(gen_range_dict[1])
-    # println(num_cases)
-    # println(num_cases*2 - numSeedCases+1)
 
     # twice as long array to allow for recovery events too
     t = zeros(num_cases*2 - numSeedCases+1)
@@ -1521,35 +1518,7 @@ function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchMo
     t[1] = model.t_init
     stateTotals[1,:] = model.state_totals
 
-    t_ind = 1
-    infect_ind = numSeedCases+1
-    recovery_ind = 1
-
-    if thinned_waitAndSee
-        # do alert level thinning
-        println()
-    end
-
     t, stateTotals = mergeArrays_events(sorted_df.time_infected[numSeedCases+1:end], sorted_df.time_recovery, t, stateTotals)
-
-    # for t_ind in 2:length(t)
-    #     if infect_ind > num_cases
-    #         break
-    #     end
-    #
-    #     t_event, eventType = findmin([sorted_df[infect_ind, :time_infected], sorted_df[recovery_ind, :time_recovery]])
-    #
-    #     if eventType==1
-    #         stateTotals[t_ind,:] = stateTotals[t_ind-1,:] .+ [-1,1,0]
-    #         infect_ind+=1
-    #     else
-    #         stateTotals[t_ind,:] = stateTotals[t_ind-1,:] .+ [0,-1,1]
-    #         recovery_ind+=1
-    #     end
-    #
-    #     t[t_ind] = t_event
-    #     t_ind+=1
-    # end
 
     if t[end] >= model.recovery_time
         # clean duplicate values of t which occur on the first recovery time
@@ -1563,7 +1532,7 @@ function casesOverTime(sorted_df::Union{DataFrame,SubDataFrame}, model::branchMo
     return t, stateTotals
 end
 
-function bpMain!(population_df::DataFrame, model::branchModel, noTimingDepend::Bool,
+function bpMain!(population_df::DataFrame, model::branchModel, noTimeDepend::Bool,
     thinMethod::ThinFunction=ThinFunction(ThinTree()),
     full_final_gen::Bool=false, sDepend::Bool=true, isolDepend::Bool=false)
     #=
@@ -1580,11 +1549,7 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingDepend::B
 
     gen_range_dict, num_cases, population_df = branchingProcess(population_df, model, full_final_gen)
 
-    # println(model.max_cases)
-    # println(gen_range_dict[maximum(keys(gen_range_dict))])
-    # println(maximum(keys(gen_range_dict)))
-
-    if noTimingDepend
+    if noTimeDepend
         generations, state_totals_all = casesOverGenerations(gen_range_dict)
         return generations, state_totals_all, population_df
     end
@@ -1596,9 +1561,7 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingDepend::B
 
     getTimeRecovered!(population_df, model)
 
-
-    sorted_df = DataFrame() #sortInfections(population_df, model)
-
+    sorted_df = DataFrame()
 
     if thinMethod.name != ThinNone && (sDepend || isolDepend)
 
@@ -1635,9 +1598,7 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimingDepend::B
         sorted_df = sortInfections(population_df, model)
     end
 
-    thinned_waitAndSee=false
-
-    t, state_totals_all = casesOverTime(sorted_df, model, gen_range_dict, thinned_waitAndSee)
+    t, state_totals_all = casesOverTime(sorted_df, model, gen_range_dict)
 
     return t, state_totals_all, sorted_df
 end
@@ -3035,7 +2996,6 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
     end
-
 end
 
 function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
@@ -3085,7 +3045,7 @@ function compilationInit()
     population_df = initDataframe(model);
     @time t, state_totals_all, num_cases= nextReact_branch!(population_df, model)
 
-    # Simple branch, random infection times, isolation thinning
+    # Simple branch, random infection times, isolation & saturation thinning
     model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
     model.p_test = 1.0
     model.sub_clin_prop = 0
@@ -3094,7 +3054,7 @@ function compilationInit()
     population_df = initDataframe_thin(model);
     @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), true, true, true)
 
-    # Simple branch, random infection times, isolation thinning
+    # Simple branch, random infection times, isolation & saturation thinning
     model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
     model.p_test = 1.0
     model.sub_clin_prop = 0
@@ -3106,7 +3066,7 @@ end
 
 compilationInit()
 
-verifySolutions(1, [11, 12, 13, 14])
+verifySolutions(1, [11,12,13,14])
 
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
 # time_step = 1;
@@ -3163,16 +3123,16 @@ verifySolutions(1, [11, 12, 13, 14])
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # Simple branch, random infection times, isolation thinning
-# model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+# model = init_model_pars(0, 200, 5*10^3, 5*10^4, [5*10^3-10,10,0]);
 # model.p_test = 1.0
 # model.sub_clin_prop = 0
 # model.stochasticIsol = false
 # # model.t_onset_shape = 5.8
 # model.t_onset_to_isol = 0
 # population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, false, true)
+# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, true, true)
 # outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
+# subtitle = "Branching Process, Random Infection Times, Isolation thinning"
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # Simple branch, random infection times, s saturation and isolation thinning

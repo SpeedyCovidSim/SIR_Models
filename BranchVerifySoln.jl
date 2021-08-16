@@ -14,7 +14,10 @@ module BranchVerifySoln
     using LightGraphs, PyPlot, Seaborn, Dierckx, StatsBase #, MetaGraphs
 
     export branchVerifyPlot, meanAbsError, initSIRArrays, multipleSIRMeans,
-        multipleLinearSplines, branchTimeStepPlot
+        multipleLinearSplines, branchTimeStepPlot, branch2wayVerifyPlot, Dots, Lines
+
+    struct Dots; end
+    struct Lines; end
 
     function branchVerifyPlot(Smean, Imean, Rmean, discreteArray, times, title, outputFileName, First=true, Display=true, save=false, Discrete=true)
 
@@ -62,6 +65,49 @@ module BranchVerifySoln
         end
         close()
 
+    end
+
+    function branch2wayVerifyPlot(x1, x2, times, title, outputFileName, dotsOrLines::Union{Dots,Lines}, Display=true, save=false)
+
+        #PyPlot.rcParams["figure.dpi"] = 300
+        x1PlotType = ""
+        x2PlotType = ""
+
+        if dotsOrLines == Dots()
+            x1PlotType = "x"
+            x2PlotType = "*"
+        elseif dotsOrLines == Lines()
+            x1PlotType = "-"
+            x2PlotType = "-."
+        else
+            @warn No line type specified. Using lines.
+            x1PlotType = "-"
+            x2PlotType = "-."
+        end
+
+        Seaborn.set()
+        Seaborn.set_color_codes("pastel")
+        fig = plt.figure(dpi=300)
+
+        plt.plot(times, x1, "b$x1PlotType", label="I - SimpleBranch", lw=2.5, figure=fig)
+        plt.plot(times, x2, "r$x2PlotType", label="I - Exponential", lw=1.5, figure=fig, alpha = 1)
+
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.suptitle("Branching Process Simulation")
+        plt.title(title)
+        plt.legend()
+
+        if Display
+            # required to display graph on plots.
+            display(fig)
+        end
+        if save
+            # Save graph as pngW
+            fig.savefig(outputFileName)
+
+        end
+        close()
     end
 
     function branchTimeStepPlot(Array1, Array2, Array3, times1, times2, times3, title, outputFileName, Display=true, save=false)

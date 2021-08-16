@@ -1,18 +1,14 @@
-using Distributions
-using Random
 using DataFrames
-using StatsBase
-using LightGraphs, GraphPlot, NetworkLayout
 using BenchmarkTools
-using TrackingHeaps
-using DataStructures
-using SparseArrays
+using Distributions, Random, StatsBase
+using LightGraphs, GraphPlot, NetworkLayout
+using TrackingHeaps, DataStructures, SparseArrays
 
 # import required modules
 push!( LOAD_PATH, "./" )
 using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot
 using BranchVerifySoln: branchVerifyPlot, meanAbsError, initSIRArrays, multipleSIRMeans,
-    multipleLinearSplines, branchTimeStepPlot
+    multipleLinearSplines, branchTimeStepPlot, branch2wayVerifyPlot, Dots, Lines
 
 function weibullParGridSearch(alpha_par, scale_par)
 
@@ -488,6 +484,8 @@ function recovery_branch!(population_df::DataFrame, model::branchModel, caseID::
     population_df[caseID, :active] = false
     model.state_totals[2] -=1
     model.state_totals[3] +=1
+
+    return nothing
 end
 
 function areaUnderCurve(area_under_curve::Array{Float64,1}, index::Array{Int64,1})::Array{Float64,1}
@@ -547,7 +545,7 @@ function newDataframe_rows(model::branchModel, nrows::Int64, maxCaseID::Int64, n
     return new_population_df
 end
 
-function branchingProcess(population_df::DataFrame, model::branchModel, full_final_gen::Bool)
+function branchingProcess(population_df::DataFrame, model::branchModel, full_final_gen::Bool, noTimeDepend::Bool)
     #=
     full_final_gen specifies that the final generation (whichever one ends in the
     simulation going over or equally the max cases allowed), will be fully simulated
@@ -560,12 +558,13 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
     num_cases::Int64 = model.state_totals[2]*1
     gen_range_dict[generation] = 1:num_cases
 
-    population_df[gen_range_dict[generation], :generation_number] .= copy(generation)
+    population_df[gen_range_dict[generation], :generation_number] .= generation * 1
 
     population_df.num_offspring = rand.(Poisson.(population_df.reproduction_number))
     hitMaxCases = false
 
-    while !hitMaxCases
+    # if noTimeDepend -> maxGen == model.t_max
+    while !hitMaxCases && (!noTimeDepend || generation < model.t_max)
 
         # determine number of offspring
         num_off = @view population_df[gen_range_dict[generation], :num_offspring]
@@ -619,7 +618,7 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
         end
         #######################
 
-        population_df[gen_range_dict[generation], :generation_number] .= copy(generation)
+        population_df[gen_range_dict[generation], :generation_number] .= generation * 1
         parentIDs = makeVectorFromFrequency(num_off, collect(gen_range_dict[generation-1]))
         population_df[gen_range_dict[generation], :parentID] .= parentIDs
 
@@ -632,7 +631,7 @@ function branchingProcess(population_df::DataFrame, model::branchModel, full_fin
     return gen_range_dict, num_cases, population_df
 end
 
-function casesOverGenerations(gen_range_dict::Dict{Int64,UnitRange})
+function casesOverGenerations(model::branchModel, gen_range_dict::Dict{Int64,UnitRange})
     #=
     Generates the state totals for a simple SIR branching process where infected
     individuals in generation 1, infect R new people, who become generation 2,
@@ -1547,10 +1546,10 @@ function bpMain!(population_df::DataFrame, model::branchModel, noTimeDepend::Boo
         full_final_gen = true
     end
 
-    gen_range_dict, num_cases, population_df = branchingProcess(population_df, model, full_final_gen)
+    gen_range_dict, num_cases, population_df = branchingProcess(population_df, model, full_final_gen, noTimeDepend)
 
     if noTimeDepend
-        generations, state_totals_all = casesOverGenerations(gen_range_dict)
+        generations, state_totals_all = casesOverGenerations(model, gen_range_dict)
         return generations, state_totals_all, population_df
     end
 
@@ -1925,7 +1924,8 @@ function nextReact_branch!(population_df::DataFrame, model::branchModel)
     end
 
 
-    while t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases
+    while t[end] < model.t_max && model.state_totals[2] != 0 &&
+        num_cases < model.max_cases && !isempty(tau_heap)
 
         # returns a event
         reaction = pop!(tau_heap)
@@ -2996,6 +2996,215 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
     end
+
+    println("Test #15: Epidemic curves (Simple BP Infections vs Exponential)")
+    if 15 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,7.0)
+        time_step = 1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(500 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        sumOffspring = 0
+        total_cases = 0
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            # model.stochasticRi = false
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true, false, false)
+
+            # filtered_df = filter(row -> row.generation_number < maximum(population_df.generation_number), population_df)
+            #
+            # sumOffspring += sum(filtered_df.num_offspring)
+            # total_cases += nrow(filtered_df)
+
+            # interpolate using linear splines
+
+            StStep[1:length(t), i] = state_totals_all[:,1]
+            ItStep[1:length(t), i] = state_totals_all[:,2]
+            RtStep[1:length(t), i] = state_totals_all[:,3]
+            # StStep[:,i], ItStep[:,i], RtStep[:,i] = state_totals_all
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        # println("average R is $(sumOffspring/total_cases)")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        meanCumI = vcat(Rmean[2:end], Rmean[end]+Imean[end])
+
+        # discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+        println("Solving Exponential equation")
+        model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+        # model.stochasticRi = false
+        # model.sub_clin_prop = 0.0
+        # model.reproduction_number = 1.0
+
+        # Iovertime = model.state_totals[2] .* (((model.reproduction_number*(1-model.sub_clin_prop) +
+        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop)*3.3/3).^times)
+
+        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
+            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(times))
+
+        Iovertime = cumsum(Iovertime)
+
+        St, It, Rt = initSIRArrays(tspan, time_step, numSims)
+
+        It = convert.(Int64, It)
+
+        It[1,:] .= model.state_totals[2]
+        time = @elapsed Threads.@threads for i in 1:numSims
+            # It =
+            # numCases = convert.(Int64, times .* 0.0)
+            # numCases[1] = 10
+            for j in Int(tspan[1]+2):Int(tspan[end]+1)
+                It[j, i] = sum(rand(Poisson(3), It[j-1, i]))
+            end
+        end
+        println("Finished Simulation in $time seconds")
+
+        Itmean= mean(It, dims = 2)
+
+        endminus = 2
+        meanCumI = meanCumI[1:end-endminus]
+
+        Itmean = Itmean[1:end-endminus]
+        Iovertime = Iovertime[1:end-endminus]
+        times = times[1:end-endminus]
+
+        misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
+        println("Mean Abs Error I = $misfitI")
+
+        title = "Exponential vs Simple Branch"
+        outputFileName = "./verifiedBranch/ExponentialvsSimpleBP"
+        branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Dots(), true, true)
+        # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
+    end
+
+    println("Test #16: Epidemic curves (Simple BP Infections vs Exponential, distributed times)")
+    if 16 in testRange
+        println("Beginning simulation of Simple BP Case")
+
+        # time span to sim on
+        tspan = (0.0,30.0)
+        time_step = 1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(100 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        sumOffspring = 0
+        total_cases = 0
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
+            model.stochasticRi = false
+            model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()), true, false, false)
+
+            # filtered_df = filter(row -> row.generation_number < maximum(population_df.generation_number), population_df)
+            #
+            # sumOffspring += sum(filtered_df.num_offspring)
+            # total_cases += nrow(filtered_df)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+
+            # StStep[1:length(t), i] = state_totals_all[:,1]
+            # ItStep[1:length(t), i] = state_totals_all[:,2]
+            # RtStep[1:length(t), i] = state_totals_all[:,3]
+            # StStep[:,i], ItStep[:,i], RtStep[:,i] = state_totals_all
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        # println("average R is $(sumOffspring/total_cases)")
+
+        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        # determine cumulative Imean
+        meanCumI = Imean + Rmean
+        # meanCumI = vcat(Rmean[2:end], Rmean[end]+Imean[end])
+
+        # discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+        println("Solving Exponential equation")
+        model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
+        model.stochasticRi = false
+        model.sub_clin_prop = 0.0
+        # model.reproduction_number = 1.0
+
+        # Iovertime = model.state_totals[2] .* (((model.reproduction_number*(1-model.sub_clin_prop) +
+        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop)*3.3/3).^times)
+
+        meanInfectTime = mean(Weibull(model.t_generation_shape, model.t_generation_scale))
+        normTimes = (times .- meanInfectTime) ./ (meanInfectTime * 1)
+
+        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
+            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(normTimes))
+
+        Iovertime = cumsum(Iovertime)
+
+        # St, It, Rt = initSIRArrays(tspan, time_step, numSims)
+
+        # It = convert.(Int64, It)
+
+        # It[1,:] .= model.state_totals[2]
+        # time = @elapsed Threads.@threads for i in 1:numSims
+        #     # It =
+        #     # numCases = convert.(Int64, times .* 0.0)
+        #     # numCases[1] = 10
+        #     for j in Int(tspan[1]+2):Int(tspan[end]+1)
+        #         It[j, i] = sum(rand(Poisson(3), It[j-1, i]))
+        #     end
+        # end
+        println("Finished Simulation in $time seconds")
+
+        # Itmean= mean(It, dims = 2)
+
+        endminus = 2
+        meanCumI = meanCumI[1:end-endminus]
+
+        # Itmean = Itmean[1:end-endminus]
+        Iovertime = Iovertime[1:end-endminus]
+        times = times[1:end-endminus]
+
+        misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
+        println("Mean Abs Error I = $misfitI")
+
+        title = "Exponential vs Simple Branch, Distributed Times"
+        outputFileName = "./verifiedBranch/ExponentialvsSimpleBPTimes.png"
+        branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Lines(), true, true)
+        # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
+    end
+
 end
 
 function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
@@ -3066,7 +3275,9 @@ end
 
 compilationInit()
 
-verifySolutions(1, [11,12,13,14])
+verifySolutions(1, [15, 16])
+
+# verifySolutions(1, [11,12,13,14,15])
 
 # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
 # time_step = 1;
@@ -3099,7 +3310,7 @@ verifySolutions(1, [11,12,13,14])
 # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
 # Simple branch
-# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+# model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
 # population_df = initDataframe_thin(model);
 # @time t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true)
 # outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"

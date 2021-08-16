@@ -1067,7 +1067,7 @@ function bp_ThinTree!(population_df::DataFrame,
     while !isempty(search)
         currentNode = pop!(search)
 
-        if saturationDepend && rand(Float64)>sSaturation/population_df[currentNode.parent[].caseID::Int64, :sSaturation_upper]
+        if saturationDepend && rand() > (sSaturation/population_df[currentNode.parent[].caseID::Int64, :sSaturation_upper])
             # you are thinned
             deleteChildNode!(currentNode)
             population_df[currentNode.parent[].caseID::Int64, :num_offspring]-=1

@@ -3,12 +3,13 @@ import igraph as ig
 from numpy import random
 from plots import plotSIR, plotSIRK
 
-def setNetwork(network, alpha, beta, prop_i=0.05):
+def setNetwork(network, lamb, alpha, beta, prop_i=0.05):
     '''
     Initialises a parsed network with required random infected individuals (1 if too small)
     Inputs
     network     : igraph network object
     prop_i      : proportion of population that is infected (default 0.05)
+    lamb        : disease development rate
     alpha       : recovery rate
     beta        : infection rate
     Outputs
@@ -30,12 +31,13 @@ def setNetwork(network, alpha, beta, prop_i=0.05):
     iTotal = numInfected
     sTotal = N-numInfected
     rTotal = 0
+    eTotal = 0
 
     # adding in hazards/rates
     numInfNei = initHazards(network, infecteds, N)
     rates = beta*numInfNei
     rates[infecteds] = alpha
-    return iTotal, sTotal, rTotal, numInfNei, rates, susceptible
+    return eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible
 
 def initHazards(network, infecteds, N):
     '''
@@ -78,7 +80,7 @@ def selectEventIndex(rates, probs, rng, N):
     return deltaT, eventIndex
 
 
-def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, tInit = 0.0):
+def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, lambd, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -91,6 +93,7 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
     Outputs
     t       : Array of times at which events have occured
     S       : Array of num people susceptible at each t
+    E       : Array of num people exposed at each t
     I       : Array of num people infected at each t
     R       : Array of num people recovered at each t
     '''
@@ -101,8 +104,10 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
     S = np.zeros(maxI)
     t = 1*S
     t[0] = tInit
+    E = 1*S
     I = 1*S
     R = 1*S
+    E[0] = eTotal
     S[0] = sTotal
     I[0] = iTotal
     R[0] = rTotal
@@ -116,7 +121,15 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
         # get next event time and next event index
         deltaT, eventIndex = selectEventIndex(rates, probs, rng, N)
         # update local neighbourhood attributes
-        if susceptible[eventIndex]:  # (S->I)
+        if susceptible[eventIndex]:  # (S->E)
+            # change state and individual rate
+            susceptible[eventIndex] = -1
+            rates[eventIndex] = lambd
+            # update network totals
+            sTotal -= 1
+            eTotal += 1
+
+        elif susceptible[eventIndex] == -1: # (E->I)
             # change state and individual rate
             susceptible[eventIndex] = 0
             rates[eventIndex] = alpha
@@ -128,7 +141,7 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
                     numInfNei[n] += 1
                     rates[n] = numInfNei[n]*beta
             # update network totals
-            sTotal-= 1
+            eTotal -= 1
             iTotal += 1
 
         else: # (I->R)
@@ -146,18 +159,19 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
             rTotal += 1
 
         # update probabilities
-        if rates.any():
-            probs = rates/np.sum(rates)
+        probs = rates/np.sum(rates)
 
         # add totals
         if i < maxI:
             t[i] = t[i-1] + deltaT
             S[i] = sTotal
+            E[i] = eTotal
             I[i] = iTotal
             R[i] = rTotal
         else:
             t.append(t[-1] + deltaT)
             S.append(sTotal)
+            E.append(eTotal)
             I.append(iTotal)
             R.append(rTotal)
 
@@ -165,55 +179,8 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rat
     
     # filter totals
     S = S[:i]
+    E = E[:i]
     t = t[:i]
     R = R[:i]
     I = I[:i]
-    return t, S, I, R
-
-def main():
-    '''
-    Main loop for testing within this Python file
-    '''
-    # testing the gillespieDirect2Processes function
-    # note random seed set within network model so result will occur everytime
-
-    # initialise variables
-    # N = np.array([5, 10, 50, 100,1000])
-    # k = [2,3,10,20,100]
-    N = np.array([5, 10, 50, 100,1000,10000])
-    k = [2,3,10,20,100,1000]
-
-
-    tMax = 200
-    alpha = 0.4
-    beta = 10 / N
-    
-    # iterate through populations for complete graphs
-    if True:
-        print("Beginning full graph simulations")
-        for i in range(len(N)):
-            print(f"Iteration {i} commencing")
-            network = ig.Graph.Full(N[i])
-            iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
-            print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
-            print(f"Exporting simulation {i}")
-            # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectSIR/SIR_Model_Pop_{N[i]}"
-            plotSIR(t, [S, I, R], alpha, beta[i], N[i], outputFileName, Display=False)
-
-    if True:   
-        print("Beginning connectedness simulations")
-        for i in range(len(N)):
-            print(f"Iteration {i} commencing")
-            network = ig.Graph.K_Regular(N[i], k[i])
-            iTotal, sTotal, rTotal, numInfNei, rates, susceptible = setNetwork(network, alpha, beta[i])
-            print(f"Beginning simulation {i}")
-            t, S, I, R = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta[i])
-            print(f"Exporting simulation {i}")
-            # plot and export the simulation
-            outputFileName = f"pythonGraphs/SpeedTest/networkDirectDegreeSIR/SIR_Model_Pop_{N[i]}"
-            plotSIRK(t, [S, I, R], alpha, beta[i], N[i], k[i], outputFileName, Display=False)
-
-if __name__=="__main__":
-    main()
+    return t, S, E, I, R

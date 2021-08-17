@@ -1,8 +1,8 @@
-
 using BenchmarkTools
 using DataFrames
 using Distributions, Random, StatsBase
 using LightGraphs, GraphPlot, NetworkLayout
+using PyPlot, Seaborn
 
 # import required modules
 push!( LOAD_PATH, "./" )
@@ -91,6 +91,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
         println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
         println("Finished Simulation in $time seconds")
+        println()
     end
 
     println("Test #2: Reproduction Number, Stochastic Case")
@@ -153,6 +154,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
         println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
         println("Finished Simulation in $time seconds")
+        println()
     end
 
     println("Test #3: Reproduction Number, Deterministic, SubClin Case")
@@ -217,6 +219,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
         println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
         println("Finished Simulation in $time seconds")
+        println()
     end
 
     println("Test #4: Reproduction Number, Stochastic, SubClin Case")
@@ -281,6 +284,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
         println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
         println("Finished Simulation in $time seconds")
+        println()
     end
 
     println("Test #5: Epidemic curves")
@@ -351,6 +355,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "First React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/FirstVsDiscrete"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, true, true, true)
+        println()
     end
 
     println("Test #6: Epidemic curves (Next vs Discrete)")
@@ -421,6 +426,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscrete"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+        println()
     end
 
     println("Test #7: Epidemic curves (Next vs Discrete - 1 Day timestep)")
@@ -491,6 +497,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Discrete. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscrete1Day"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+        println()
     end
 
     println("Test #8: Epidemic curves - changing Time Steps")
@@ -509,6 +516,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Discrete solution for fixed inputs when varying time step"
         outputFileName = "./verifiedBranch/DiscreteVariedTimeStep"
         branchTimeStepPlot(discrete_mean_1, discrete_mean_2, discrete_mean_3, times1, times2, times3, title, outputFileName, true, true)
+        println()
     end
 
     println("Test #9: Epidemic curves (Next vs Discrete, Isolation)")
@@ -589,6 +597,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscreteIsolationg"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+        println()
     end
 
     println("Test #10: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep)")
@@ -669,6 +678,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
         outputFileName = "./verifiedBranch/NextvsDiscreteIsol1Day"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+        println()
     end
 
     println("Test #11: Epidemic curves (Next vs Simple BP, S Saturation Thinning)")
@@ -741,6 +751,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Simple Branch with Saturation Thinning"
         outputFileName = "./verifiedBranch/NextvsSimpleBP"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+        println()
     end
 
     println("Test #12: Epidemic curves (Next vs Simple BP, S Saturation & Isolation Thinning)")
@@ -822,6 +833,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Simple BP with Isolation and S Saturation"
         outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+        println()
     end
 
     println("Test #13: Initial Epidemic curves (Next vs Simple BP, S Saturation Single Thin)")
@@ -895,6 +907,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Simple Branch with Saturation (Single) Thinning"
         outputFileName = "./verifiedBranch/NextvsSimpleBP_SingleThin"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+        println()
     end
 
     println("Test #14: Initial Epidemic curves (Next vs Simple BP, S Saturation & Isolation Single Thin)")
@@ -978,6 +991,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         title = "Next React vs Simple BP with Isolation and S Saturation (Single) Thinning"
         outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
         branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+        println()
     end
 
     println("Test #15: Epidemic curves (Simple BP Infections vs Exponential)")
@@ -1040,11 +1054,9 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         # model.sub_clin_prop = 0.0
         # model.reproduction_number = 1.0
 
-        # Iovertime = model.state_totals[2] .* (((model.reproduction_number*(1-model.sub_clin_prop) +
-        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop)*3.3/3).^times)
 
         Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
-        model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(times))
+            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(times))
 
         Iovertime = cumsum(Iovertime)
 
@@ -1075,14 +1087,94 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
         println("Mean Abs Error I = $misfitI")
 
-        title = "Exponential vs Simple Branch"
+        title = "Geometric Series vs Simple Branch Mean"
         outputFileName = "./verifiedBranch/ExponentialvsSimpleBP"
         branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Dots(), true, true)
         # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
+        println()
     end
 
-    println("Test #16: Epidemic curves (Simple BP Infections vs Exponential, distributed times)")
+    println("Test #16: Epidemic curves (Simple BP Infections, Heteregenous and Non), Mean + other realisations")
     if 16 in testRange
+        println("Beginning simulation of Simple BP Case, Homogeneous")
+
+        # time span to sim on
+        tspan = (0.0,9.0)
+        time_step = 1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(400 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            model.stochasticRi = false
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true, false, false)
+
+            StStep[1:length(t), i] = state_totals_all[:,1]
+            ItStep[1:length(t), i] = state_totals_all[:,2]
+            RtStep[1:length(t), i] = state_totals_all[:,3]
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        println("Beginning simulation of Simple BP Case, Heterogeneous")
+
+        x1 = ItStep .+ RtStep
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            model.stochasticRi = true
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true, false, false)
+
+            StStep[1:length(t), i] = state_totals_all[:,1]
+            ItStep[1:length(t), i] = state_totals_all[:,2]
+            RtStep[1:length(t), i] = state_totals_all[:,3]
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        x2 = ItStep .+ RtStep
+
+        # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+        endminus = 1
+        x1 = x1[1:end-endminus, :]
+        x2 = x2[1:end-endminus, :]
+        times = times[1:end-endminus]
+
+        title = "Generation Based Branching Process Simulation"
+        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNon"
+        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true)
+
+        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonSD"
+        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true)
+        println()
+    end
+
+    println("Test #17: Epidemic curves (Simple BP Infections vs Exponential, distributed times)")
+    if 17 in testRange
         println("Beginning simulation of Simple BP Case")
 
         # time span to sim on
@@ -1092,7 +1184,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
 
-        numSims = convert(Int, round(100 / numSimsScaling))
+        numSims = convert(Int, round(400 / numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -1104,7 +1196,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
             model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
             model.stochasticRi = false
-            model.sub_clin_prop = 0.0
+            # model.sub_clin_prop = 0.0
             # model.reproduction_number = 1.0
 
             # Simple branch, no infection times
@@ -1141,21 +1233,28 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println("Solving Exponential equation")
         model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
         model.stochasticRi = false
-        model.sub_clin_prop = 0.0
+        # model.sub_clin_prop = 0.0
         # model.reproduction_number = 1.0
 
         # Iovertime = model.state_totals[2] .* (((model.reproduction_number*(1-model.sub_clin_prop) +
         #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop)*3.3/3).^times)
 
-        meanInfectTime = mean(Weibull(model.t_generation_shape, model.t_generation_scale))
-        normTimes = (times .- meanInfectTime) .* (meanInfectTime * 1)
+        meanGenTime = mean(Weibull(model.t_generation_shape, model.t_generation_scale))
+        # normTimes = (times) ./ (meanGenTime .* log(3))
+        # Inormtime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
+        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(normTimes))
 
         # times*gentime
 
-        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
-        model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(times))
+        gen = convert.(Int64, collect(0:(tspan[end]/meanGenTime+1)))
 
+        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
+            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(gen))
+
+        actualGenTimes = gen .* meanGenTime
         Iovertime = cumsum(Iovertime)
+
+        Iovertime = singleSpline(Iovertime, actualGenTimes, times)
 
         # St, It, Rt = initSIRArrays(tspan, time_step, numSims)
 
@@ -1170,25 +1269,102 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         #         It[j, i] = sum(rand(Poisson(3), It[j-1, i]))
         #     end
         # end
-        println("Finished Simulation in $time seconds")
+        # println("Finished Simulation in $time seconds")
 
         # Itmean= mean(It, dims = 2)
 
-        endminus = 2
-        meanCumI = meanCumI[1:end-endminus]
-
+        # endminus = 2
+        # meanCumI = meanCumI[1:end-endminus]
         # Itmean = Itmean[1:end-endminus]
-        Iovertime = Iovertime[1:end-endminus]
-        times = times[1:end-endminus]
-        normTimes = normTimes[1:end-endminus]
+        # Iovertime = Iovertime[1:end-endminus]
+        # times = times[1:end-endminus]
+        # normTimes = normTimes[1:end-endminus]
 
         misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
         println("Mean Abs Error I = $misfitI")
 
-        title = "Exponential vs Simple Branch, Distributed Times"
+        title = "Geometric Series vs Simple Branch Mean, Distributed Times"
         outputFileName = "./verifiedBranch/ExponentialvsSimpleBPTimes.png"
-        branch2wayVerifyPlot(meanCumI, Iovertime, normTimes, title, outputFileName, Lines(), true, true)
-        # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
+        branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Lines(), true, true)
+        # branch2wayVerifyPlot(Inormtime, Iovertime, times, title, outputFileName, Lines(), true, false)
+        println()
+    end
+
+    println("Test #18: Epidemic curves (Simple BP Infections, Heteregenous and Non), Mean + other realisations")
+    if 18 in testRange
+        println("Beginning simulation of Simple BP Case, Homogeneous")
+
+        # time span to sim on
+        tspan = (0.0,45.0)
+        time_step = 1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+
+        numSims = convert(Int, round(300 / numSimsScaling))
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            model.stochasticRi = false
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()), true, false, false)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        println("Beginning simulation of Simple BP Case, Heterogeneous")
+
+        x1 = ItStep .+ RtStep
+
+        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+        i = 1
+        time = @elapsed Threads.@threads for i = 1:numSims
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            model.stochasticRi = true
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
+
+            # Simple branch, no infection times
+            population_df = initDataframe_thin(model);
+
+            t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()), true, false, false)
+
+            # interpolate using linear splines
+            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+
+        end
+
+        println("Finished Simulation in $time seconds")
+
+        x2 = ItStep .+ RtStep
+
+        endminus = 1
+        x1 = x1[1:end-endminus, :]
+        x2 = x2[1:end-endminus, :]
+        times = times[1:end-endminus]
+
+        title = "Time Distributed Branching Process Simulation"
+        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimes"
+        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true)
+
+        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimesSD"
+        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true)
+        println()
     end
 end
 
@@ -1224,8 +1400,10 @@ end
 
 compilationInit()
 
+# verifySolutions(40, collect(1:16))
+verifySolutions(1, [16,18])
 
-verifySolutions(40, collect(1:16))
+
 
 # verifySolutions(1, [11,12,13,14,15])
 

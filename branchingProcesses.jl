@@ -2062,5 +2062,4 @@ module branchingProcesses
         population_df = initDataframe_thin(model);
         @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, true)
     end
-
 end  # module branchingProcesses

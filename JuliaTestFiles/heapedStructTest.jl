@@ -1,3 +1,7 @@
+#=
+Test the functionality of defining a custom struct that is used within a heap 
+=#
+
 using TrackingHeaps, DataStructures
 
 struct event
@@ -18,8 +22,6 @@ eventList = [event(1, true, 1, 1.0), event(2, false, 2, 1.0)]
 
 eventList2 = [event(t_max+i,false,0,1.0) for i=1:10]
 
-
-
 h = TrackingHeap(event, S=NoTrainingWheels, O=MinHeapOrder, N = 3, init_val_coll=eventList)
 track!(h, event(100,true,0,1.0))
 
@@ -27,7 +29,6 @@ track!(h, event(100,true,0,1.0))
 # for the individual infected
 # if event at key 'x' is a recovery event,
 update!(h, 1, event(20, true, 1,1.0))
-
 
 h2 = TrackingHeap(event, S=NoTrainingWheels, O=MinHeapOrder, N = 3, init_val_coll=eventList2)
 

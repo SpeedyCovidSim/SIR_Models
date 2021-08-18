@@ -530,7 +530,7 @@ function benchmarkNetwork(compare3, compare2, violin3)
         println(tMean)
 
         Seaborn.set()
-        Seaborn.set_style("white")
+        Seaborn.set_style("ticks")
         fig = plt.figure(dpi=300)
         # plt.violinplot(data)
         Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.type,
@@ -546,8 +546,6 @@ function benchmarkNetwork(compare3, compare2, violin3)
         close()
 
     end
-
-
 end
 
 benchmarkNetwork(false, false, true)

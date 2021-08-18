@@ -10,7 +10,7 @@ Author: Joel Trent and Josh Looker
 using LightGraphs, GraphPlot, MetaGraphs, BenchmarkTools
 
 # import required modules
-push!( LOAD_PATH, "./" )    #Set path to current
+push!( LOAD_PATH, pwd() )    #Set path to current
 using networkFunctions
 
 

@@ -1,6 +1,11 @@
+#=
+Test the relative performance of storing a population's data in a nested dictionary
+and a DataFrame.
+
+Demonstrably better performance found using a DataFrame
+=#
 
 using DataFrames
-
 
 function test2()
     # test DataFrame
@@ -61,8 +66,6 @@ function test2()
     end
 end;
 
-
-
 function test1()
     n = 500000
     TestDict1 = Dict{Int64, Dict{String, Any}}();
@@ -113,7 +116,6 @@ end;
 end
 
 @time test1()
-
 
 @profiler for j in 1:10
     test2()

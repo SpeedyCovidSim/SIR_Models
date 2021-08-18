@@ -1,3 +1,7 @@
+#=
+Test functionality of a tracked heap / priority queue for use with Gibson and Bruck's
+next reaction method.
+=#
 
 using TrackingHeaps
 
@@ -31,7 +35,6 @@ a = top(h)[1]
 tracker2 = track!(h, Inf)
 a = top(h)
 
-
 # 99% sure this implements the update algorithm from Gibson and Bruck 2000, which
 # we need for the NextReactionMethod
 update!(h, tracker, 2.0)
@@ -39,6 +42,5 @@ update!(h, tracker, 2.0)
 # returns the value of the item in the heap.
 getindex(h, tracker)
 getindex(h, 10)
-
 
 length(h)

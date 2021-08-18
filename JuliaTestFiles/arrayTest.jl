@@ -2,9 +2,6 @@
 
 using Distributions, Random, BenchmarkTools
 
-
-
-
 n = 10000000
 
 x = cumsum(ones(n,5), dims=2)

@@ -9,9 +9,6 @@ Author: Joel Trent and Josh Looker
 
 module moduleTest
 
-
-
-
     #Pkg.add("Distributions")
     #Pkg.add("Plots")
     using Distributions

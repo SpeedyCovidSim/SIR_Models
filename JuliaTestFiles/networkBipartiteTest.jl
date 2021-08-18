@@ -7,11 +7,11 @@ Author: Joel Trent
 
 using LightGraphs, GraphPlot, MetaGraphs, BenchmarkTools, DataFrames, StatsBase, SparseArrays
 
-push!( LOAD_PATH, "./" )    #Set path to current
+push!( LOAD_PATH, pwd() )    #Set path to current
+# joinpath(splitpath(pwd())[1:end-1]...)
 using networkInitFunctions: initialiseNetwork!
 using plotsPyPlot: plotSIRPyPlot
 using bipartiteInitFunctions: bipartiteGenerator!
-
 
 
 # # size of graph

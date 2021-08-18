@@ -1,6 +1,9 @@
+#=
+Test the ability to inversely sample values from a conditional distribution.
+=#
+
 using Distributions
 using Random
-
 
 dist = Weibull(2.83, 5.67)
 
@@ -8,7 +11,6 @@ dist = Weibull(2.83, 5.67)
 ccdf(dist, 0)
 
 ccdf(dist, 5)
-
 
 n = 1000
 times = [0,1,2,3,4,5,6,7,8,9]
@@ -33,7 +35,6 @@ for time in times
     print(mean(timeToReact))
     print("\n\n")
 end
-
 
 log(0.9999)
 

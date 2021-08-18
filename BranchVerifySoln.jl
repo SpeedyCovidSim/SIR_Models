@@ -39,6 +39,7 @@ module BranchVerifySoln
         end
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
         plt.plot(times, Smean, "k-", label="S - $typeSim", lw=2.5, figure=fig)
@@ -46,7 +47,7 @@ module BranchVerifySoln
         plt.plot(times, Rmean, "r-", label="R - $typeSim", lw=2.5, figure=fig)
 
         plt.plot(times, discreteArray[:,1], "g-.", label="S - $typeSim2", lw=1.5, figure=fig, alpha = 1)
-        plt.plot(times, discreteArray[:,2], "w-.", label="I - $typeSim2", lw=1.5, figure=fig, alpha = 1)
+        plt.plot(times, discreteArray[:,2], color="tab:gray", linestyle="-.", label="I - $typeSim2", lw=1.5, figure=fig, alpha = 1)
         plt.plot(times, discreteArray[:,3], "k-.", label="R - $typeSim2", lw=1.5, figure=fig, alpha = 1)
 
 
@@ -76,7 +77,8 @@ module BranchVerifySoln
         =#
 
         Seaborn.set()
-        Seaborn.set_color_codes("pastel")
+        set_style("ticks")
+        set_color_codes("pastel")
         # fig = plt.figure(dpi=300)
 
         # Initialise plots - need figure size to make them square and nice
@@ -142,6 +144,7 @@ module BranchVerifySoln
         # Dodge the other plots
         # plt.tight_layout(pad = 0.8, h_pad=0.01, w_pad=0.01)
         plt.tight_layout(h_pad=0.01)
+        # despine()
 
         if Display
             # required to display graph on plots.
@@ -174,6 +177,7 @@ module BranchVerifySoln
         end
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
 
@@ -201,6 +205,7 @@ module BranchVerifySoln
     function branchTimeStepPlot(Array1, Array2, Array3, times1, times2, times3, title, outputFileName, Display=true, save=false)
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
 

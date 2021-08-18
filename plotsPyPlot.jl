@@ -26,6 +26,7 @@ module plotsPyPlot
         =#
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)
@@ -70,6 +71,7 @@ module plotsPyPlot
         =#
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)
@@ -111,6 +113,7 @@ module plotsPyPlot
         =#
 
         Seaborn.set()
+        set_style("ticks")
         Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)

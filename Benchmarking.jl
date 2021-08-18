@@ -18,9 +18,9 @@ using Conda, BenchmarkTools, PyCall, DataFrames, Seaborn
 
 # It'd probably be better to tell Julia to use an already installed python ENV
 
-#-----------------------------------------------------------------------------
+# ##############################################################################
 
-# Benchmarking Python vs Julia -----------------------------------------------
+# Benchmarking Python vs Julia #################################################
 
 # Loading a Julia function (must be within a module). Set path to current
 
@@ -102,7 +102,7 @@ end
 # plotBenchmarks(tMean,tMedian,N,true,true)
 
 Seaborn.set()
-Seaborn.set_style("white")
+set_style("ticks")
 fig = plt.figure(dpi=300)
 # plt.violinplot(data)
 Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.language,

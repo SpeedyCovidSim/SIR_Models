@@ -1,7 +1,7 @@
 module branchingProcesses
 
     using DataFrames
-    using Distributions, Random, StatsBase
+    using Distributions, Random#, StatsBase
     using LightGraphs, GraphPlot, NetworkLayout
     using TrackingHeaps, DataStructures, SparseArrays
 
@@ -479,7 +479,7 @@ module branchingProcesses
         Performs a recovery on the given individual. Sets them inactive and increments
         totals
 
-        Works in place on the population dataframe
+        Works in place on the population dataframe and model
         =#
         population_df[caseID, :active] = false
         model.state_totals[2] -=1
@@ -1720,7 +1720,7 @@ module branchingProcesses
         state_totals_all = initStateTotals(model, 1+(model.max_cases-num_cases)*2)
         infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
 
-        while t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases
+        while (t[end] < model.t_max) && (model.state_totals[2] != 0) && (num_cases < model.max_cases)
 
             # filter df on active infections
             active_df = filter(row -> row.active, population_df[1:num_cases, :], view=true)
@@ -1742,6 +1742,7 @@ module branchingProcesses
             # find minimum time to any reaction for each active individual (including recovery)
             min_time = num_off .* 0.0
 
+            # for i::Int64 in 1:length(min_time)
             Threads.@threads for i::Int64 in 1:length(min_time)
                 if num_off[i] == 0
                     min_time[i] = active_time_left[i]
@@ -1754,7 +1755,7 @@ module branchingProcesses
 
                     timeToReact = invlogcdf.(infection_time_dist, log_transformed_rand) .- active_time_spent[i]
 
-                    min_time[i] = minimum([minimum(timeToReact), active_time_left[i]])
+                    min_time[i] = min(minimum(timeToReact), active_time_left[i])
                     #################
 
                     # ####### one sample only
@@ -1767,7 +1768,18 @@ module branchingProcesses
             end
 
             # find overall minimum time
+            # active_index = 0
             active_index = argmin(min_time)
+            # try
+            # catch ArgumentError
+            #     println(min_time)
+            #     println(num_off)
+            #     println(expOff)
+            #     println(nrow(active_df))
+            #     println("Have $(model.state_totals[2]) cases left")
+            #     println("Have a faulty while loop: $(t[end] < model.t_max && model.state_totals[2] != 0 && num_cases < model.max_cases) ")
+            #     rethrow()
+            # end
             infection_time = t[end] + min_time[active_index]
             ID = active_df[active_index, :caseID]
 
@@ -1782,7 +1794,7 @@ module branchingProcesses
 
             num_events += 1
             push!(t, infection_time*1)
-            state_totals_all[num_events, :] .= copy(model.state_totals)
+            state_totals_all[num_events, :] .= model.state_totals .* 1
         end
 
         if t[end] < model.t_max
@@ -1925,7 +1937,7 @@ module branchingProcesses
 
 
         while t[end] < model.t_max && model.state_totals[2] != 0 &&
-            num_cases < model.max_cases && !isempty(tau_heap)
+            num_cases < model.max_cases #&& !isempty(tau_heap)
 
             # returns a event
             reaction = pop!(tau_heap)
@@ -2035,7 +2047,7 @@ module branchingProcesses
         @time t, state_totals_all, num_cases = discrete_branch!(population_df, model, time_step)
 
         # first
-        model = init_model_pars(0, 20, 5*10^7, 100, [5*10^7-10,10,0])
+        model = init_model_pars(0, 20, 5*10^3, 100, [5*10^3-10,10,0])
         population_df = initDataframe(model)
         @time t, state_totals_all, num_cases = firstReact_branch!(population_df, model)
 

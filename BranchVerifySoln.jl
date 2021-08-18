@@ -15,7 +15,7 @@ module BranchVerifySoln
 
     export branchVerifyPlot, meanAbsError, initSIRArrays, multipleSIRMeans,
         multipleLinearSplines, branchTimeStepPlot, branchSideBySideVerifyPlot,
-        branch2wayVerifyPlot, Dots, Lines, singleSpline
+        branchSideBySideVerifyPlot2, branch2wayVerifyPlot, Dots, Lines, singleSpline
 
     struct Dots; end
     struct Lines; end
@@ -71,7 +71,7 @@ module BranchVerifySoln
     end
 
     function branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName,
-        allRealisations=true, Display=true, save=false)
+        allRealisations=true, Display=true, save=false, alphaMultiplier=1.0)
         #=
         Plot multiple realisations of x1 and x2 as well as their means.
         =#
@@ -92,24 +92,24 @@ module BranchVerifySoln
         if allRealisations
             for i in 1:length(x1[1,:])
                 if i == 1
-                    ax[1].plot(times, x1[:,i], "b-", label="Homogeneous Realisation", lw=2, alpha = 0.2)
+                    ax[1].plot(times, x1[:,i], "b-", label="Homogeneous Realisation", lw=2, alpha = 0.2*alphaMultiplier)
                 else
-                    ax[1].plot(times, x1[:,i], "b-", lw=2, alpha = 0.09)
+                    ax[1].plot(times, x1[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
                 end
             end
 
             for i in 1:length(x2[1,:])
                 if i == 1
-                    ax[2].plot(times, x2[:,i], "b-", label="Heterogeneous Realisation", lw=2, alpha = 0.2)
+                    ax[2].plot(times, x2[:,i], "b-", label="Heterogeneous Realisation", lw=2, alpha = 0.2*alphaMultiplier)
                 else
-                    ax[2].plot(times, x2[:,i], "b-", lw=2, alpha = 0.09)
+                    ax[2].plot(times, x2[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
                 end
             end
 
             labelx1 = ["Homogeneous Mean" for i in 1:length(timesVector)]
             labelx2 = ["Heterogeneous Mean" for i in 1:length(timesVector)]
-            Seaborn.lineplot(x = timesVector, y = [x1...], hue = labelx1, palette = "flare", ax=ax[1])
-            Seaborn.lineplot(x = timesVector, y = [x2...], hue = labelx2, palette = "flare", ax=ax[2])
+            Seaborn.lineplot(x = timesVector, y = [x1...], hue = labelx1, palette = "flare", ci=nothing, ax=ax[1])
+            Seaborn.lineplot(x = timesVector, y = [x2...], hue = labelx2, palette = "flare", ci=nothing, ax=ax[2])
         else
             labelx1 = ["Homogeneous Mean and SD" for i in 1:length(timesVector)]
             labelx2 = ["Heterogeneous Mean and SD" for i in 1:length(timesVector)]
@@ -124,6 +124,121 @@ module BranchVerifySoln
         # ax[2].plot(times, meanx2, "r-", label="Heterogeneous Mean", lw=2.5, alpha = 1.0)
 
         maxy = max(maximum(x1), maximum(x2))
+
+        ax[1].set_ylim([0, maxy])
+        ax[1].legend(loc = "upper left")
+        ax[1].set_xlabel("Time")
+        ax[1].set_ylabel("Cumulative Number of Infections")
+        ax[1].set_title("Homogeneous Reproduction Number")
+
+        ax[2].set_ylim([0, maxy])
+        ax[2].set_xlabel("Time")
+        ax[2].set_ylabel("Cumulative Number of Infections")
+        ax[2].set_title("Heterogeneous Reproduction Number")
+        ax[2].legend(loc = "upper left")
+
+        plt.suptitle(title,figure=f)
+        # plt.title(title)
+
+
+        # Dodge the other plots
+        # plt.tight_layout(pad = 0.8, h_pad=0.01, w_pad=0.01)
+        plt.tight_layout(h_pad=0.01)
+        # despine()
+
+        if Display
+            # required to display graph on plots.
+            display(f)
+        end
+        if save
+            # Save graph as pngW
+            f.savefig(outputFileName)
+
+        end
+        close()
+    end
+
+    function branchSideBySideVerifyPlot2(x11, x12, x21, x22, times, title, outputFileName,
+        allRealisations=true, Display=true, save=false, alphaMultiplier=1.0)
+        #=
+        Plot multiple realisations of x1 and x2 as well as their means.
+        =#
+
+        Seaborn.set()
+        set_style("ticks")
+        set_color_codes("pastel")
+        # fig = plt.figure(dpi=300)
+
+        # Initialise plots - need figure size to make them square and nice
+        f,ax = Seaborn.subplots(1,2, figsize=(10,4), dpi=300)
+
+        timesVector = []
+        for i in 1:(length(x11[1,:]))
+            timesVector = vcat(timesVector, times)
+        end
+
+        if allRealisations
+            for i in 1:length(x11[1,:])
+                if i == 1
+                    ax[1].plot(times, x11[:,i], "b-", label="Homogeneous Realisation", lw=2, alpha = 0.2*alphaMultiplier)
+                    ax[1].plot(times, x12[:,i], "g-", label="Homogeneous Realisation - Isolation", lw=2, alpha = 0.2*alphaMultiplier)
+                else
+                    ax[1].plot(times, x11[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
+                    ax[1].plot(times, x12[:,i], "g-", lw=2, alpha = 0.09*alphaMultiplier)
+                end
+            end
+
+            for i in 1:length(x21[1,:])
+                if i == 1
+                    ax[2].plot(times, x21[:,i], "b-", label="Heterogeneous Realisation", lw=2, alpha = 0.2*alphaMultiplier)
+                    ax[2].plot(times, x22[:,i], "g-", label="Heterogeneous Realisation - Isolation", lw=2, alpha = 0.2*alphaMultiplier)
+                else
+                    ax[2].plot(times, x21[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
+                    ax[2].plot(times, x22[:,i], "g-", lw=2, alpha = 0.09*alphaMultiplier)
+                end
+            end
+
+            labelx11 = ["Homogeneous Mean" for i in 1:length(timesVector)]
+            labelx21 = ["Heterogeneous Mean" for i in 1:length(timesVector)]
+            labelx12 = ["Homogeneous Mean - Isolation" for i in 1:length(timesVector)]
+            labelx22 = ["Heterogeneous Mean - Isolation" for i in 1:length(timesVector)]
+
+            x1cat = vcat([x11...],[x12...])
+            labelx1 = vcat(labelx11, labelx12)
+            x2cat = vcat([x21...],[x22...])
+            labelx2 = vcat(labelx21, labelx22)
+
+            # println(length(x1cat))
+            # println(length(labelx1))
+            # println(length(timesVector))
+
+            timesVector = vcat(timesVector, timesVector)
+            Seaborn.lineplot(x = timesVector, y = x1cat, hue = labelx1, palette = "flare", ci=nothing, ax=ax[1])
+            Seaborn.lineplot(x = timesVector, y = x2cat, hue = labelx2, palette = "flare", ci=nothing, ax=ax[2])
+
+        else
+            labelx11 = ["Homogeneous Mean and SD" for i in 1:length(timesVector)]
+            labelx21 = ["Heterogeneous Mean and SD" for i in 1:length(timesVector)]
+            labelx12 = ["Homogeneous Mean and SD - Isolation" for i in 1:length(timesVector)]
+            labelx22 = ["Heterogeneous Mean and SD - Isolation" for i in 1:length(timesVector)]
+
+            x1cat = vcat([x11...],[x12...])
+            labelx1 = vcat(labelx11, labelx12)
+            x2cat = vcat([x21...],[x22...])
+            labelx2 = vcat(labelx21, labelx22)
+
+            timesVector = vcat(timesVector, timesVector)
+            Seaborn.lineplot(x = timesVector, y = x1cat, hue = labelx1, palette = "flare", ci="sd", ax=ax[1])
+            Seaborn.lineplot(x = timesVector, y = x2cat, hue = labelx2, palette = "flare", ci="sd", ax=ax[2])
+        end
+
+        # meanx1 = mean(x1, dims=2)
+        # meanx2 = mean(x2, dims=2)
+        #
+        # ax[1].plot(times, meanx1, "r-", label="Homogeneous Mean", lw=2.5, alpha = 1.0)
+        # ax[2].plot(times, meanx2, "r-", label="Heterogeneous Mean", lw=2.5, alpha = 1.0)
+
+        maxy = max(maximum(x11), maximum(x21), maximum(x12), maximum(x22))
 
         ax[1].set_ylim([0, maxy])
         ax[1].legend(loc = "upper left")

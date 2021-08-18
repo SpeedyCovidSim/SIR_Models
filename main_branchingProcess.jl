@@ -1744,12 +1744,6 @@ function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64
     return hcat(Smean, Imean, Rmean), times
 end
 
-compilationInit()
-# verifySolutions(1, 5)
-# verifySolutions(1, collect(5:18))
-# verifySolutions(1, collect(21))
-
-
 function augustOutbreakSim(numSimsScaling::Int64, simRange)
     #=
     Estimation of the August 2021 Delta outbreak on 18 Aug.
@@ -1863,7 +1857,12 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
     end
 end
 
+compilationInit()
+# verifySolutions(1, 5)
+# verifySolutions(1, collect(5:18))
+# verifySolutions(1, collect(21))
 
+augustOutbreakSim(1, collect(1:2))
 
 # verifySolutions(1, [11,12,13,14,15])
 

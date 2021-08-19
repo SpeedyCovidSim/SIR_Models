@@ -23,7 +23,7 @@ def selectEventIndex(rates, probs, rng, N):
     return deltaT, eventIndex
 
 
-def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, gamma, tInit = 0.0):
+def gillespieSEIR(tMax, network, eTotal, pTotal, iTotal, sTotal, rTotal, numInfNei, numPreNei, rates, susceptible, alpha, beta, gamma, zeta, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -50,8 +50,10 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
     E = 1*S
     I = 1*S
     R = 1*S
+    P = 1*S
     E[0] = eTotal
     S[0] = sTotal
+    P[0] = pTotal
     I[0] = iTotal
     R[0] = rTotal
     i = 1
@@ -64,15 +66,28 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
         # get next event time and next event index
         deltaT, eventIndex = selectEventIndex(rates, probs, rng, N)
         # update local neighbourhood attributes
-        if susceptible[eventIndex]:  # (S->E)
+        if susceptible[eventIndex]==1:  # (S->E)
             # change state and individual rate
             susceptible[eventIndex] = -1
             rates[eventIndex] = gamma
             # update network totals
             sTotal -= 1
             eTotal += 1
-
-        elif susceptible[eventIndex] == -1: # (E->I)
+        elif susceptible[eventIndex] == -1: #(E->P)
+            # change state and individual rate
+            susceptible[eventIndex] = -2
+            rates[eventIndex] = zeta
+            # get neighbouring vertices
+            neighbors = network.neighbors(eventIndex)
+            # update hazards of neighbouring susceptible vertices
+            for n in neighbors:
+                if susceptible[n] == 1:
+                    numPreNei[n] += 1
+                    rates[n] = numInfNei[n]*beta + numPreNei[n]*beta/4
+            # update network totals
+            eTotal -= 1
+            pTotal += 1
+        elif susceptible[eventIndex] == -2: # (P->I)
             # change state and individual rate
             susceptible[eventIndex] = 0
             rates[eventIndex] = alpha
@@ -82,9 +97,10 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
             for n in neighbors:
                 if susceptible[n] == 1:
                     numInfNei[n] += 1
-                    rates[n] = numInfNei[n]*beta
+                    numPreNei[n] -= 1
+                    rates[n] = numInfNei[n]*beta + numPreNei[n]*beta/4
             # update network totals
-            eTotal -= 1
+            pTotal -= 1
             iTotal += 1
 
         else: # (I->R)
@@ -96,7 +112,7 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
             for n in neighbors:
                 if susceptible[n] == 1:
                     numInfNei[n] -= 1
-                    rates[n] = numInfNei[n]*beta
+                    rates[n] = numInfNei[n]*beta + numPreNei[n]*beta/4
             # update network totals
             iTotal -= 1
             rTotal += 1
@@ -109,12 +125,14 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
             t[i] = t[i-1] + deltaT
             S[i] = sTotal
             E[i] = eTotal
+            P[i] = pTotal
             I[i] = iTotal
             R[i] = rTotal
         else:
             t.append(t[-1] + deltaT)
             S.append(sTotal)
             E.append(eTotal)
+            P.append(pTotal)
             I.append(iTotal)
             R.append(rTotal)
 
@@ -124,6 +142,7 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
     S = S[:i]
     E = E[:i]
     t = t[:i]
+    P = P[:i]
     R = R[:i]
     I = I[:i]
-    return t, S, E, I, R
+    return t, S, E, P, I, R

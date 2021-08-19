@@ -14,6 +14,7 @@ https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/manual.md#handling-
 #Pkg.add("Conda")
 
 using Conda, BenchmarkTools, PyCall, DataFrames, Seaborn
+using ProgressMeter
 
 # It'd probably be better to tell Julia to use an already installed python ENV
 
@@ -26,7 +27,8 @@ using Conda, BenchmarkTools, PyCall, DataFrames, Seaborn
 # import required modules
 push!( LOAD_PATH, "./" )
 using sirModels: gillespieDirect2Processes_rand # don't use 'include'
-# using plots: plotBenchmarks
+using PyPlot: plotBenchmarksViolin
+
 
 function gillespieDirect_pyVsJl()
     # create local function wrapper
@@ -70,7 +72,7 @@ function gillespieDirect_pyVsJl()
         jlGillespieTimes = []
         pyGillespieTimes = []
 
-        for j in 1:(20000/log10(N[i]))
+        @showprogress 0.5 for j in 1:(20000/log10(N[i]))
             time_jl = @elapsed juliaGillespieDirect(t_max, copy(S_total[i]), copy(I_total[i]), copy(R_total[i]), copy(alpha), copy(beta[i]), copy(N[i]))
             push!(jlGillespieTimes, time_jl)
             push!(time_df, [log10(time_jl), "Julia", N[i]])
@@ -84,8 +86,8 @@ function gillespieDirect_pyVsJl()
 
         println("Completed iteration #$i")
 
-        tMean[i,:] = [mean(jlGillespieTimes), mean(pyGillespieTimes)]
-        tMedian[i,:] = [median(jlGillespieTimes), median(pyGillespieTimes)]
+        # tMean[i,:] = [mean(jlGillespieTimes), mean(pyGillespieTimes)]
+        # tMedian[i,:] = [median(jlGillespieTimes), median(pyGillespieTimes)]
 
     end
 
@@ -101,21 +103,26 @@ function gillespieDirect_pyVsJl()
     # # each other with median on one and mean on other.
     # plotBenchmarks(tMean,tMedian,N,true,true)
 
-    Seaborn.set()
-    set_style("ticks")
-    fig = plt.figure(dpi=300)
-    # plt.violinplot(data)
-    Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.language,
-        bw=0.5, cut=0,scale="count",palette = "Set2" )
+    outputFileName = "Benchmarks/SimulationTimes"
+    xlabel = "Population Size"
+    plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
+        xlabel, true, true)
 
-    plt.xlabel("Population Size")
-    plt.ylabel("Log10 Simulation time (log10(s))")
-    plt.title("Time To Complete Simulation")
-    # plt.title("For alpha = $alpha and beta $beta")
-    plt.legend()
-    display(fig)
-    fig.savefig("Benchmarks/SimulationTimes")
-    close()
+    # Seaborn.set()
+    # # Seaborn.set_style("ticks")
+    # fig = plt.figure(dpi=300)
+    # # plt.violinplot(data)
+    # Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.language,
+    #     bw=0.5, cut=0,scale="count",palette = "Set2" )
+    #
+    # plt.xlabel("Population Size")
+    # plt.ylabel("Log10 Simulation time (log10(s))")
+    # plt.title("Time To Complete Simulation")
+    # # plt.title("For alpha = $alpha and beta $beta")
+    # plt.legend()
+    # display(fig)
+    # fig.savefig("Benchmarks/SimulationTimes")
+    # close()
 end
 
 gillespieDirect_pyVsJl()

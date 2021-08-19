@@ -25,6 +25,7 @@ function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileNa
     #PyPlot.rcParams["figure.dpi"] = 300
 
     Seaborn.set()
+    set_style("ticks")
     Seaborn.set_color_codes("pastel")
     fig = plt.figure(dpi=300)
     plt.plot(times, Smean, "k-", label="S - Simulation Mean", lw=2.5, figure=fig)
@@ -32,7 +33,7 @@ function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileNa
     plt.plot(times, Rmean, "r-", label="R - Simulation Mean", lw=2.5, figure=fig)
 
     plt.plot(times, ODEarray[:,1], "g-.", label="S - ODE", lw=1.5, figure=fig, alpha = 1)
-    plt.plot(times, ODEarray[:,2], "w-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
+    plt.plot(times, ODEarray[:,2], color="tab:gray", linestyle="-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
     plt.plot(times, ODEarray[:,3], "k-.", label="R - ODE", lw=1.5, figure=fig, alpha = 1)
 
 
@@ -60,15 +61,16 @@ function ODEVerifyPlotSIRD(Smean, Imean, Rmean, Dmean, ODEarray, times, title, o
     #PyPlot.rcParams["figure.dpi"] = 300
 
     Seaborn.set()
+    set_style("ticks")
     Seaborn.set_color_codes("pastel")
     fig = plt.figure(dpi=300)
     plt.plot(times, Smean, "k-", label="S - Simulation Mean", lw=2.5, figure=fig)
     plt.plot(times, Imean, "b-", label="I - Simulation Mean", lw=2.5, figure=fig)
     plt.plot(times, Rmean, "r-", label="R - Simulation Mean", lw=2.5, figure=fig)
-    plt.plot(times, Dmean, "w-", label="D - Simulation Mean", lw=2.5, figure=fig)
+    plt.plot(times, Dmean, color="tab:gray", linestyle="-", label="D - Simulation Mean", lw=2.5, figure=fig)
 
     plt.plot(times, ODEarray[:,1], "g-.", label="S - ODE", lw=1.5, figure=fig, alpha = 1)
-    plt.plot(times, ODEarray[:,2], "w-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
+    plt.plot(times, ODEarray[:,2], color="tab:gray", linestyle="-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
     plt.plot(times, ODEarray[:,3], "k-.", label="R - ODE", lw=1.5, figure=fig, alpha = 1)
     plt.plot(times, ODEarray[:,4], "m-.", label="D - ODE", lw=1.5, figure=fig, alpha = 1)
 
@@ -697,7 +699,7 @@ end
 function main(SIR, SIRD)
 
     if SIR
-        mainSIR(false, true, true, true)
+        mainSIR(true, true, true, true)
     end
 
     if SIRD
@@ -705,4 +707,4 @@ function main(SIR, SIRD)
     end
 end
 
-main(true, false)
+main(true, true)

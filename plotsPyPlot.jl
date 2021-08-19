@@ -224,4 +224,33 @@ module plotsPyPlot
         end
         close()
     end
+
+    function plotBenchmarksViolin(x_vector, y_vector, hue_vector, outputFileName, xlabel, Display=true, save=true)
+
+        Seaborn.set()
+        Seaborn.set_style("ticks")
+        fig = plt.figure(dpi=300)
+
+        Seaborn.violinplot(x=x_vector, y=y_vector, hue=hue_vector, bw=1.5,
+            cut=0, scale="count",palette = "Set2" )
+
+        plt.xlabel(xlabel)
+        plt.ylabel("Log10 Simulation time (log10(s))")
+        plt.title("Time To Complete Simulation")
+        # plt.title("For alpha = $alpha and beta $beta")
+        plt.legend(loc = "upper left")
+
+        fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
+
+        if Display
+            # required to display graph on plots.
+            display(fig)
+        end
+        if save
+            # Save graph as pngW
+            fig.savefig(outputFileName)
+
+        end
+        close()
+    end
 end  # module plots

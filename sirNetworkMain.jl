@@ -6,6 +6,7 @@ Author: Joel Trent and Josh Looker
 =#
 using Random, Conda, PyCall, LightGraphs, GraphPlot#, MetaGraphs
 using BenchmarkTools, Seaborn, DataFrames
+using ProgressMeter
 
 # import required modules
 push!( LOAD_PATH, "./" )    #Set path to current
@@ -13,6 +14,8 @@ using networkInitFunctions: initialiseNetwork!
 #using sirModels: gillespieDirect_network!, gillespieFirstReact_network!
 using plotsPyPlot: plotSIRPyPlot
 using plots: plotBenchmarks_network
+
+global const PROGRESS__METER__DT = 0.2
 
 # main
 function main(direct, firstReact, nextReact, Display = true, save = true, profiling = true)
@@ -474,7 +477,6 @@ function benchmarkNetwork(compare3, compare2, violin3)
         # new inputs to the initialisation
         infectionProp = 0.05
 
-
         tMean = zeros(Float64,length(N),3)
         tMedian = zeros(Float64,length(N),3)
         time_df = DataFrame(time=Float64[], type=String[], population=Int64[])
@@ -486,7 +488,7 @@ function benchmarkNetwork(compare3, compare2, violin3)
             firstTimes = []
             nextTimes = []
 
-            for j in 1:(it_count[i])
+            @showprogress PROGRESS__METER__DT for j in 1:(it_count[i])
                 Random.seed!(j)
                 network = random_regular_graph(N[i], k[i])
 
@@ -496,11 +498,11 @@ function benchmarkNetwork(compare3, compare2, violin3)
                 push!(directTimes, time_dir)
                 push!(time_df, [log10(time_dir), "Direct", N[i]])
 
-                simType = "SIR_firstReact"
-                networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
-                time_fir = @elapsed model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
-                push!(firstTimes, time_fir)
-                push!(time_df, [log10(time_fir), "First Reaction", N[i]])
+                # simType = "SIR_firstReact"
+                # networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
+                # time_fir = @elapsed model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
+                # push!(firstTimes, time_fir)
+                # push!(time_df, [log10(time_fir), "First Reaction", N[i]])
 
                 simType = "SIR_nextReact"
                 networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
@@ -509,7 +511,7 @@ function benchmarkNetwork(compare3, compare2, violin3)
                 push!(time_df, [log10(time_nex), "Next Reaction", N[i]])
             end
 
-            for j in 1:(it_count_first[i])
+            @showprogress PROGRESS__METER__DT for j in 1:(it_count_first[i])
                 Random.seed!(j)
                 network = random_regular_graph(N[i], k[i])
 
@@ -527,7 +529,7 @@ function benchmarkNetwork(compare3, compare2, violin3)
 
         end
 
-        println(tMean)
+        # println(tMean)
 
         Seaborn.set()
         Seaborn.set_style("ticks")

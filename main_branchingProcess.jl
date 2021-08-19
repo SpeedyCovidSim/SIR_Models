@@ -3,12 +3,16 @@ using DataFrames
 using Distributions, Random, StatsBase
 using LightGraphs, GraphPlot, NetworkLayout
 using PyPlot, Seaborn
+using ProgressMeter
 
 # import required modules
 push!( LOAD_PATH, "./" )
-using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot, plotCumulativeInfections
+using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot, plotCumulativeInfections,
+    plotBenchmarksViolin
 using BranchVerifySoln
 using branchingProcesses
+
+global const PROGRESS__METER__DT = 0.2
 
 function verifySolutions(numSimsScaling::Int64, testRange)
     #=
@@ -1565,15 +1569,16 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
 
-        numSims = convert(Int, round(40 / numSimsScaling))
+        numSims = convert(Int, round(400 / numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
         models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
             models[Threads.threadid()].stochasticRi = false
             # models[Threads.threadid()].sub_clin_prop = 0.0
             # models[Threads.threadid()].reproduction_number = 1.0
@@ -1591,7 +1596,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1603,9 +1608,10 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
             models[Threads.threadid()].stochasticRi = true
             # models[Threads.threadid()].sub_clin_prop = 0.0
             # models[Threads.threadid()].reproduction_number = 1.0
@@ -1623,7 +1629,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1635,9 +1641,10 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
             models[Threads.threadid()].stochasticRi = false
             models[Threads.threadid()].p_test = 1.0
             # models[Threads.threadid()].sub_clin_prop = 0.0
@@ -1657,6 +1664,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
 
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1668,9 +1676,10 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
             models[Threads.threadid()].stochasticRi = true
             models[Threads.threadid()].p_test = 1.0
             # models[Threads.threadid()].sub_clin_prop = 0.0
@@ -1689,7 +1698,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1744,6 +1753,153 @@ function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64
     return hcat(Smean, Imean, Rmean), times
 end
 
+function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
+
+    println("Benchmark #1: Discrete (1 day and 0.02 day timesteps) vs Next and First React Style, Speed, Varied Max Case Size")
+    if 1 in benchmarkRange
+
+        # initialise variables
+        maxCases = [1,2,5,10,25,50,75]*10^2#,500,1000]*10^2
+        tspan = (0.0,100.0)
+
+        it_count = 10000*10^2 ./ maxCases
+        # [2000,1000,200,100,40,20,5]
+        it_count = convert.(Int, round.(it_count ./ numSimsScaling))
+        # it_count_first = [2000, 1000, 800, 200, 50, 20, 4, 2]
+
+        time_df = DataFrame(time=Float64[], type=String[], population=Int64[])
+
+        # setup a loop that benchmarks each function for different N values
+        for i::Int64 in 1:length(maxCases)
+
+            timesteps = [0.02,1]
+
+            @showprogress PROGRESS__METER__DT for j in 1:(it_count[i])
+
+                model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases[i], [5*10^6-10,10,0]);
+                model.stochasticRi = true
+                model.reproduction_number = 3
+                model.p_test = 0.4
+
+                # model = init_model_pars(tspan[1], tspan[end], 5*10^3, maxCases, [5*10^3-10,10,0])
+                models = [deepcopy(model) for i in 1:4]
+
+                population_df = initDataframe(models[1]);
+                population_dfs = [deepcopy(population_df) for i in 1:4]
+
+                k = 1
+                if rem(j, 6) == 0
+                    time_dir = @elapsed discrete_branch!(population_dfs[k], models[k], timesteps[1])
+                    push!(time_df, [log10(time_dir), "Discrete, Timestep=$(timesteps[1])", maxCases[i]])
+                end
+
+                k+=1
+                time_dir = @elapsed discrete_branch!(population_dfs[k], models[k], timesteps[2])
+                push!(time_df, [log10(time_dir), "Discrete, Timestep=$(timesteps[2])", maxCases[i]])
+
+                k+=1
+                if rem(j, 10) == 0
+                    time_dir = @elapsed firstReact_branch!(population_dfs[k], models[k])
+                    push!(time_df, [log10(time_dir), "First React Style", maxCases[i]])
+                end
+
+                k+=1
+                time_dir = @elapsed nextReact_branch!(population_dfs[k], models[k])
+                push!(time_df, [log10(time_dir), "Next React Style", maxCases[i]])
+
+            end
+
+            println("Completed iteration #$i")
+
+        end
+
+        outputFileName = "Benchmarks/SimulationTimesMikeBranch"
+        xlabel = "Maximum Case Size"
+        plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
+            xlabel, true, true)
+    end
+
+    println("Benchmark #2: Discrete (1 day and 0.02 day timesteps) vs Next React Style, Speed, Varied Max Case Size")
+    if 2 in benchmarkRange
+
+        # initialise variables
+        maxCases = [25,50,75,500,1000]*10^2
+        tspan = (0.0,100.0)
+
+        it_count = 20000*10^2 ./ maxCases
+        # [2000,1000,200,100,40,20,5]
+        it_count = convert.(Int, round.(it_count ./ numSimsScaling))
+        # it_count_first = [2000, 1000, 800, 200, 50, 20, 4, 2]
+
+        time_df = DataFrame(time=Float64[], type=String[], population=Int64[])
+
+        # setup a loop that benchmarks each function for different N values
+        for i::Int64 in 1:length(maxCases)
+
+            timesteps = [0.02,1]
+
+            @showprogress PROGRESS__METER__DT for j in 1:(it_count[i])
+
+                model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases[i], [5*10^6-10,10,0]);
+                model.stochasticRi = true
+                model.reproduction_number = 3
+                model.p_test = 0.4
+
+                # model = init_model_pars(tspan[1], tspan[end], 5*10^3, maxCases, [5*10^3-10,10,0])
+                models = [deepcopy(model) for i in 1:4]
+
+                population_df = initDataframe(models[1]);
+                population_dfs = [deepcopy(population_df) for i in 1:4]
+
+                k = 1
+                if rem(j, 5) == 0
+                    time_dir = @elapsed discrete_branch!(population_dfs[k], models[k], timesteps[1])
+                    push!(time_df, [log10(time_dir), "Discrete, Timestep=$(timesteps[1])", maxCases[i]])
+                end
+
+                k+=1
+                time_dir = @elapsed discrete_branch!(population_dfs[k], models[k], timesteps[2])
+                push!(time_df, [log10(time_dir), "Discrete, Timestep=$(timesteps[2])", maxCases[i]])
+
+                # k+=1
+                # if rem(j, 10) == 0
+                #     time_dir = @elapsed firstReact_branch!(population_dfs[k], models[k])
+                #     push!(time_df, [log10(time_dir), "First React Style", maxCases[i]])
+                # end
+
+                k+=1
+                time_dir = @elapsed nextReact_branch!(population_dfs[k], models[k])
+                push!(time_df, [log10(time_dir), "Next React Style", maxCases[i]])
+
+            end
+
+            println("Completed iteration #$i")
+
+        end
+
+        outputFileName = "Benchmarks/SimulationTimesMikeBranch_noFirst"
+        xlabel = "Maximum Case Size"
+        plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
+            xlabel, true, true)
+
+        # Seaborn.set()
+        # Seaborn.set_style("ticks")
+        # fig = plt.figure(dpi=300)
+        # # plt.violinplot(data)
+        # Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.type,
+        #     bw=1.5, cut=0,scale="count",palette = "Set2" )
+        #
+        # plt.xlabel("Maximum Case Size")
+        # plt.ylabel("Log10 Simulation time (log10(s))")
+        # plt.title("Time To Complete Simulation")
+        # # plt.title("For alpha = $alpha and beta $beta")
+        # plt.legend(loc = "upper left")
+        # display(fig)
+        # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
+        # close()
+    end
+end
+
 function augustOutbreakSim(numSimsScaling::Int64, simRange)
     #=
     Estimation of the August 2021 Delta outbreak on 18 Aug.
@@ -1770,6 +1926,7 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
         models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
             models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
@@ -1792,7 +1949,7 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1820,6 +1977,7 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
         models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
         i = 1
+        p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
 
             models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
@@ -1842,7 +2000,7 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
+            next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -1857,12 +2015,19 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
     end
 end
 
-compilationInit()
-# verifySolutions(1, 5)
-# verifySolutions(1, collect(5:18))
-# verifySolutions(1, collect(21))
+function main()
 
-augustOutbreakSim(1, collect(1:2))
+    compilationInit()
+    # verifySolutions(1, 5)
+    # verifySolutions(1, collect(5:18))
+    # verifySolutions(1, collect(21))
+
+    BPbenchmarking(1, [1,2])
+
+    # augustOutbreakSim(1, collect(1:2))
+end
+
+main()
 
 # verifySolutions(1, [11,12,13,14,15])
 

@@ -3,63 +3,6 @@ import igraph as ig
 from numpy import random
 from plots import plotSIR, plotSIRK
 
-def setNetwork(network, lamb, alpha, beta, prop_i=0.05):
-    '''
-    Initialises a parsed network with required random infected individuals (1 if too small)
-    Inputs
-    network     : igraph network object
-    prop_i      : proportion of population that is infected (default 0.05)
-    lamb        : disease development rate
-    alpha       : recovery rate
-    beta        : infection rate
-    Outputs
-    iTotal      : number of infected
-    sTotal      : number of susceptible
-    rTotal      : number of recovered
-    numInfNei   : number of infected neighbour of each vertex
-    rates       : hazard rate of each vertex
-    susceptible : boolean array if vertex is susceptible or not
-    '''
-    # get random proportion of populace to be infected and set states
-    N = network.vcount()
-    numInfected = int(np.ceil(prop_i*N))
-    infecteds = list(random.choice(N, numInfected, replace=False))
-    susceptible = np.ones(N)
-    susceptible[infecteds] = 0
-
-    # set SIR numbers
-    iTotal = numInfected
-    sTotal = N-numInfected
-    rTotal = 0
-    eTotal = 0
-
-    # adding in hazards/rates
-    numInfNei = initHazards(network, infecteds, N)
-    rates = beta*numInfNei
-    rates[infecteds] = alpha
-    return eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible
-
-def initHazards(network, infecteds, N):
-    '''
-    inits numInfNei array
-    Inputs
-    network     : igraph network object
-    infecteds   : array of infected vertices
-    N           : total number of vertices
-    Outputs
-    numInfNei   : number of infected neighbours for each vertex
-    '''
-    numInfNei = np.zeros(N)
-    # loop over all infected vertices
-    for inf_vert in network.vs(infecteds):
-        # Increase number of infected neighbours for neighbouring vertices
-        neighbours = network.neighbors(inf_vert)
-        for n in neighbours:
-            numInfNei[n] += 1
-    # don't count infecteds for speed-up
-    numInfNei[infecteds] = 0
-    return numInfNei
-
 def selectEventIndex(rates, probs, rng, N):
     '''
     finds time and index of next event
@@ -80,7 +23,7 @@ def selectEventIndex(rates, probs, rng, N):
     return deltaT, eventIndex
 
 
-def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, lambd, tInit = 0.0):
+def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, gamma, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -124,7 +67,7 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
         if susceptible[eventIndex]:  # (S->E)
             # change state and individual rate
             susceptible[eventIndex] = -1
-            rates[eventIndex] = lambd
+            rates[eventIndex] = gamma
             # update network totals
             sTotal -= 1
             eTotal += 1
@@ -137,8 +80,8 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
             neighbors = network.neighbors(eventIndex)
             # update hazards of neighbouring susceptible vertices
             for n in neighbors:
-                if susceptible[n]:
-                    numInfNei[n] += 1
+                if susceptible[n] == 1:
+                    numInfNei[n] -= 1
                     rates[n] = numInfNei[n]*beta
             # update network totals
             eTotal -= 1
@@ -151,7 +94,7 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
             neighbors = network.neighbors(eventIndex)
             # update hazards of neighbouring susceptible vertices
             for n in neighbors:
-                if susceptible[n]:
+                if susceptible[n] == 1:
                     numInfNei[n] -= 1
                     rates[n] = numInfNei[n]*beta
             # update network totals

@@ -36,7 +36,6 @@ function ODEVerifyPlot(Smean, Imean, Rmean, ODEarray, times, title, outputFileNa
     plt.plot(times, ODEarray[:,2], color="tab:gray", linestyle="-.", label="I - ODE", lw=1.5, figure=fig, alpha = 1)
     plt.plot(times, ODEarray[:,3], "k-.", label="R - ODE", lw=1.5, figure=fig, alpha = 1)
 
-
     plt.xlabel("Time")
     plt.ylabel("Population Number")
     #plt.suptitle("ODE Solution vs Simulation Solution")

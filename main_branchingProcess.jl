@@ -1,6 +1,6 @@
 using BenchmarkTools
 using DataFrames
-using Distributions, Random, StatsBase
+using Distributions, Random, StatsBase, Statistics
 using LightGraphs, GraphPlot, NetworkLayout
 using PyPlot, Seaborn
 using ProgressMeter
@@ -13,6 +13,38 @@ using BranchVerifySoln
 using branchingProcesses
 
 global const PROGRESS__METER__DT = 0.2
+
+function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
+
+    # times to sim on
+    times = [i for i=tspan[1]:time_step:tspan[end]]
+
+    numSims = convert(Int, round(numSimulations / numSimsScaling))
+
+    StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
+    i = 1
+    time = @elapsed Threads.@threads for i = 1:numSims
+
+        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+
+        population_df = initDataframe(models[Threads.threadid()]);
+        t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
+
+        StStep[:,i] = state_totals_all[:,1]
+        ItStep[:,i] = state_totals_all[:,2]
+        RtStep[:,i] = state_totals_all[:,3]
+
+    end
+
+    println("Finished Simulation in $time seconds")
+
+    Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+    return hcat(Smean, Imean, Rmean), times
+end
+
 
 function verifySolutions(numSimsScaling::Int64, testRange)
     #=
@@ -281,7 +313,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
             models[Threads.threadid()].recovery_time = 20
 
             population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = firstReact_branch!(population_df, models[Threads.threadid()])
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
 
             inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
 
@@ -1012,7 +1044,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #15: Epidemic curves (Simple BP Infections vs Exponential)")
+    println("Test #15: Cumulative Infection curve (Simple BP Infections vs Geometric Series)")
     if 15 in testRange
         println("Beginning simulation of Simple BP Case")
 
@@ -1113,7 +1145,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #16: Epidemic curves (Simple BP Infections, Heteregenous and Non), Mean + other realisations")
+    println("Test #16: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non), Mean + other realisations")
     if 16 in testRange
         println("Beginning simulation of Simple BP Case, Homogeneous")
 
@@ -1193,7 +1225,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #17: Epidemic curves (Simple BP Infections vs Exponential, distributed times)")
+    println("Test #17: Cumulative Infection curve (Simple BP Infections vs Geometric Series, distributed times)")
     if 17 in testRange
         println("Beginning simulation of Simple BP Case")
 
@@ -1311,7 +1343,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #18: Epidemic curves (Simple BP Infections, Heteregenous and Non, distributed times), Mean + other realisations")
+    println("Test #18: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non, distributed times), Mean + other realisations")
     if 18 in testRange
         println("Beginning simulation of Simple BP Case, Homogeneous")
 
@@ -1389,7 +1421,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #19: Epidemic curves (Simple BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
+    println("Test #19: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
     if 19 in testRange
         println("Beginning simulation of Simple BP Case, Homogeneous")
 
@@ -1467,7 +1499,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #20: Epidemic curves (Next React BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
+    println("Test #20: Cumulative Infection curve (Next React BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
     if 20 in testRange
         println("Beginning simulation of Next React BP Case, Homogeneous")
 
@@ -1557,7 +1589,7 @@ function verifySolutions(numSimsScaling::Int64, testRange)
         println()
     end
 
-    println("Test #21: Epidemic curves (Next React BP Infections, Heteregenous and Non, Mike et al, Isolation and Non), Mean + other realisations")
+    println("Test #21: Cumulative Infection curve (Next React BP Infections, Heteregenous and Non, Mike et al, Isolation and Non), Mean + other realisations")
     if 21 in testRange
 
         println("Beginning simulation of Next React BP Case, Homogeneous")
@@ -1722,37 +1754,6 @@ function verifySolutions(numSimsScaling::Int64, testRange)
     end
 end
 
-function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
-
-    # times to sim on
-    times = [i for i=tspan[1]:time_step:tspan[end]]
-
-    numSims = convert(Int, round(numSimulations / numSimsScaling))
-
-    StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-    i = 1
-    time = @elapsed Threads.@threads for i = 1:numSims
-
-        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-        population_df = initDataframe(models[Threads.threadid()]);
-        t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-        StStep[:,i] = state_totals_all[:,1]
-        ItStep[:,i] = state_totals_all[:,2]
-        RtStep[:,i] = state_totals_all[:,3]
-
-    end
-
-    println("Finished Simulation in $time seconds")
-
-    Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-    return hcat(Smean, Imean, Rmean), times
-end
-
 function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
 
     println("Benchmark #1: Discrete (1 day and 0.02 day timesteps) vs Next and First React Style, Speed, Varied Max Case Size")
@@ -1816,7 +1817,7 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
         outputFileName = "Benchmarks/SimulationTimesMikeBranch"
         xlabel = "Maximum Case Size"
         plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
-            xlabel, true, true)
+        xlabel, true, true)
     end
 
     println("Benchmark #2: Discrete (1 day and 0.02 day timesteps) vs Next React Style, Speed, Varied Max Case Size")
@@ -1880,7 +1881,7 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
         outputFileName = "Benchmarks/SimulationTimesMikeBranch_noFirst"
         xlabel = "Maximum Case Size"
         plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
-            xlabel, true, true)
+        xlabel, true, true)
 
         # Seaborn.set()
         # Seaborn.set_style("ticks")
@@ -1898,6 +1899,340 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
         # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
         # close()
     end
+end
+
+function quantile2D(x, quantileValue)
+    # x is 2D
+
+    quantiles = zeros(length(x[:,1]))
+
+    for i in 1:length(x[:,1])
+
+        quantiles[i] = quantile(x[i,:], quantileValue)
+    end
+    return quantiles
+end
+
+function plotDailyCasesOutbreak(confirmedCases, times, actualDailyCumCases, timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false)
+
+    # actualDailyCases = diff(actualDailyCumCases)
+    # timesActual = timesActual[1:end-1]
+    actualDailyCases = actualDailyCumCases
+    timesActual = timesActual
+
+    # dailyIndexes = findall(rem.(times, 1).==0)
+    dailyIndexes = collect(1:length(times))
+
+    # dailyConfirmedCases = diff(confirmedCases[dailyIndexes, :],dims=1)
+    dailyConfirmedCases = confirmedCases[dailyIndexes, :]
+
+    # medDailyConfirmedCases = diff(median(confirmedCases,dims=2)[dailyIndexes, :],dims=1)
+    # dailyTimes = times[dailyIndexes][1:end-1]
+    dailyTimes = times[dailyIndexes]
+
+    # # add on zeroness
+    # dailyTimes = vcat(collect(-6:-1), dailyTimes)
+    # dailyConfirmedCases = vcat(convert.(Int64, zeros(length(dailyIndexes),6)), dailyConfirmedCases)
+
+    if two21
+        finalIndex = findfirst(dailyTimes.==15)
+
+        dailyConfirmedCases = dailyConfirmedCases[1:finalIndex, :]
+        dailyTimes = dailyTimes[1:finalIndex]
+    end
+
+    Seaborn.set()
+    set_style("ticks")
+    Seaborn.set_color_codes("pastel")
+    fig = plt.figure(dpi=300)
+
+    quantiles1 = quantile2D(dailyConfirmedCases, 0.025)
+    quantiles3 = quantile2D(dailyConfirmedCases, 0.975)
+    plt.plot(dailyTimes, median(dailyConfirmedCases,dims=2), "b-", label="Median Daily Confirmed Cases", lw=2.5, figure=fig)
+    plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Confirmed Cases", lw=2.5, figure=fig)
+
+
+    # plt.plot(dailyTimes, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
+    # plt.plot(dailyTimes, quantiles3, "k--", lw=2, alpha = 0.5)
+    plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.3, color = "r")
+
+    # plt.plot(times, x2, "r$x2PlotType", label="I - Geometric Series", lw=1.5, figure=fig, alpha = 1)
+
+    if two21
+        plt.xticks([-3,0,3,6,9,12,15],vcat(["Aug $(14+3*i)" for i in 0:5], ["Sep 01"]))
+        plt.xlabel("Date")
+    else
+        plt.xlabel("Days since Detection")
+    end
+    plt.ylabel("Daily Confirmed Cases")
+    # plt.suptitle("Branching Process Simulation")
+    plt.title(title)
+    plt.legend()
+
+    if Display
+        # required to display graph on plots.
+        display(fig)
+    end
+    if save
+        # Save graph as pngW
+        fig.savefig(outputFileName)
+
+    end
+    close()
+end
+
+function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect,
+    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0)
+    #=
+    Plot multiple realisations of confirmedCases and x2 as well as their means.
+    =#
+
+    Seaborn.set()
+    set_style("ticks")
+    set_color_codes("pastel")
+    # fig = plt.figure(dpi=300)
+
+    # Initialise plots - need figure size to make them square and nice
+    f,ax = Seaborn.subplots(1,2, figsize=(10,6), dpi=300)
+
+    timesVector = []
+    for i in 1:length(confirmedCases[1,:])
+        timesVector = vcat(timesVector, times)
+    end
+
+    # Confirmed cases since first detect #######################################
+    for i in 1:length(confirmedCases[1,:])
+        if i == 1
+            ax[1].plot(times, confirmedCases[:,i], "b-", label="BPM Realisations", lw=2, alpha = 0.2)
+        else
+            ax[1].plot(times, confirmedCases[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
+        end
+    end
+    labelconfirmedCases = ["Mean and SD" for i in 1:length(timesVector)]
+
+    quantiles1 = quantile2D(confirmedCases, 0.025)
+    quantiles3 = quantile2D(confirmedCases, 0.975)
+
+    ax[1].plot(times, median(confirmedCases, dims=2), "r-", label="Median Realisation", lw=3, alpha = 1)
+    ax[1].plot(times, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
+    ax[1].plot(times, quantiles3, "k--", lw=2, alpha = 0.5)
+    ax[1].fill_between(times, quantiles1, quantiles3, alpha=0.3, color = "r")
+    # Seaborn.lineplot(x = timesVector, y = [confirmedCases...], hue = labelconfirmedCases, palette = "flare", ci="sd", ax=ax[1])
+
+    ax[1].plot(tDetect, observedIDetect, "k-", label="August Outbreak", lw=2, alpha = 1)
+    ############################################################################
+
+    # Cumulative cases since first detect ######################################
+    for i in 1:length(cumulativeCases[1,:])
+        if i == 1
+            ax[2].plot(times, cumulativeCases[:,i], "b-", label="BPM Realisations", lw=2, alpha = 0.2)
+        else
+            ax[2].plot(times, cumulativeCases[:,i], "b-", lw=2, alpha = 0.09*alphaMultiplier)
+        end
+    end
+    labelcumulativeCases = ["Mean and SD" for i in 1:length(timesVector)]
+    ax[2].plot(times, median(cumulativeCases, dims=2), "r-", label="Median Realisation", lw=3, alpha = 1)
+
+    quantiles1 = quantile2D(cumulativeCases, 0.025)
+    quantiles3 = quantile2D(cumulativeCases, 0.975)
+
+    # ax[1].plot(times, median(confirmedCases, dims=2), "b-", label="Median Realisation", lw=4, alpha = 1)
+    ax[2].plot(times, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
+    ax[2].plot(times, quantiles3, "k--", lw=2, alpha = 0.5)
+    ax[2].fill_between(times, quantiles1, quantiles3, alpha=0.3, color = "r")
+
+    # Seaborn.lineplot(x = timesVector, y = [cumulativeCases...], hue = labelcumulativeCases, palette = "flare", ci="sd", ax=ax[2], estimator=median)
+    ############################################################################
+
+    if t_current > 0
+        ax[1].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
+            "k--", label="21/8/2021", lw=2, alpha = 1)
+        ax[2].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
+            "k--", label="21/8/2021", lw=2, alpha = 1)
+    end
+    # ax[1].axvline(10, "k--", label="21/8/2021")
+    # ax[2].vline()
+
+    # BP_df = DataFrame()
+    # BP_df.timesVector = timesVector
+    # BP_df.infections = [confirmedCases...]
+    # BP_df.label = labelconfirmedCases
+    #
+    # filtered_BP = filter(row -> row.timesVector in timesOfInterest, BP_df, view=false)
+    #
+    # # Seaborn.violinplot(x=filtered_BP.timesVector, y=filtered_BP.infections, hue=filtered_BP.timesVector,
+    #     # bw=0.4, cut=0, scale="count",palette = "Set2",ax=ax[2])
+    #
+    #
+    # for i in timesOfInterest
+    #     # meanNumber = round(mean(filter(row -> row.timesVector == i, filtered_BP).infections))
+    #     # println("Mean number of infections is: $meanNumber")
+    #     println("Summary Statistics at Day #$i")
+    #     describe(filter(row -> row.timesVector == i, filtered_BP).infections)
+    # end
+    #
+    # t_span = convert.(Int64, ceil.([times[1], times[end]]))
+    #
+    # c_mean = Array{Float64}(undef, t_span[end]-t_span[1]+1)
+    # c_median = Array{Float64}(undef, t_span[end]-t_span[1]+1)
+    #
+    # timeDays = collect(t_span[1]:t_span[end])
+    #
+    # for i in 1:length(timeDays)
+    #     c_mean[i] = mean(filter(row -> row.timesVector == float(timeDays[i]), BP_df).infections)
+    #     c_median[i] = median(filter(row -> row.timesVector == float(timeDays[i]), BP_df).infections)
+    # end
+    #
+    # growth_rates_mean = round.(diff(log.(diff(c_mean))), digits=2)
+    # growth_rates_median = round.(diff(log.(diff(c_median))), digits=2)
+    #
+    # R_eff_mean = round.(1 .+ 5 .* diff(log.(diff(c_mean))), digits=2)
+    # R_eff_median = round.(1 .+ 5 .* diff(log.(diff(c_median))), digits=2)
+    #
+    # println("Growth rate mean is $growth_rates_mean")
+    # println("Growth rate median is $growth_rates_median")
+    #
+    #
+    # println("Estimated mean R_eff is $R_eff_mean")
+    # println("Estimated median R_eff is $R_eff_median")
+
+    # maxy = maximum(confirmedCases)
+    # maxy=1000
+
+    # ax[1].set_ylim([0, maxy*0.6])
+    ax[1].legend(loc = "lower right")
+    ax[1].set_xlabel("Time from Detection (days)")
+    ax[1].set_ylabel("Cumulative Confirmed Cases")
+    ax[1].set_title("Confirmed Cases")
+    ax[1].set(yscale="log")
+    ax[1].set_yticks([1.0,10.0,100.0,1000.0, 10000.0])
+    ax[1].set_yticklabels([1,10,100,1000,10000])
+
+    # ax[2].set_ylim([0, maxy*0.6])
+    ax[2].legend(loc = "lower right")
+    ax[2].set_xlabel("Time from Detection (days)")
+    ax[2].set_ylabel("Cumulative Total Cases")
+    ax[2].set_title("Total Cases")
+    ax[2].set(yscale="log")
+    ax[2].set_yticks([1.0,10.0,100.0,1000.0, 10000.0])
+    ax[2].set_yticklabels([1,10,100, 1000,10000])
+
+
+    plt.suptitle(title)
+    # plt.title(title)
+
+
+    # Dodge the other plots
+    # plt.tight_layout(pad = 0.8, h_pad=0.01, w_pad=0.01)
+    plt.tight_layout(h_pad=0.01)
+    # despine()
+
+    if Display
+        # required to display graph on plots.
+        display(f)
+    end
+    if save
+        # Save graph as pngW
+        f.savefig(outputFileName)
+
+    end
+    close()
+end
+
+function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxCases=20*10^3, p_test::Array{Float64,1}=[0.1,0.8], R_number=3, R_alert_scaling=0.2,
+    t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1)
+    StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+    IDetect_tStep = StStep .* 0
+
+    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+    population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
+    i = 1
+    p = Progress(numSims,PROGRESS__METER__DT)
+
+    meanOffspring = zeros(numSims)
+    meanRNumber = zeros(numSims)
+
+    establishedSims = BitArray(undef, numSims) .* false
+    establishedSims .= true
+
+    time = @elapsed Threads.@threads for i = 1:numSims
+
+        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCases,initCases,0], true);
+        models[Threads.threadid()].stochasticRi = true
+        models[Threads.threadid()].reproduction_number = R_number*1
+        models[Threads.threadid()].p_test = p_test[1]*1
+        models[Threads.threadid()].alert_pars.p_test = p_test[2]*1
+        models[Threads.threadid()].t_onset_to_isol = t_onset_to_isol[1]*1
+        models[Threads.threadid()].alert_pars.t_onset_to_isol = t_onset_to_isol[2]*1
+        models[Threads.threadid()].alert_pars.R_scaling = R_alert_scaling*1
+
+        # models[Threads.threadid()].sub_clin_prop = 0.0
+        # models[Threads.threadid()].reproduction_number = 1.0
+
+        # next React branching process with alert level
+        population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
+        t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+
+        firstDetectIndex = findfirst(state_totals_all[:,4].==1)
+
+        if !isnothing(firstDetectIndex)
+            t_first_detect = t[firstDetectIndex]
+
+            if detection_tspan[1] < t_first_detect && t_first_detect < detection_tspan[end]
+
+                detectIndexes = findall(diff(state_totals_all[:,4]).==1) .+ 1
+                undetectedIndexes = setdiff(collect(1:length(t)), detectIndexes)
+                state_totals_all_new = state_totals_all[undetectedIndexes, 1:3]
+                # tnew = t[undetectedIndexes] .- t_first_detect
+                tnew = t .- t_first_detect
+
+                IDetect = state_totals_all[detectIndexes, 4]
+                tnew_detect = t[detectIndexes] .- t_first_detect
+                tnew_detect[1] = tspan[1]*1
+
+                # interpolate using linear splines
+                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all_new, tnew, times)
+                StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, tnew, times)
+
+                if length(IDetect) > 1
+                    try
+                        IDetect_tStep[:,i] = singleLinearSpline(IDetect, tnew_detect, times)
+                    catch
+                        println(issorted(IDetect))
+                        println(issorted(tnew_detect))
+                        @warn "Not good"
+                    end
+                else
+                    # index = findfirst(t_first_detect.<times) + 1
+
+                    IDetect_tStep[:, i] .= 1
+                end
+            else
+                establishedSims[i] = false
+            end
+        else
+            establishedSims[i] = false
+        end
+
+        next!(p)
+    end
+
+
+    IcumCases = ItStep .+ RtStep
+
+    indexesToKeep = []
+    sizehint!(indexesToKeep, numSims)
+
+    for i in 2:length(establishedSims)
+        if establishedSims[i]
+            # xnew = hcat(xnew, x[:,i])
+            push!(indexesToKeep, i)
+        end
+    end
+
+    observedIDetect = [1, 10, 20, 30, 51]
+    tDetect = collect(0:length(observedIDetect)-1)
+    return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect
 end
 
 function augustOutbreakSim(numSimsScaling::Int64, simRange)
@@ -1920,13 +2255,21 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
 
-        numSims = convert(Int, round(5000/numSimsScaling))
+        numSims = convert(Int, round(10000/numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
         models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
+        population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
         i = 1
         p = Progress(numSims,PROGRESS__METER__DT)
+
+        meanOffspring = zeros(numSims)
+        meanRNumber = zeros(numSims)
+
+        establishedSims = BitArray(undef, numSims) .* false
+        establishedSims .= true
+
         time = @elapsed Threads.@threads for i = 1:numSims
 
             models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
@@ -1937,8 +2280,12 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
             # models[Threads.threadid()].reproduction_number = 1.0
 
             # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+            population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
+            t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+
+            if num_cases < 3
+                establishedSims[i] = false
+            end
 
             # clean duplicate values of t which occur on the first recovery time
             # firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
@@ -1949,15 +2296,34 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+
+            inactive_df = filter(row -> row.parentID!=0, population_dfs[Threads.threadid()][1:num_cases, :], view=true)
+
+            meanOffspring[i] = mean(inactive_df.num_offspring)
+            meanRNumber[i] = mean(inactive_df.reproduction_number)
+
             next!(p)
         end
 
+        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(median(meanRNumber))")
         println("Finished Simulation in $time seconds")
         x = ItStep .+ RtStep
 
+        # xnew = x[:,1]
+        # sizehint!(xnew, size(x)...)
+        indexesToKeep = []
+        sizehint!(indexesToKeep, numSims)
+
+        for i in 2:length(establishedSims)
+            if establishedSims[i]
+                # xnew = hcat(xnew, x[:,i])
+                push!(indexesToKeep, i)
+            end
+        end
+
         title = "August 2021 Outbreak Cumulative Infection Estimation"
         outputFileName = "./August2021Outbreak/EstimatedCaseNumbers"
-        plotCumulativeInfections(x, times, [10.0,13.0,15.0,17.0], title, outputFileName, true, true, 0.1)
+        plotCumulativeInfections(x[:,indexesToKeep], times, [10.0,13.0,15.0,17.0], title, outputFileName, true, true, 0.1)
     end
 
     println("Sim #2: Homogeneous Reproduction Number")
@@ -1971,11 +2337,15 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
 
-        numSims = convert(Int, round(5000/numSimsScaling))
+        numSims = convert(Int, round(10000/numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
+        establishedSims = BitArray(undef, numSims) .* false
+        establishedSims .= true
+
         models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
+        population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
         i = 1
         p = Progress(numSims,PROGRESS__METER__DT)
         time = @elapsed Threads.@threads for i = 1:numSims
@@ -1987,9 +2357,12 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
             # models[Threads.threadid()].sub_clin_prop = 0.0
             # models[Threads.threadid()].reproduction_number = 1.0
 
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+            population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
+            t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+
+            if num_cases < 3
+                establishedSims[i] = false
+            end
 
             # clean duplicate values of t which occur on the first recovery time
             # firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
@@ -2006,25 +2379,181 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
         println("Finished Simulation in $time seconds")
         x = ItStep .+ RtStep
 
+        indexesToKeep = []
+        sizehint!(indexesToKeep, numSims)
+
+        # xnew = x[:,1]
+        # sizehint!(xnew, size(x)...)
+
+        for i in 1:length(establishedSims)
+            if establishedSims[i]
+                # xnew = hcat(xnew, x[:,i])
+                push!(indexesToKeep, i)
+            end
+        end
+
         title = "August 2021 Outbreak Cumulative Infection Estimation"
         outputFileName = "./August2021Outbreak/EstimatedCaseNumbersHomogeneous"
-        plotCumulativeInfections(x, times, [10.0,13.0,15.0,17.0], title, outputFileName, true, true, 0.1)
+        plotCumulativeInfections(x[:,indexesToKeep], times, [10.0,13.0,15.0,17.0], title, outputFileName, true, true, 0.1)
 
 
         ################################################################################
     end
+
+    println("Sim #3: Affect of p_test on infection curves post first detection, August Outbreak Sim")
+    if 3 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,60.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (10,17)
+
+        maxCases=20*10^3
+        p_test=[0.1,0.8]
+        R_number=6
+        R_alert_scaling=0.2
+        t_onset_to_isol=[2.2,1.0]
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+            maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol)
+
+        t_current = 4
+
+        title = "August 2021 Outbreak, Daily Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection"
+        plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak, Estimated Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #4: Fitting on August 2020 Outbreak")
+    if 4 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,60.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (13,18)
+
+        initCases=1
+        maxCases=5*10^3
+        p_test=[0.1,0.9]
+        R_number=4
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        cumulativeCases, confirmedCases, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+            maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases)
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        t_current = 0 # don't put date on plot
+
+        observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
+            122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
+            184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
+        tDetect = collect(0:length(observedIDetect)-1)
+
+        title = "August 2020 Outbreak, Daily Case Numbers After Detection"
+        outputFileName = "./August2020OutbreakFit/DailyCaseNumbersAfterDetection"
+        plotDailyCasesOutbreak(confirmedCases, times, observedIDetect, tDetect, title, outputFileName, false, true, true)
+
+        title = "August 2020 Outbreak, Estimated Case Numbers After Detection"
+        outputFileName = "./August2020OutbreakFit/EstimatedCaseNumbersAfterDetection"
+        plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #5: August 2021 Sim using August 2020 Fit")
+    if 5 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,60.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(5000/numSimsScaling))
+
+        detection_tspan = (8,14)
+
+        maxCases=20*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=6
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+            maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol)
+
+        t_current = 4
+
+        title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, Estimated Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    # println("Sim #3: Heterogeneous Infection Tree Example")
+    # if 3 in simRange
+    #     tspan = (0.0,17.0)
+    #     time_step = 0.1
+    #
+    #     model = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
+    #     model.stochasticRi = true
+    #     model.reproduction_number = 5
+    #     model.p_test = 0.4
+    #
+    #     population_df = initDataframe(model);
+    #     t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+    #
+    #     simpleGraph_branch(population_df, num_cases, true, 1)
+    #
+    # end
 end
+
+
+
+# function R_estimateAtTimes(args)
+#     body
+# end
+
 
 function main()
 
     compilationInit()
-    # verifySolutions(1, 5)
+    # verifySolutions(1, 4)
     # verifySolutions(1, collect(5:18))
     # verifySolutions(1, collect(21))
 
-    BPbenchmarking(1, [1,2])
+    # BPbenchmarking(1, [1,2])
 
-    # augustOutbreakSim(1, collect(1:2))
+    # augustOutbreakSim(1, collect(1:3))
+    augustOutbreakSim(10, [5])
 end
 
 main()
@@ -2117,11 +2646,37 @@ main()
 # population_df = initDataframe_thin(model);
 # t, state_totals_all, population_df = bpMain!(population_df, model, false, true, true, true, false)
 
-
-# tspan = [0,100]
-# model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+time_step=0.5
+tspan = [0,100]
+times = [i for i=tspan[1]:time_step:tspan[end]]
+# model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-1,1,0], true);
+# model.stochasticRi = true
+# model.reproduction_number = 5
+# model.p_test = 0.4
+# model.alert_pars.R_scaling = 1.0
 #
 # population_df = initDataframe(model);
-# t, state_totals_all, num_cases = firstReact_branch!(population_df, model)
+# t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+# t_first_detect = t[findfirst(state_totals_all[:,4].==1)]
 #
-# model.state_totals
+#
+# detectIndexes = findall(diff(state_totals_all[:,4]).==1) .+ 1
+# undetectedIndexes = setdiff(collect(1:length(t)), detectIndexes)
+# state_totals_all_new = state_totals_all[undetectedIndexes, 1:3]
+# tnew = t[undetectedIndexes] .- t_first_detect
+#
+# issorted(tnew)
+# issorted(state_totals_all_new)
+#
+# IDetect = state_totals_all[detectIndexes, 4]
+# tnew_detect = t[detectIndexes] .- t_first_detect
+#
+# issorted(tnew_detect)
+# issorted(IDetect)
+#
+# # interpolate using linear splines
+# StStep, ItStep, RtStep = multipleLinearSplines(state_totals_all_new, tnew, times)
+# IDetect_tStep = singleSpline(IDetect, tnew_detect, times)
+#
+#
+# issorted(t)

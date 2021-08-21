@@ -15,7 +15,8 @@ module BranchVerifySoln
 
     export branchVerifyPlot, meanAbsError, initSIRArrays, multipleSIRMeans,
         multipleLinearSplines, branchTimeStepPlot, branchSideBySideVerifyPlot,
-        branchSideBySideVerifyPlot2, branch2wayVerifyPlot, Dots, Lines, singleSpline
+        branchSideBySideVerifyPlot2, branch2wayVerifyPlot, Dots, Lines, singleSpline,
+        singleLinearSpline
 
     struct Dots; end
     struct Lines; end
@@ -389,6 +390,12 @@ module BranchVerifySoln
 
     function singleSpline(x::Array{}, t::Array, times::Array)
         spline = Spline1D(t, x, k=2)
+
+        return spline(times)
+    end
+
+    function singleLinearSpline(x::Array{}, t::Array, times::Array)
+        spline = Spline1D(t, x, k=1)
 
         return spline(times)
     end

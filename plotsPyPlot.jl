@@ -8,7 +8,7 @@ Author: Joel Trent and Josh Looker
 
 module plotsPyPlot
 
-    using PyCall, PyPlot, Seaborn, DataFrames, StatsBase
+    using PyCall, PyPlot, Seaborn, DataFrames, StatsBase, Statistics
 
     function plotSIRPyPlot(t, SIR, alpha, beta, N, outputFileName="plot", Display=true, save=true)
         #=
@@ -103,6 +103,31 @@ module plotsPyPlot
             println("Summary Statistics at Day #$i")
             describe(filter(row -> row.timesVector == i, filtered_BP).infections)
         end
+
+        t_span = convert.(Int64, ceil.([times[1], times[end]]))
+
+        c_mean = Array{Float64}(undef, t_span[end]-t_span[1]+1)
+        c_median = Array{Float64}(undef, t_span[end]-t_span[1]+1)
+
+        timeDays = collect(t_span[1]:t_span[end])
+
+        for i in 1:length(timeDays)
+            c_mean[i] = mean(filter(row -> row.timesVector == float(timeDays[i]), BP_df).infections)
+            c_median[i] = median(filter(row -> row.timesVector == float(timeDays[i]), BP_df).infections)
+        end
+
+        growth_rates_mean = round.(diff(log.(diff(c_mean))), digits=2)
+        growth_rates_median = round.(diff(log.(diff(c_median))), digits=2)
+
+        R_eff_mean = round.(1 .+ 5 .* diff(log.(diff(c_mean))), digits=2)
+        R_eff_median = round.(1 .+ 5 .* diff(log.(diff(c_median))), digits=2)
+
+        println("Growth rate mean is $growth_rates_mean")
+        println("Growth rate median is $growth_rates_median")
+
+
+        println("Estimated mean R_eff is $R_eff_mean")
+        println("Estimated median R_eff is $R_eff_median")
 
         # maxy = maximum(x1)
         maxy=1000

@@ -2022,6 +2022,16 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     ax[1].plot(tDetect, observedIDetect, "k-", label="August Outbreak", lw=2, alpha = 1)
     ############################################################################
 
+    # 2020 Confirmed Cases
+    if outputFileName == "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
+        observedIDetect2020 = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
+            122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
+            184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
+        tDetect2020 = collect(0:length(observedIDetect)-1)
+
+        ax[1].plot(tDetect2020, observedIDetect2020, color="tab:gray", linestyle="-.", label="August Outbreak 2020", lw=2, alpha = 1)
+    end
+
     # Cumulative cases since first detect ######################################
     for i in 1:length(cumulativeCases[1,:])
         if i == 1
@@ -2140,7 +2150,7 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
 end
 
 function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxCases=20*10^3, p_test::Array{Float64,1}=[0.1,0.8], R_number=3, R_alert_scaling=0.2,
-    t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1)
+    t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1, num_detected_before_alert=1)
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
     IDetect_tStep = StStep .* 0
 
@@ -2165,6 +2175,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
         models[Threads.threadid()].t_onset_to_isol = t_onset_to_isol[1]*1
         models[Threads.threadid()].alert_pars.t_onset_to_isol = t_onset_to_isol[2]*1
         models[Threads.threadid()].alert_pars.R_scaling = R_alert_scaling*1
+        models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
 
         # models[Threads.threadid()].sub_clin_prop = 0.0
         # models[Threads.threadid()].reproduction_number = 1.0
@@ -2173,7 +2184,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
         population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
         t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
 
-        firstDetectIndex = findfirst(state_totals_all[:,4].==1)
+        firstDetectIndex = findfirst(state_totals_all[:,4].==num_detected_before_alert)
 
         if !isnothing(firstDetectIndex)
             t_first_detect = t[firstDetectIndex]
@@ -2188,7 +2199,9 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
 
                 IDetect = state_totals_all[detectIndexes, 4]
                 tnew_detect = t[detectIndexes] .- t_first_detect
-                tnew_detect[1] = tspan[1]*1
+
+                # zeroindex = findfirst(abs.(abs.(tnew_detect).-tspan[1]) .< 1*10-8)# = tspan[1]*1
+                # tnew_detect[zeroindex] = tspan[1]*1
 
                 # interpolate using linear splines
                 # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all_new, tnew, times)
@@ -2198,8 +2211,9 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
                     try
                         IDetect_tStep[:,i] = singleLinearSpline(IDetect, tnew_detect, times)
                     catch
-                        println(issorted(IDetect))
-                        println(issorted(tnew_detect))
+                        println("IDetect is sorted = $(issorted(IDetect))")
+                        println("Tnew is sorted = $(issorted(tnew_detect))")
+                        println(tnew_detect)
                         @warn "Not good"
                     end
                 else
@@ -2230,12 +2244,15 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
         end
     end
 
-    observedIDetect = [1, 10, 20, 30, 51]
+    println("Kept $(length(indexesToKeep)) Sims or $(length(indexesToKeep)/numSims*100)% of Sims")
+
+    # observedIDetect = [1, 10, 20, 30, 51]
+    observedIDetect = cumsum([5,4,15,20,19])
     tDetect = collect(0:length(observedIDetect)-1)
     return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect
 end
 
-function augustOutbreakSim(numSimsScaling::Int64, simRange)
+function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
     #=
     Estimation of the August 2021 Delta outbreak on 18 Aug.
 
@@ -2425,9 +2442,9 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
         t_current = 4
 
-        title = "August 2021 Outbreak, Daily Case Numbers After Detection"
-        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection"
-        plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+        # title = "August 2021 Outbreak, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
 
         title = "August 2021 Outbreak, Estimated Case Numbers After Detection"
         outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection"
@@ -2444,7 +2461,7 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
 
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
-        numSims = convert(Int, round(10000/numSimsScaling))
+        numSims = convert(Int, round(5000/numSimsScaling))
 
         detection_tspan = (13,18)
 
@@ -2473,9 +2490,9 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
             184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
         tDetect = collect(0:length(observedIDetect)-1)
 
-        title = "August 2020 Outbreak, Daily Case Numbers After Detection"
-        outputFileName = "./August2020OutbreakFit/DailyCaseNumbersAfterDetection"
-        plotDailyCasesOutbreak(confirmedCases, times, observedIDetect, tDetect, title, outputFileName, false, true, true)
+        # title = "August 2020 Outbreak, Daily Case Numbers After Detection"
+        # outputFileName = "./August2020OutbreakFit/DailyCaseNumbersAfterDetection"
+        # plotDailyCasesOutbreak(confirmedCases, times, observedIDetect, tDetect, title, outputFileName, false, true, true)
 
         title = "August 2020 Outbreak, Estimated Case Numbers After Detection"
         outputFileName = "./August2020OutbreakFit/EstimatedCaseNumbersAfterDetection"
@@ -2487,14 +2504,62 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
         ################################################################################
         # Simulating Delta Outbreak 18 August 2021
         # time span to sim on
-        tspan = (0.0,60.0)
+        tspan = (0.0,70.0)
         time_step = 0.1
 
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
-        numSims = convert(Int, round(5000/numSimsScaling))
+        numSims = convert(Int, round(10000/numSimsScaling))
 
-        detection_tspan = (8,14)
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=10*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=5
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect = baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #6: High R_i: August 2021 Sim using August 2020 Fit")
+    if 6 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
 
         maxCases=20*10^3
         p_test=[0.1,0.9]#p_test=[0.1,0.8]
@@ -2503,20 +2568,266 @@ function augustOutbreakSim(numSimsScaling::Int64, simRange)
         # t_onset_to_isol=[2.2,1.0]
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
-            maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol)
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
         t_current = 4
 
-        title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
-        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
-        plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
 
-        title = "August 2021 Outbreak using August 2020 Fit, Estimated Case Numbers After Detection"
-        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, High R0"# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryR_i/EstimatedCaseNumbersAfterDetection2020FitHighR"
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
+
+    println("Sim #7: Low R_i: August 2021 Sim using August 2020 Fit")
+    if 7 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(20000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=8*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=4
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, Low R0"# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryR_i/EstimatedCaseNumbersAfterDetection2020FitLowR"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #8: High P_test: August 2021 Sim using August 2020 Fit")
+    if 8 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=10*10^3
+        p_test=[0.1,1.0]#p_test=[0.1,0.8]
+        R_number=5
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, High P_test"# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryP_test/EstimatedCaseNumbersAfterDetection2020FitHighP_test"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #9: Low P_test: August 2021 Sim using August 2020 Fit")
+    if 9 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=15*10^3
+        p_test=[0.1,0.7]#p_test=[0.1,0.8]
+        R_number=5
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, Low P_test"# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryP_test/EstimatedCaseNumbersAfterDetection2020FitLowP_test"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #10: High R_scaling: August 2021 Sim using August 2020 Fit")
+    if 10 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=10*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=5
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.15
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, High Alert Level Reduction of R0 "# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryR_scaling/EstimatedCaseNumbersAfterDetection2020FitHighAlert_Reduct"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    println("Sim #11: Low R_scaling: August 2021 Sim using August 2020 Fit")
+    if 11 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=20*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=5
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.35
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=3
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, Low Alert Level Reduction of R0 "# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryR_scaling/EstimatedCaseNumbersAfterDetection2020FitLowAlert_Reduct"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+
 
     # println("Sim #3: Heterogeneous Infection Tree Example")
     # if 3 in simRange
@@ -2552,8 +2863,8 @@ function main()
 
     # BPbenchmarking(1, [1,2])
 
-    # augustOutbreakSim(1, collect(1:3))
-    augustOutbreakSim(10, [5])
+    # augustOutbreakSim(0.5, collect(4:11))
+    augustOutbreakSim(0.5, [4])
 end
 
 main()
@@ -2646,9 +2957,9 @@ main()
 # population_df = initDataframe_thin(model);
 # t, state_totals_all, population_df = bpMain!(population_df, model, false, true, true, true, false)
 
-time_step=0.5
-tspan = [0,100]
-times = [i for i=tspan[1]:time_step:tspan[end]]
+# time_step=0.5
+# tspan = [0,100]
+# times = [i for i=tspan[1]:time_step:tspan[end]]
 # model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-1,1,0], true);
 # model.stochasticRi = true
 # model.reproduction_number = 5

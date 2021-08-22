@@ -1993,6 +1993,81 @@ function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumC
     close()
 end
 
+function plotDailyCasesMultOutbreak(dailyConfirmedCasesHigh, dailyConfirmedCasesMod, dailyConfirmedCasesLow, timesDaily, actualDailyCumCases, timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false)
+
+    actualDailyCases = diff(vcat([0],actualDailyCumCases))
+
+    dailyTimes=timesDaily
+
+
+    Seaborn.set()
+    set_style("ticks")
+    Seaborn.set_color_codes("pastel")
+    fig = plt.figure(dpi=300)
+
+    # High ######################################################################
+    quantiles1 = quantile2D(dailyConfirmedCasesHigh, 0.025)
+    quantiles3 = quantile2D(dailyConfirmedCasesHigh, 0.975)
+    plt.plot(dailyTimes, median(dailyConfirmedCasesHigh,dims=2), "b-", label="Median Daily Confirmed Cases - High", lw=2.5, figure=fig)
+
+    plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.3, color = "b")
+    ######################################################################
+
+    # Mod ######################################################################
+    quantiles1 = quantile2D(dailyConfirmedCasesMod, 0.025)
+    quantiles3 = quantile2D(dailyConfirmedCasesMod, 0.975)
+    plt.plot(dailyTimes, median(dailyConfirmedCasesMod,dims=2), "r-", label="Median Daily Confirmed Cases - Moderate", lw=2.5, figure=fig)
+
+    plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.3, color = "r")
+    ######################################################################
+
+    # Low ######################################################################
+    quantiles1 = quantile2D(dailyConfirmedCasesLow, 0.025)
+    quantiles3 = quantile2D(dailyConfirmedCasesLow, 0.975)
+    plt.plot(dailyTimes, median(dailyConfirmedCasesLow,dims=2), "g-", label="Median Daily Confirmed Cases - Low", lw=2.5, figure=fig)
+
+    plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.3, color = "g")
+    ######################################################################
+
+    plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Confirmed Cases", lw=2.5, figure=fig)
+
+    # plt.plot(times, x2, "r$x2PlotType", label="I - Geometric Series", lw=1.5, figure=fig, alpha = 1)
+
+    if two21
+        observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
+        122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
+        184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
+
+        observedIDetect = diff(vcat([0],observedIDetect))
+        tDetect = collect(0:length(observedIDetect)-1)
+
+        plt.plot(tDetect, observedIDetect, color="tab:gray", linestyle="-", label="August 2020 Daily Confirmed Cases", lw=2.5, figure=fig)
+    end
+
+    if two21 && false
+        plt.xticks([-3,0,3,6,9,12,15],vcat(["Aug $(14+3*i)" for i in 0:5], ["Sep 01"]))
+        plt.xlabel("Date")
+    else
+        plt.xlabel("Days since Detection")
+    end
+    plt.ylabel("Daily Confirmed Cases")
+    # plt.suptitle("Branching Process Simulation")
+    plt.title(title)
+    plt.legend()
+
+    if Display
+        # required to display graph on plots.
+        display(fig)
+    end
+    if save
+        # Save graph as pngW
+        fig.savefig(outputFileName)
+
+    end
+    close()
+end
+
+
 function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect,
     tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0)
     #=
@@ -2521,6 +2596,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    modPDailyDetect = []
     println("Sim #5: August 2021 Sim using August 2020 Fit")
     if 5 in simRange
         ################################################################################
@@ -2558,6 +2634,8 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
             end
         end
 
+        modPDailyDetect = dailyDetectCases
+
         timesDaily = [i for i=tspan[1]:1:tspan[end]]
         title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
@@ -2569,6 +2647,55 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         # plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    println("Sim #5.5: August 2021 Sim using August 2020 Fit")
+    if 5.5 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 0.1
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,14)
+
+        initCases=1
+
+        maxCases=10*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=6
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.1]
+        num_detected_before_alert=2
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases = baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
+
+        t_current = 4
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit2"
+        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true)
+        # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit2"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+    end
+
+    highRPreDailyDetect = []
     println("Sim #6: High R_i: August 2021 Sim using August 2020 Fit")
     if 6 in simRange
         ################################################################################
@@ -2593,7 +2720,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,0.1]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases  =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2606,7 +2733,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
                 end
             end
         end
-
+        highRPreDailyDetect = dailyDetectCases
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
@@ -2616,6 +2743,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    lowRPreDailyDetect = []
     println("Sim #7: Low R_i: August 2021 Sim using August 2020 Fit")
     if 7 in simRange
         ################################################################################
@@ -2640,7 +2768,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,0.1]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases  =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2654,6 +2782,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
             end
         end
 
+        lowRPreDailyDetect = dailyDetectCases
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
@@ -2663,6 +2792,16 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    println("Sim #7.5: Effect of R Pre scaling on Daily Cases: August 2021 Sim using August 2020 Fit")
+    if 5 in simRange && 6 in simRange && 6 in simRange
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Varying Pre Intervention Reff"
+        outputFileName = "./August2021Outbreak/VaryR_i/DailyCaseNumbersAfterDetection"
+        plotDailyCasesMultOutbreak(highRPreDailyDetect, modPDailyDetect, lowRPreDailyDetect, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true)
+    end
+
+    highPDailyDetect = []
     println("Sim #8: High P_test: August 2021 Sim using August 2020 Fit")
     if 8 in simRange
         ################################################################################
@@ -2687,7 +2826,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,0.1]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2701,6 +2840,8 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
             end
         end
 
+        highPDailyDetect = dailyDetectCases
+
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
@@ -2710,6 +2851,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    lowPDailyDetect = []
     println("Sim #9: Low P_test: August 2021 Sim using August 2020 Fit")
     if 9 in simRange
         ################################################################################
@@ -2734,7 +2876,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,1.0]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases  =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2748,6 +2890,8 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
             end
         end
 
+        lowPDailyDetect = dailyDetectCases
+
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
@@ -2757,6 +2901,16 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    println("Sim #9.5: Effect of P_test scaling on Daily Cases: August 2021 Sim using August 2020 Fit")
+    if 5 in simRange && 8 in simRange && 9 in simRange
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Varying Symptomatic Testing Rate"
+        outputFileName = "./August2021Outbreak/VaryP_test/DailyCaseNumbersAfterDetection"
+        plotDailyCasesMultOutbreak(highPDailyDetect, modPDailyDetect, lowPDailyDetect, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true)
+    end
+
+    highRPostDailyDetect = []
     println("Sim #10: High R_scaling: August 2021 Sim using August 2020 Fit")
     if 10 in simRange
         ################################################################################
@@ -2781,7 +2935,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.15
         t_onset_to_isol=[2.2,0.1]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2795,6 +2949,8 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
             end
         end
 
+        highRPostDailyDetect = dailyDetectCases
+
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, true, true, true)
@@ -2804,6 +2960,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    lowRPostDailyDetect = []
     println("Sim #11: Low R_scaling: August 2021 Sim using August 2020 Fit")
     if 11 in simRange
         ################################################################################
@@ -2828,7 +2985,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         R_alert_scaling=0.35
         t_onset_to_isol=[2.2,0.1]
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect =
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -2841,6 +2998,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
                 end
             end
         end
+        lowRPostDailyDetect = dailyDetectCases
 
         # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
@@ -2851,6 +3009,14 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange)
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
     end
 
+    println("Sim #11.5: Effect of R Post scaling on Daily Cases: August 2021 Sim using August 2020 Fit")
+    if 5 in simRange && 10 in simRange && 11 in simRange
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Varying Post Intervention Reff"
+        outputFileName = "./August2021Outbreak/VaryR_scaling/DailyCaseNumbersAfterDetection"
+        plotDailyCasesMultOutbreak(highRPostDailyDetect, modPDailyDetect, lowRPostDailyDetect, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true)
+    end
 
 
     # println("Sim #3: Heterogeneous Infection Tree Example")
@@ -2888,7 +3054,9 @@ function main()
     # BPbenchmarking(1, [1,2])
 
     # augustOutbreakSim(0.5, collect(4:11))
-    augustOutbreakSim(0.5, [5])
+
+    augustOutbreakSim(1, [1,2])
+    # augustOutbreakSim(2, [5, 6,7,10,11])
 end
 
 main()

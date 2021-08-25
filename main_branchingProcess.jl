@@ -5,6 +5,7 @@ using LightGraphs, GraphPlot, NetworkLayout
 using PyPlot, Seaborn
 using ProgressMeter
 using CSV
+using Dates
 
 # import required modules
 push!( LOAD_PATH, "./" )
@@ -1914,7 +1915,7 @@ function quantile2D(x, quantileValue)
 end
 
 function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumCases,
-    timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false, conditioned=false)
+    timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false, conditioned=false, useDates=false)
 
     actualDailyCases = diff(vcat([0],actualDailyCumCases))
     # timesActual = timesActual[1:end-1]
@@ -1986,11 +1987,13 @@ function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumC
         plt.plot(tDetect, observedIDetect, color="tab:gray", linestyle="-", label="August 2020 Daily Confirmed Cases", lw=2.5, figure=fig)
     end
 
-    if two21 && false
-        plt.xticks([-3,0,3,6,9,12,15],vcat(["Aug $(14+3*i)" for i in 0:5], ["Sep 01"]))
+    if useDates
+        plt.xticks(collect(dailyTimes[1]:10:dailyTimes[end]),
+            [Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(dailyTimes[1]:10:dailyTimes[end]))-1)])
         plt.xlabel("Date")
+
     else
-        plt.xlabel("Days since Detection")
+        plt.xlabel("Days since detection")
     end
     plt.ylabel("Daily Confirmed Cases")
     # plt.suptitle("Branching Process Simulation")
@@ -2084,10 +2087,12 @@ function plotDailyCasesMultOutbreak(dailyConfirmedCasesHigh, dailyConfirmedCases
 end
 
 function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect,
-    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0, conditioned=false)
+    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0, conditioned=false, useDates=false)
     #=
     Plot multiple realisations of confirmedCases and x2 as well as their means.
     =#
+
+    dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
 
     Seaborn.set()
     set_style("ticks")
@@ -2095,7 +2100,7 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     # fig = plt.figure(dpi=300)
 
     # Initialise plots - need figure size to make them square and nice
-    f,ax = Seaborn.subplots(1,2, figsize=(10,6), dpi=300)
+    f,ax = Seaborn.subplots(1,2, figsize=(12,6), dpi=300)
 
     timesVector = []
     for i in 1:length(confirmedCases[1,:])
@@ -2170,7 +2175,6 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
         ax[1].plot(times, quantiles3, "r--", lw=2, alpha = 0.5)
         ########################################################################
 
-
         # Cumulative cases since first detect ######################################
         quantiles1 = quantile2D(cumulativeCases, 0.25)
         quantiles3 = quantile2D(cumulativeCases, 0.75)
@@ -2181,9 +2185,9 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
 
     if t_current > 0
         ax[1].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label="$(17+t_current)/08/2021", lw=2, alpha = 1)
+            "k--", label=Dates.format(dayZeroDate+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
         ax[2].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label="$(17+t_current)/08/2021", lw=2, alpha = 1)
+            "k--", label=Dates.format(dayZeroDate+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
     end
     # ax[1].axvline(10, "k--", label="21/8/2021")
     # ax[2].vline()
@@ -2235,17 +2239,31 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     # maxy=1000
 
     # ax[1].set_ylim([0, maxy*0.6])
+
+    if useDates
+        ax[1].set_xticks(collect(times[1]:10:times[end]))
+        ax[1].set_xticklabels([Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
+        ax[1].set_xlabel("Date")
+
+        ax[2].set_xticks(collect(times[1]:10:times[end]))
+        ax[2].set_xticklabels([Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
+        ax[2].set_xlabel("Date")
+
+    else
+        ax[1].set_xlabel("Days since detection")
+        ax[2].set_xlabel("Days since detection")
+    end
+
+
     ax[1].legend(loc = "lower right")
-    ax[1].set_xlabel("Time from Detection (days)")
     ax[1].set_ylabel("Cumulative Confirmed Cases")
     ax[1].set_title("Confirmed Cases")
     ax[1].set(yscale="log")
-    ax[1].set_yticks([1.0,10.0,100.0,1000.0, 10000.0])
+    ax[1].set_yticks([1.0,10.0,100.0,1000.0,10000.0])
     ax[1].set_yticklabels([1,10,100,1000,10000])
 
     # ax[2].set_ylim([0, maxy*0.6])
     ax[2].legend(loc = "lower right")
-    ax[2].set_xlabel("Time from Detection (days)")
     ax[2].set_ylabel("Cumulative Total Cases")
     ax[2].set_title("Total Cases")
     ax[2].set(yscale="log")
@@ -2719,7 +2737,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         # tspan = (0.0,70.0)
         # timesDaily = [i for i=tspan[1]:1:tspan[end]]
         title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
-        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetectionCcandu25Augsl"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetectionCcandu25Aug"
 
         timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases.csv", false)[1:2]
         cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases.csv", true)[2:3]
@@ -2730,7 +2748,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         # cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
         # cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
 
-        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true)
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
 
         numCasesRange = 80:-10:10
         daysSinceRange = 10:10:70
@@ -2741,7 +2759,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
 
         title = "August 2021 Outbreak Conditioned Model Ensemble"
         outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetectionCcandu25Aug"
-        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true)
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true)
 
         title = "Probability of less than y cases per day, x days after detection"
         outputFileName = "./August2021Outbreak/ProbDaysSinceDetection_August2021Ccandu25Aug"
@@ -3828,3 +3846,12 @@ if false
     #
     # issorted(t)
 end
+
+
+# dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
+#
+# newDate = dayZeroDate + Dates.Day(1)
+#
+# Dates.format(dayZeroDate, "u d")
+#
+# Dates.format(newDate, "u d")

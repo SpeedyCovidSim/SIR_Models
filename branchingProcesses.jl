@@ -69,6 +69,7 @@ module branchingProcesses
         num_detected_before_alert::Int64 # 1
         time_to_alert::Symbol # :instant, :onDay
         alert_level_changed::Bool # init false
+        alert_level_scaling_speed::Union{Int64,Float64} # how many days it takes for alert level scaling to come into affect
     end
 
     struct branchModelAlert_nopars; end
@@ -113,13 +114,12 @@ module branchingProcesses
     function alertR_reduction(model::branchModel, timeSinceAlertChange::Union{Int64, Float64}=-1)
 
         if timeSinceAlertChange != -1
-            if timeSinceAlertChange < 5
-                return 0.7 + (model.alert_pars.R_scaling - 0.7) / 5
+            if timeSinceAlertChange < model.alert_pars.alert_level_scaling_speed
+                return 0.8 + ((model.alert_pars.R_scaling-0.8)/model.alert_pars.alert_level_scaling_speed) * timeSinceAlertChange
             else
                 return model.alert_pars.R_scaling
             end
         end
-
         return model.alert_pars.R_scaling
     end
 
@@ -1985,7 +1985,6 @@ module branchingProcesses
 
         expOff = (model.state_totals[1]/model.population_size) .* active_df.reproduction_number
         num_off = rand.(Poisson.(expOff))
-
         active_df.num_offspring .= num_off
 
         for i in 1:length(active_df.time_infected)
@@ -2017,7 +2016,6 @@ module branchingProcesses
                 num_events += 1
                 state_totals_all[num_events, :] .= copy(model.state_totals)
                 push!(t, infection_time*1)
-
             elseif reaction.kind === :infection # infection event
 
                 sSaturation = (model.state_totals[1]/model.population_size)
@@ -2103,17 +2101,17 @@ module branchingProcesses
 
                         # add alert level event
                         push!(tau_heap, event(timeAlert, :alertChange, -1, sSaturation))
+                        model.t_max += timeAlert
                     end
 
                     num_events += 1
                     state_totals_all[num_events, :] .= copy(model.state_totals)
                     push!(t, infection_time*1)
                 end
-
             elseif reaction.kind === :alertChange
                 alertLevelChanged = true
                 timeAlertChange = infection_time*1
-                model.t_max += infection_time
+
                 model.alert_pars.alert_level_changed = true
 
                 # edit iso times for currently active cases
@@ -2167,9 +2165,7 @@ module branchingProcesses
                     #     end
                     # end
                 end
-
             end
-
         end
 
         if t[end] < model.t_max
@@ -2226,8 +2222,9 @@ module branchingProcesses
             num_detected_before_alert = 1
             time_to_alert = :oneDay # ∈ [:instant, :onDay, :oneDay]
             alert_level_changed = false
+            alert_level_scaling_speed = 5
             alert_pars = branchModelAlert_pars(t_onset_to_isol_new, p_test_new, R_scaling, num_detected_before_alert,
-                    time_to_alert, alert_level_changed)
+                    time_to_alert, alert_level_changed, alert_level_scaling_speed)
         end
 
         model = branchModel(t_init, t_max, population_size, max_cases, state_totals, states,

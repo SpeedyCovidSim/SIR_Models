@@ -4,6 +4,7 @@ using Distributions, Random, StatsBase, Statistics
 using LightGraphs, GraphPlot, NetworkLayout
 using PyPlot, Seaborn
 using ProgressMeter
+using CSV
 
 # import required modules
 push!( LOAD_PATH, "./" )
@@ -44,7 +45,6 @@ function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64
 
     return hcat(Smean, Imean, Rmean), times
 end
-
 
 function verifySolutions(numSimsScaling::Int64, testRange)
     #=
@@ -1913,7 +1913,8 @@ function quantile2D(x, quantileValue)
     return quantiles
 end
 
-function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumCases, timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false)
+function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumCases,
+    timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false, conditioned=false)
 
     actualDailyCases = diff(vcat([0],actualDailyCumCases))
     # timesActual = timesActual[1:end-1]
@@ -1952,10 +1953,25 @@ function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumC
     plt.plot(dailyTimes, median(dailyConfirmedCases,dims=2), "b-", label="Median Daily Confirmed Cases", lw=2.5, figure=fig)
     plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Confirmed Cases", lw=2.5, figure=fig)
 
-
     # plt.plot(dailyTimes, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
     # plt.plot(dailyTimes, quantiles3, "k--", lw=2, alpha = 0.5)
-    plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.3, color = "r")
+
+    # plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.5, color = "r")
+
+    if conditioned
+        plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.4, color = "b", label="95% Curvewise Quantile Band")
+
+        quantiles1 = quantile2D(dailyConfirmedCases, 0.25)
+        quantiles3 = quantile2D(dailyConfirmedCases, 0.75)
+
+        plt.plot(dailyTimes, quantiles1, "r--", label="50% Curvewise Quantile Bands", lw=2, alpha = 0.9)
+        plt.plot(dailyTimes, quantiles3, "r--", lw=2, alpha = 0.9)
+    else
+        plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.5, color = "r", label="95% Quantile Band")
+    end
+
+
+
 
     # plt.plot(times, x2, "r$x2PlotType", label="I - Geometric Series", lw=1.5, figure=fig, alpha = 1)
 
@@ -2067,9 +2083,8 @@ function plotDailyCasesMultOutbreak(dailyConfirmedCasesHigh, dailyConfirmedCases
     close()
 end
 
-
 function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect,
-    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0)
+    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0, conditioned=false)
     #=
     Plot multiple realisations of confirmedCases and x2 as well as their means.
     =#
@@ -2087,6 +2102,11 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
         timesVector = vcat(timesVector, times)
     end
 
+    type = ""
+    if conditioned
+        type=" Curvewise"
+    end
+
     # Confirmed cases since first detect #######################################
     for i in 1:length(confirmedCases[1,:])
         if i == 1
@@ -2101,7 +2121,7 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     quantiles3 = quantile2D(confirmedCases, 0.975)
 
     ax[1].plot(times, median(confirmedCases, dims=2), "r-", label="Median Realisation", lw=3, alpha = 1)
-    ax[1].plot(times, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
+    ax[1].plot(times, quantiles1, "k--", label="95%$type Quantile Bands ", lw=2, alpha = 0.5)
     ax[1].plot(times, quantiles3, "k--", lw=2, alpha = 0.5)
     ax[1].fill_between(times, quantiles1, quantiles3, alpha=0.3, color = "r")
     # Seaborn.lineplot(x = timesVector, y = [confirmedCases...], hue = labelconfirmedCases, palette = "flare", ci="sd", ax=ax[1])
@@ -2134,18 +2154,36 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     quantiles3 = quantile2D(cumulativeCases, 0.975)
 
     # ax[1].plot(times, median(confirmedCases, dims=2), "b-", label="Median Realisation", lw=4, alpha = 1)
-    ax[2].plot(times, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
+    ax[2].plot(times, quantiles1, "k--", label="95%$type Quantile Bands ", lw=2, alpha = 0.5)
     ax[2].plot(times, quantiles3, "k--", lw=2, alpha = 0.5)
     ax[2].fill_between(times, quantiles1, quantiles3, alpha=0.3, color = "r")
 
     # Seaborn.lineplot(x = timesVector, y = [cumulativeCases...], hue = labelcumulativeCases, palette = "flare", ci="sd", ax=ax[2], estimator=median)
     ############################################################################
 
+    if conditioned
+        # Confirmed cases since first detect ###################################
+        quantiles1 = quantile2D(confirmedCases, 0.25)
+        quantiles3 = quantile2D(confirmedCases, 0.75)
+
+        ax[1].plot(times, quantiles1, "r--", label="50%$type Quantile Bands ", lw=2, alpha = 0.5)
+        ax[1].plot(times, quantiles3, "r--", lw=2, alpha = 0.5)
+        ########################################################################
+
+
+        # Cumulative cases since first detect ######################################
+        quantiles1 = quantile2D(cumulativeCases, 0.25)
+        quantiles3 = quantile2D(cumulativeCases, 0.75)
+
+        ax[2].plot(times, quantiles1, "r--", label="50%$type Quantile Bands ", lw=2, alpha = 0.7)
+        ax[2].plot(times, quantiles3, "r--", lw=2, alpha = 0.7)
+    end
+
     if t_current > 0
         ax[1].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label="21/8/2021", lw=2, alpha = 1)
+            "k--", label="$(17+t_current)/08/2021", lw=2, alpha = 1)
         ax[2].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label="21/8/2021", lw=2, alpha = 1)
+            "k--", label="$(17+t_current)/08/2021", lw=2, alpha = 1)
     end
     # ax[1].axvline(10, "k--", label="21/8/2021")
     # ax[2].vline()
@@ -2236,13 +2274,145 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     close()
 end
 
+function indexWhereAllValuesLessThanX(array, x)
+    #=
+    Given an array, return the largest range that represents the range array[index:end]
+    where all values in this range are less than x
+
+    If no range exists, return 0:0
+    =#
+    for i in length(array):-1:1
+        if array[i] >= x
+            if i+1 > length(array)
+                return 0:0
+            else
+                return i+1:length(array)
+            end
+        end
+    end
+
+    return 1:length(array)
+end
+
+function testIndexWhereAll()
+    @assert indexWhereAllValuesLessThanX([1,2,3,4,5], 6) == 1:5
+    @assert indexWhereAllValuesLessThanX([5,4,3,2,1], 4) == 3:5
+end
+
+function probOfLessThanXGivenYDays(dailyConfirmedCases, x, y::Union{UnitRange,StepRange})
+    #=
+    Given a 2D array, where the columns contain individual realisations and the
+    rows represent values at given times, return the proportion of columns that
+    satisfy indexWhereAllValuesLessThanX after y days.
+
+    The first row corresponds to t=0
+    The second row corresponds to t=1 etc.
+    =#
+
+    probability = zeros(length(y))
+
+    caseXranges = [0:0 for _ in 1:length(dailyConfirmedCases[1,:])]
+
+    for col in 1:length(dailyConfirmedCases[1,:])
+        caseXranges[col] = indexWhereAllValuesLessThanX(dailyConfirmedCases[:,col], x)
+    end
+
+    for i in 1:length(y)
+        for j in caseXranges
+            if !isnothing(j) && y[i] in j
+                probability[i] += 1.0
+            end
+        end
+        probability[i] = probability[i] / length(caseXranges)
+    end
+
+    return probability
+end
+
+function testprobOfLess()
+    @assert sum(probOfLessThanXGivenYDays([0 1; 2 3; 5 6; 4 5; 3 2; 2 1; 1 0], 6, 1:7) .== [0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0])==7
+    @assert sum(probOfLessThanXGivenYDays([0 1; 2 3; 5 6; 4 5; 3 2; 2 1; 1 0], 5, 1:7) .== [0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])==7
+end
+testprobOfLess()
+
+function probOfLessThanXGivenYHeatMap(probabilties, numCasesRange, daysSinceRange,
+    title, outputFileName, Display=true, save=false)
+
+    Seaborn.set()
+    set_style("ticks")
+    Seaborn.set_color_codes("pastel")
+    fig = plt.figure(dpi=300)
+
+
+    Seaborn.heatmap(probabilties, cmap="rocket_r")
+
+
+    # plt.xticks([-3,0,3,6,9,12,15],vcat(["Aug $(14+3*i)" for i in 0:5], ["Sep 01"]))
+    # no more than 8 labels
+
+
+
+    plt.yticks(collect(1:length(numCasesRange)) , collect(numCasesRange))
+    plt.ylabel("Less than y cases per day")
+
+    plt.xlabel("Days since detection")
+    plt.xticks(collect(1:length(daysSinceRange)) , collect(daysSinceRange))
+    # plt.suptitle("Branching Process Simulation")
+    plt.title(title)
+    # plt.legend()
+
+    if Display
+        # required to display graph on plots.
+        display(fig)
+    end
+    if save
+        # Save graph as pngW
+        fig.savefig(outputFileName)
+
+    end
+    close()
+
+end
+
+
+
+function caseNumbersBeginToDrop(dailyConfirmedCases, numCasesRange=0:1, daysSinceRange=0:1)
+
+    # timesDaily is time in days (zero inclusive) since
+
+
+    maxVal, maxIndex = findmax(median(dailyConfirmedCases, dims=2))
+
+    println("Cases numbers on average begin to drop $(maxIndex[1]) days after detection")
+    println("Median max case number is $maxVal")
+
+    # numCasesRange = 10:60
+    # daysSinceRange = 45:70
+    probabilities = zeros(length(numCasesRange), length(daysSinceRange))
+
+    for i in 1:length(numCasesRange)
+        probabilities[i,:] = probOfLessThanXGivenYDays(dailyConfirmedCases, numCasesRange[i], daysSinceRange)
+    end
+
+
+    return probabilities
+end
+
+function ObservedCases()
+    observedIDetect = cumsum([5,4,15,20,26,38,36,56,50])
+    tDetect = collect(0:length(observedIDetect)-1)
+    return observedIDetect, tDetect
+end
+
 function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxCases=20*10^3, p_test::Array{Float64,1}=[0.1,0.8], R_number=3, R_alert_scaling=0.2,
-    t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1, num_detected_before_alert=1)
+    t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1, num_detected_before_alert=1, alert_scaling_speed=5)
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
     IDetect_tStep = StStep .* 0
 
-    dailyDetectCases = initSIRArrays(tspan, 1, numSims)[1]
-    timesDaily = [i for i=tspan[1]:1:tspan[end]]
+    timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
+    tspanNew = (tspan[1],tspan[2]+1)
+    dailyDetectCases, dailyICases, dailyRCases = initSIRArrays(tspanNew, 1, numSims)
+    @assert length(dailyDetectCases[:,1]) == length(timesDaily)
 
     models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
     population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
@@ -2266,9 +2436,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
         models[Threads.threadid()].alert_pars.t_onset_to_isol = t_onset_to_isol[2]*1
         models[Threads.threadid()].alert_pars.R_scaling = R_alert_scaling*1
         models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
-
-        # models[Threads.threadid()].sub_clin_prop = 0.0
-        # models[Threads.threadid()].reproduction_number = 1.0
+        models[Threads.threadid()].alert_pars.alert_level_scaling_speed = alert_scaling_speed
 
         # next React branching process with alert level
         population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
@@ -2290,32 +2458,12 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
                 IDetect = state_totals_all[detectIndexes, 4]
                 tnew_detect = t[detectIndexes] .- t_first_detect
 
-                # zeroindex = findfirst(abs.(abs.(tnew_detect).-tspan[1]) .< 1*10-8)# = tspan[1]*1
-                # tnew_detect[zeroindex] = tspan[1]*1
 
-                # interpolate using linear splines
-                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all_new, tnew, times)
                 StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, tnew, times)
 
                 IDetect_tStep[:,i] = singleLinearSpline(state_totals_all[:, 4], tnew, times)
-                dailyDetectCases[:,i] = singleLinearSpline(state_totals_all[:, 4], tnew, timesDaily)
+                dailyICases[:,i], dailyRCases[:,i], dailyDetectCases[:,i] = multipleLinearSplines(state_totals_all[:, 2:4], tnew, timesDaily)
 
-
-                # if length(IDetect) > 1
-                #     try
-                #         IDetect_tStep[:,i] = singleLinearSpline(IDetect, tnew_detect, times)
-                #         dailyDetectCases[:,i] = singleLinearSpline(IDetect, tnew_detect, timesDaily)
-                #     catch
-                #         println("IDetect is sorted = $(issorted(IDetect))")
-                #         println("Tnew is sorted = $(issorted(tnew_detect))")
-                #         println(tnew_detect)
-                #         @warn "Not good"
-                #     end
-                # else
-                #     # index = findfirst(t_first_detect.<times) + 1
-                #
-                #     IDetect_tStep[:, i] .= 1
-                # end
             else
                 establishedSims[i] = false
             end
@@ -2327,7 +2475,10 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
     end
 
     # dailyDetectCases = diff(hcat(convert.(Int64, zeros(length(timesDaily))), dailyDetectCases),dims=1)
-    dailyDetectCases = diff(vcat(transpose(zeros(numSims)), dailyDetectCases),dims=1)
+    # dailyDetectCases = diff(vcat(transpose(zeros(numSims)), dailyDetectCases),dims=1)
+    dailyDetectCases = diff(dailyDetectCases,dims=1)
+    dailyTotalCases = dailyICases .+ dailyRCases
+    dailyTotalCases = diff(dailyTotalCases, dims=1)
 
 
 
@@ -2346,12 +2497,276 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
     println("Kept $(length(indexesToKeep)) Sims or $(length(indexesToKeep)/numSims*100)% of Sims")
 
     # observedIDetect = [1, 10, 20, 30, 51]
-    observedIDetect = cumsum([5,4,15,20,26,35,2])
-    tDetect = collect(0:length(observedIDetect)-1)
-    return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep]
+    observedIDetect, tDetect = ObservedCases()
+
+    return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep]
 end
 
-function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Display=true, save=true)
+struct Ensemble
+    p_test_ranges::Array
+    t_isol_ranges::Array
+    alert_level_scaling_range::Array
+    alert_level_speed_range::Array
+    R_input_range::Array
+    init_cases_range::Array{Int64,1}
+end
+
+function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, ensemble::Ensemble, maxCases=20*10^3,
+    initCases=1, num_detected_before_alert=1)
+
+    StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+    IDetect_tStep = StStep .* 0
+
+    timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
+    tspanNew = (tspan[1],tspan[2]+1)
+    dailyDetectCases, dailyICases, dailyRCases = initSIRArrays(tspanNew, 1, numSims)
+    @assert length(dailyDetectCases[:,1]) == length(timesDaily)
+
+    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+    population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
+    initCases = [rand(ensemble.init_cases_range) for i in 1:Threads.nthreads()];
+
+    i = 1
+    p = Progress(numSims,PROGRESS__METER__DT)
+
+    meanOffspring = zeros(numSims)
+    meanRNumber = zeros(numSims)
+
+    establishedSims = BitArray(undef, numSims) .* false
+    establishedSims .= true
+
+    time = @elapsed Threads.@threads for i = 1:numSims
+
+        initCases[Threads.threadid()] = rand(ensemble.init_cases_range)
+
+        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCases[Threads.threadid()],initCases[Threads.threadid()],0], true);
+        models[Threads.threadid()].stochasticRi = true
+        models[Threads.threadid()].reproduction_number = rand(Uniform(ensemble.R_input_range...))
+        models[Threads.threadid()].p_test = rand(Uniform(ensemble.p_test_ranges[1]...))
+        models[Threads.threadid()].alert_pars.p_test = rand(Uniform(ensemble.p_test_ranges[2]...))
+
+        models[Threads.threadid()].t_onset_to_isol = rand(Uniform(ensemble.t_isol_ranges[1]...))
+        models[Threads.threadid()].alert_pars.t_onset_to_isol = min(rand(Uniform(ensemble.t_isol_ranges[2]...)), models[Threads.threadid()].t_onset_to_isol)
+
+        models[Threads.threadid()].alert_pars.R_scaling = rand(Uniform(ensemble.alert_level_scaling_range...))
+        models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
+        models[Threads.threadid()].alert_pars.alert_level_scaling_speed = rand(Uniform(ensemble.alert_level_speed_range...))
+
+        # next React branching process with alert level
+        population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
+        t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+
+        firstDetectIndex = findfirst(state_totals_all[:,4].==num_detected_before_alert)
+
+        if !isnothing(firstDetectIndex) && firstDetectIndex != length(state_totals_all[:,4])
+            t_first_detect = t[firstDetectIndex]
+
+            if detection_tspan[1] < t_first_detect && t_first_detect < detection_tspan[end]
+
+                detectIndexes = findall(diff(state_totals_all[:,4]).==1) .+ 1
+                undetectedIndexes = setdiff(collect(1:length(t)), detectIndexes)
+                state_totals_all_new = state_totals_all[undetectedIndexes, 1:3]
+                # tnew = t[undetectedIndexes] .- t_first_detect
+                tnew = t .- t_first_detect
+
+                IDetect = state_totals_all[detectIndexes, 4]
+                tnew_detect = t[detectIndexes] .- t_first_detect
+
+
+                StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, tnew, times)
+
+                IDetect_tStep[:,i] = singleLinearSpline(state_totals_all[:, 4], tnew, times)
+                dailyICases[:,i], dailyRCases[:,i], dailyDetectCases[:,i] = multipleLinearSplines(state_totals_all[:, 2:4], tnew, timesDaily)
+
+            else
+                establishedSims[i] = false
+            end
+        else
+            establishedSims[i] = false
+        end
+
+        if sum(isnan.(dailyDetectCases[:,i])) > 0 || sum(isnan.(IDetect_tStep[:,i])) > 0
+            establishedSims[i] = false
+
+            # println(findall(isnan.(dailyDetectCases[:,i])))
+        end
+
+        next!(p)
+    end
+
+    # dailyDetectCases = diff(hcat(convert.(Int64, zeros(length(timesDaily))), dailyDetectCases),dims=1)
+    # dailyDetectCases = diff(vcat(transpose(zeros(numSims)), dailyDetectCases),dims=1)
+    dailyDetectCases = diff(dailyDetectCases,dims=1)
+    dailyTotalCases = dailyICases .+ dailyRCases
+    dailyTotalCases = diff(dailyTotalCases, dims=1)
+
+
+
+    IcumCases = ItStep .+ RtStep
+
+    indexesToKeep = []
+    sizehint!(indexesToKeep, numSims)
+
+    for i in 2:length(establishedSims)
+        if establishedSims[i]
+            # xnew = hcat(xnew, x[:,i])
+            push!(indexesToKeep, i)
+        end
+    end
+
+    println("Kept $(length(indexesToKeep)) Sims or $(length(indexesToKeep)/numSims*100)% of Sims")
+
+    # observedIDetect = [1, 10, 20, 30, 51]
+    observedIDetect, tDetect = ObservedCases()
+
+    return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep]
+end
+
+function outputCSVDailyCases(dailyConfirmedCases, dailyTotalCases, times, outputFileName, cumulative::Bool)
+
+    case_df = DataFrame()
+    case_df[!, "time"] = times
+
+    type = ""
+    if cumulative
+        type = "cumulative"
+    else
+        type = "daily"
+    end
+
+    for col in 1:length(dailyConfirmedCases[1,:])
+
+        colname = "$type confirmed cases - run_$col"
+        case_df[!, colname] = dailyConfirmedCases[:,col]
+
+        colname = "$type total cases - run_$col"
+        case_df[!, colname] = dailyTotalCases[:,col]
+
+    end
+
+    # outputFileName = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
+
+    CSV.write(outputFileName, case_df)
+
+    return nothing
+end
+
+function reloadCSV(CSVpath::String, cumulative::Bool)
+
+    type = ""
+    if cumulative
+        type = "cumulative"
+    else
+        type = "daily"
+    end
+
+    # CSVpath = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
+
+    case_df = DataFrame(CSV.File(CSVpath))
+
+    times = case_df.time
+
+    dailyConfirmedCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
+    dailyTotalCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
+
+    for col in 1:length(dailyConfirmedCases[1,:])
+        colname = "$type confirmed cases - run_$col"
+        dailyConfirmedCases[:,col] = case_df[:, colname]
+
+        colname = "$type total cases - run_$col"
+        dailyTotalCases[:,col] = case_df[:, colname]
+
+    end
+
+    return times, dailyConfirmedCases, dailyTotalCases
+end
+
+function augustOutbreakPostProcess(processRange, Display=true, save=false)
+
+    observedIDetect, tDetect = ObservedCases()
+
+    println("Process #1: Effect of Alert Level Reff Decrease Speed on Daily Cases: August 2021 Sim using August 2020 Fit")
+    if 1 in processRange
+
+        # tspan = (0.0,70.0)
+        # timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Varying Alert Level Reff Decrease Speed"
+        outputFileName = "./August2021Outbreak/VaryAlert_speed/DailyCaseNumbersAfterDetection"
+
+        timesDaily, highAlertSpeedDailyDetect = reloadCSV("August2021Outbreak/CSVOutputs/HighAlert/BP2021fit_dailycases.csv", false)[1:2]
+        lowAlertSpeedDailyDetect = reloadCSV("August2021Outbreak/CSVOutputs/LowAlert/BP2021fit_dailycases.csv", false)[2]
+        modPDailyDetect = reloadCSV("August2021Outbreak/CSVOutputs/BP2021fit_dailycases.csv", false)[2]
+
+        plotDailyCasesMultOutbreak(highAlertSpeedDailyDetect, modPDailyDetect, lowAlertSpeedDailyDetect, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, true)
+
+        numCasesRange = 80:-10:10
+        daysSinceRange = 30:5:70
+
+        caseNumbersBeginToDrop(highAlertSpeedDailyDetect)
+        probabilities = caseNumbersBeginToDrop(modPDailyDetect, numCasesRange, daysSinceRange)
+        # println(probabilities)
+        caseNumbersBeginToDrop(lowAlertSpeedDailyDetect)
+
+        title = "Probability of less than y cases per day, x days after detection"
+        outputFileName = "./August2021Outbreak/ProbDaysSinceDetection_August2021Base"
+        probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
+
+    end
+
+    println("Process #2: August 2021 Model Ensemble Conditioned on case data using Ccandu")
+    if 2 in processRange
+
+        # tspan = (0.0,70.0)
+        # timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetectionCcandu25Augsl"
+
+        timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases.csv", false)[1:2]
+        cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases.csv", true)[2:3]
+
+        # Ccandu filtering
+        # filterVector = []
+        # dailyDetectedCases = dailyDetectedCases[:,filterVector]
+        # cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
+        # cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
+
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true)
+
+        numCasesRange = 80:-10:10
+        daysSinceRange = 10:10:70
+
+        probabilities = caseNumbersBeginToDrop(dailyDetectedCases, numCasesRange, daysSinceRange)
+
+        t_current = 8
+
+        title = "August 2021 Outbreak Conditioned Model Ensemble"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetectionCcandu25Aug"
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true)
+
+        title = "Probability of less than y cases per day, x days after detection"
+        outputFileName = "./August2021Outbreak/ProbDaysSinceDetection_August2021Ccandu25Aug"
+        probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
+
+    end
+end
+
+function removeNaNs(array::Array{Float64,2})
+    #=
+    Replace all NaNs in a 2d array with 0.0
+    =#
+
+    for i in 1:length(array[1,:])
+        for j in 1:length(array[:,1])
+            if isnan(array[j,i])
+                array[j,i]=0.0
+            end
+        end
+    end
+
+    return array
+end
+
+function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Display=true, save=true, CSVOutputRange=[])
     #=
     Estimation of the August 2021 Delta outbreak on 18 Aug.
 
@@ -2359,6 +2774,8 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
 
     Estimate the cumulative number of infections from this time point.
     =#
+
+    observedIDetect, tDetect = ObservedCases()
 
     println("Sim #1: Heterogeneous Reproduction Number")
     if 1 in simRange
@@ -2568,8 +2985,9 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         maxCases=5*10^3
         p_test=[0.1,0.9]
         R_number=4
-        R_alert_scaling=0.25
-        t_onset_to_isol=[2.2,0.1]
+        R_alert_scaling=0.25 #= was 0.25, bumped to 0.3 when made linear reduction
+                                in R_scaling actually work.=#
+        t_onset_to_isol=[2.2,0.8]
         cumulativeCases, confirmedCases, observedIDetect, tDetect, dailyDetectCases =
             baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
             maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases)
@@ -2606,28 +3024,28 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         # Simulating Delta Outbreak 18 August 2021
         # time span to sim on
         tspan = (0.0,70.0)
-        time_step = 0.1
+        time_step = 1.0
 
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
         numSims = convert(Int, round(10000/numSimsScaling))
 
-        detection_tspan = (6,14)
+        detection_tspan = (6,15) # increase from 6,14
 
         initCases=1
 
-        maxCases=10*10^3
+        maxCases=20*10^3
         p_test=[0.1,0.9]#p_test=[0.1,0.8]
-        R_number=5
+        R_number=6
         # R_alert_scaling=0.2
         # t_onset_to_isol=[2.2,1.0]
         R_alert_scaling=0.25
-        t_onset_to_isol=[2.2,0.1]
+        t_onset_to_isol=[2.2,0.8] # increase from 2.2, 0.1
         num_detected_before_alert=3
-        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases = baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases = baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
-        t_current = 4
+        t_current = 6
 
         for i in 1:length(cumulativeCases[1,:])
             for j in 1:length(cumulativeCases[:,1])
@@ -2648,9 +3066,86 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         title = "August 2021 Outbreak using August 2020 Fit \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
         outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
         plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+
+        if 5 in CSVOutputRange
+            @assert time_step == 1.0
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021fit_dailycases.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021fit_cumulativecases.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+        end
     end
 
-    println("Sim #5.5: August 2021 Sim using August 2020 Fit")
+    println("Sim #5.1: August 2021 Sim Model Ensemble for Ccandu fitting")
+    if 5.1 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 1.0
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(20000/numSimsScaling))
+
+        detection_tspan = (6,20) # increase from 6,14
+
+        maxCases=100*10^3
+
+        num_detected_before_alert=1
+
+        ensemble = Ensemble([[0.05,0.15],[0.6,1.0]], [[1.0,3.0],[0.5,2.0]],[0.10,0.3],[2,10],[5,7], [1,2])
+
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                ensemble, maxCases, num_detected_before_alert)
+
+        t_current = 8
+
+        cumulativeCases = removeNaNs(cumulativeCases)
+
+        # for i in 1:length(cumulativeCases[1,:])
+        #     for j in 1:length(cumulativeCases[:,1])
+        #         if isnan(cumulativeCases[j,i])
+        #             cumulativeCases[j,i]=0.0
+        #         end
+        #     end
+        # end
+
+        # for i in 1:length(dailyDetectCases[1,:])
+        #     for j in 1:length(dailyDetectCases[:,1])
+        #         if isnan(dailyDetectCases[j,i])
+        #             dailyDetectCases[j,i]=0.0
+        #         end
+        #     end
+        # end
+        # dailyDetectCases = removeNaNs(dailyDetectCases)
+        # IDetect_tStep = removeNaNs(IDetect_tStep)
+
+
+        modPDailyDetect = dailyDetectCases
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetectionEnsemble"
+        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true)
+        # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
+
+        title = "August 2021 Outbreak Model Ensemble for Ccandu"
+        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetectionEnsemble"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1)
+
+        if 5.1 in CSVOutputRange
+            @assert time_step == 1.0
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+        end
+    end
+
+    println("Sim #5.5: August 2021 Sim using August 2020 Fit") # original simulation params
     if 5.5 in simRange
         ################################################################################
         # Simulating Delta Outbreak 18 August 2021
@@ -2668,12 +3163,12 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
 
         maxCases=10*10^3
         p_test=[0.1,0.9]#p_test=[0.1,0.8]
-        R_number=6
+        R_number=5
         # R_alert_scaling=0.2
         # t_onset_to_isol=[2.2,1.0]
         R_alert_scaling=0.25
         t_onset_to_isol=[2.2,0.1]
-        num_detected_before_alert=2
+        num_detected_before_alert=3
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases = baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert)
 
@@ -3021,6 +3516,136 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         plotDailyCasesMultOutbreak(highRPostDailyDetect, modPDailyDetect, lowRPostDailyDetect, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save)
     end
 
+    highAlertSpeedDailyDetect = []
+    println("Sim #12: High Alert Level Reff Decrease Speed: August 2021 Sim using August 2020 Fit")
+    if 12 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 1.0
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,15)
+
+        initCases=1
+
+        maxCases=14*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=6
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.8]
+        num_detected_before_alert=3
+        alert_scaling_speed = 2
+
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert, alert_scaling_speed)
+
+        t_current = 6
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+
+        highAlertSpeedDailyDetect = dailyDetectCases
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, Display, save, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, High Alert Level Reff Decrease Speed"# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryAlert_speed/EstimatedCaseNumbersAfterDetection2020FitHighAlert_speed"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, Display, save, 0.1)
+
+        if 12 in CSVOutputRange
+
+            timesDaily = [i for i=tspan[1]:1:tspan[end]]
+            @assert time_step == 1.0
+            outputFileName = "August2021Outbreak/CSVOutputs/HighAlert/BP2021fit_dailycases.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+
+            outputFileName = "August2021Outbreak/CSVOutputs/HighAlert/BP2021fit_cumulativecases.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+        end
+    end
+
+    lowAlertSpeedDailyDetect = []
+    println("Sim #13: Low Alert Level Reff Decrease Speed: August 2021 Sim using August 2020 Fit")
+    if 13 in simRange
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2021
+        # time span to sim on
+        tspan = (0.0,70.0)
+        time_step = 1.0
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(10000/numSimsScaling))
+
+        detection_tspan = (6,15)
+
+        initCases=1
+
+        maxCases=30*10^3
+        p_test=[0.1,0.9]#p_test=[0.1,0.8]
+        R_number=6
+        # R_alert_scaling=0.2
+        # t_onset_to_isol=[2.2,1.0]
+        R_alert_scaling=0.25
+        t_onset_to_isol=[2.2,0.8]
+        num_detected_before_alert=3
+        alert_scaling_speed = 8
+
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases =
+            baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                maxCases, p_test, R_number, R_alert_scaling, t_onset_to_isol, initCases, num_detected_before_alert, alert_scaling_speed)
+
+        t_current = 6
+
+        for i in 1:length(cumulativeCases[1,:])
+            for j in 1:length(cumulativeCases[:,1])
+                if isnan(cumulativeCases[j,i])
+                    cumulativeCases[j,i]=0.0
+                end
+            end
+        end
+        lowAlertSpeedDailyDetect = dailyDetectCases
+
+        # title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+        # outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
+        # plotDailyCasesOutbreak(IDetect_tStep, times, observedIDetect, tDetect, title, outputFileName, Display, save, true)
+
+        title = "August 2021 Outbreak using August 2020 Fit, Low Alert Level Reff Decrease Speed "# \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
+        outputFileName = "./August2021Outbreak/VaryAlert_speed/EstimatedCaseNumbersAfterDetection2020FitLowAlert_speed"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, Display, save, 0.1)
+
+        if 13 in CSVOutputRange
+
+            timesDaily = [i for i=tspan[1]:1:tspan[end]]
+            @assert time_step == 1.0
+            outputFileName = "August2021Outbreak/CSVOutputs/LowAlert/BP2021fit_dailycases.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+
+            outputFileName = "August2021Outbreak/CSVOutputs/LowAlert/BP2021fit_cumulativecases.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+        end
+
+    end
+
+
+
+
+    # caseNumbersBeginToDrop(modPDailyDetect)
 
     # println("Sim #3: Heterogeneous Infection Tree Example")
     # if 3 in simRange
@@ -3040,11 +3665,14 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
     # end
 end
 
+function casesAtDetection()
+    cumulativeCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021fit_cumulativecases.csv", true)[3]
+    println(median(cumulativeCases, dims=2)[1])
+    println(quantile2D(cumulativeCases, 0.25)[1])
+    println(quantile2D(cumulativeCases, 0.75)[1])
+end
 
-
-# function R_estimateAtTimes(args)
-#     body
-# end
+# casesAtDetection()
 
 
 function main()
@@ -3057,133 +3685,146 @@ function main()
     # BPbenchmarking(1, [1,2])
 
     # augustOutbreakSim(0.5, collect(4:11))
+    # augustOutbreakSim(2, [4])
+    # augustOutbreakSim(1,[5,12,13],true,false)
+    # augustOutbreakSim(1,5,true,true)
 
-    # augustOutbreakSim(1, [1,2])
-    augustOutbreakSim(1, [5, 6, 7], true, true)
+    # augustOutbreakSim(1, [13.5])
+
+    augustOutbreakPostProcess(2,true,true)
+
+    # augustOutbreakSim(1, [5.1], true, false)
+
+
+    # augustOutbreakSim(1, [5, 6, 7], true, true)
     # augustOutbreakSim(2, [5, 6,7,10,11])
+
+    # times, dailyConfirmedCases, dailyTotalCases = reloadCSV("", true)
 end
 
 main()
 
-# verifySolutions(1, [11,12,13,14,15])
+if false
+    # verifySolutions(1, [11,12,13,14,15])
 
-# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
-# time_step = 1;
-# model.p_test = 1.0
-# model.sub_clin_prop = 0
-# model.stochasticIsol = false
-# model.t_onset_shape = 5.8
-# model.t_onset_to_isol = 0
+    # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0])
+    # time_step = 1;
+    # model.p_test = 1.0
+    # model.sub_clin_prop = 0
+    # model.stochasticIsol = false
+    # model.t_onset_shape = 5.8
+    # model.t_onset_to_isol = 0
 
-# population_df = initDataframe(model);
-# @time t, state_totals_all, num_cases = discrete_branch!(population_df, model, time_step)
-# outputFileName = "juliaGraphs/branchDiscrete/branch_model_$(model.population_size)"
-# # subtitle = "Discrete model with timestep of $time_step days"
-# # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
-#
-# # # next tracked heap
-# model = init_model_pars(0, 200, 5*10^6, 5*10^3, [5*10^6-10,10,0]);
-# population_df = initDataframe(model);
-# @time t, state_totals_all, num_cases = nextReact_branch_trackedHeap!(population_df, model)
-# outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
-# subtitle = "Next react model"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
-#
-# # next, regular heap
-# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
-# population_df = initDataframe(model);
-# @time t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
-# outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
-# subtitle = "Next react model"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # population_df = initDataframe(model);
+    # @time t, state_totals_all, num_cases = discrete_branch!(population_df, model, time_step)
+    # outputFileName = "juliaGraphs/branchDiscrete/branch_model_$(model.population_size)"
+    # # subtitle = "Discrete model with timestep of $time_step days"
+    # # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    #
+    # # # next tracked heap
+    # model = init_model_pars(0, 200, 5*10^6, 5*10^3, [5*10^6-10,10,0]);
+    # population_df = initDataframe(model);
+    # @time t, state_totals_all, num_cases = nextReact_branch_trackedHeap!(population_df, model)
+    # outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
+    # subtitle = "Next react model"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    #
+    # # next, regular heap
+    # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+    # population_df = initDataframe(model);
+    # @time t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+    # outputFileName = "juliaGraphs/branchNextReact/branch_model_$(model.population_size)"
+    # subtitle = "Next react model"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# Simple branch
-# model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-# population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true)
-# outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"
-# subtitle = "Simple Branching Process"
-# plotSimpleBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # Simple branch
+    # model = init_model_pars(0, 200, 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+    # population_df = initDataframe_thin(model);
+    # @time t, state_totals_all, population_df = bpMain!(population_df, model, true, ThinFunction(ThinNone()), true)
+    # outputFileName = "juliaGraphs/branchSimple/branch_model_$(model.population_size)"
+    # subtitle = "Simple Branching Process"
+    # plotSimpleBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# Simple branch, random infection times
-# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
-# population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()))
-# outputFileName = "juliaGraphs/branchSimpleRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Simple Branching Process, Random Infection Times"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # Simple branch, random infection times
+    # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+    # population_df = initDataframe_thin(model);
+    # @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinNone()))
+    # outputFileName = "juliaGraphs/branchSimpleRandITimes/branch_model_$(model.population_size)"
+    # subtitle = "Simple Branching Process, Random Infection Times"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# Simple branch, random infection times, s saturation thinning
-# model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
-# population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false)
-# outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Branching Process, Random Infection Times, S saturation thinning"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # Simple branch, random infection times, s saturation thinning
+    # model = init_model_pars(0, 200, 5*10^6, 5*10^6, [5*10^6-10,10,0]);
+    # population_df = initDataframe_thin(model);
+    # @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false)
+    # outputFileName = "juliaGraphs/branchSThinRandITimes/branch_model_$(model.population_size)"
+    # subtitle = "Branching Process, Random Infection Times, S saturation thinning"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# Simple branch, random infection times, isolation thinning
-# model = init_model_pars(0, 200, 5*10^3, 5*10^4, [5*10^3-10,10,0]);
-# model.p_test = 1.0
-# model.sub_clin_prop = 0
-# model.stochasticIsol = false
-# # model.t_onset_shape = 5.8
-# model.t_onset_to_isol = 0
-# population_df = initDataframe_thin(model);
-# @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, true, true)
-# outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Branching Process, Random Infection Times, Isolation thinning"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # Simple branch, random infection times, isolation thinning
+    # model = init_model_pars(0, 200, 5*10^3, 5*10^4, [5*10^3-10,10,0]);
+    # model.p_test = 1.0
+    # model.sub_clin_prop = 0
+    # model.stochasticIsol = false
+    # # model.t_onset_shape = 5.8
+    # model.t_onset_to_isol = 0
+    # population_df = initDataframe_thin(model);
+    # @time t, state_totals_all, population_df = bpMain!(population_df, model, false, ThinFunction(ThinTree()), false, true, true)
+    # outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
+    # subtitle = "Branching Process, Random Infection Times, Isolation thinning"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# Simple branch, random infection times, s saturation and isolation thinning
-# model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-# model.p_test = 1.0;
-# model.sub_clin_prop = 0;
-# model.stochasticIsol = false;
-# # model.t_onset_shape = 5.8
-# model.t_onset_to_isol = 0;
-# population_df = initDataframe_thin(model);
-# @profiler bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, true);
-# outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
-# subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
-# plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
+    # Simple branch, random infection times, s saturation and isolation thinning
+    # model = init_model_pars(0, 200, 5*10^5, 5*10^5, [5*10^5-10,10,0]);
+    # model.p_test = 1.0;
+    # model.sub_clin_prop = 0;
+    # model.stochasticIsol = false;
+    # # model.t_onset_shape = 5.8
+    # model.t_onset_to_isol = 0;
+    # population_df = initDataframe_thin(model);
+    # @profiler bpMain!(population_df, model, false, ThinFunction(ThinSingle()), true, true, true);
+    # outputFileName = "juliaGraphs/branchSThinIsolThinRandITimes/branch_model_$(model.population_size)"
+    # subtitle = "Branching Process, Random Infection Times, S saturation & Isolation thinning"
+    # plotBranchPyPlot(t, state_totals_all, model.population_size, outputFileName, subtitle, true, false)
 
-# tspan = [0,100];
-# model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-# Simple branch, random infection times, s saturation thinning
-# population_df = initDataframe_thin(model);
-# t, state_totals_all, population_df = bpMain!(population_df, model, false, true, true, true, false)
+    # tspan = [0,100];
+    # model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+    # Simple branch, random infection times, s saturation thinning
+    # population_df = initDataframe_thin(model);
+    # t, state_totals_all, population_df = bpMain!(population_df, model, false, true, true, true, false)
 
-# time_step=0.5
-# tspan = [0,100]
-# times = [i for i=tspan[1]:time_step:tspan[end]]
-# model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-1,1,0], true);
-# model.stochasticRi = true
-# model.reproduction_number = 5
-# model.p_test = 0.4
-# model.alert_pars.R_scaling = 1.0
-#
-# population_df = initDataframe(model);
-# t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
-# t_first_detect = t[findfirst(state_totals_all[:,4].==1)]
-#
-#
-# detectIndexes = findall(diff(state_totals_all[:,4]).==1) .+ 1
-# undetectedIndexes = setdiff(collect(1:length(t)), detectIndexes)
-# state_totals_all_new = state_totals_all[undetectedIndexes, 1:3]
-# tnew = t[undetectedIndexes] .- t_first_detect
-#
-# issorted(tnew)
-# issorted(state_totals_all_new)
-#
-# IDetect = state_totals_all[detectIndexes, 4]
-# tnew_detect = t[detectIndexes] .- t_first_detect
-#
-# issorted(tnew_detect)
-# issorted(IDetect)
-#
-# # interpolate using linear splines
-# StStep, ItStep, RtStep = multipleLinearSplines(state_totals_all_new, tnew, times)
-# IDetect_tStep = singleSpline(IDetect, tnew_detect, times)
-#
-#
-# issorted(t)
+    # time_step=0.5
+    # tspan = [0,100]
+    # times = [i for i=tspan[1]:time_step:tspan[end]]
+    # model = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-1,1,0], true);
+    # model.stochasticRi = true
+    # model.reproduction_number = 5
+    # model.p_test = 0.4
+    # model.alert_pars.R_scaling = 1.0
+    #
+    # population_df = initDataframe(model);
+    # t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
+    # t_first_detect = t[findfirst(state_totals_all[:,4].==1)]
+    #
+    #
+    # detectIndexes = findall(diff(state_totals_all[:,4]).==1) .+ 1
+    # undetectedIndexes = setdiff(collect(1:length(t)), detectIndexes)
+    # state_totals_all_new = state_totals_all[undetectedIndexes, 1:3]
+    # tnew = t[undetectedIndexes] .- t_first_detect
+    #
+    # issorted(tnew)
+    # issorted(state_totals_all_new)
+    #
+    # IDetect = state_totals_all[detectIndexes, 4]
+    # tnew_detect = t[detectIndexes] .- t_first_detect
+    #
+    # issorted(tnew_detect)
+    # issorted(IDetect)
+    #
+    # # interpolate using linear splines
+    # StStep, ItStep, RtStep = multipleLinearSplines(state_totals_all_new, tnew, times)
+    # IDetect_tStep = singleSpline(IDetect, tnew_detect, times)
+    #
+    #
+    # issorted(t)
+end

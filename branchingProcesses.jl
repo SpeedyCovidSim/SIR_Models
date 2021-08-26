@@ -2119,24 +2119,24 @@ module branchingProcesses
                     # find active clinical cases
                     active_df = filter(row -> row.active==true && row.sub_Clin_Case==false, population_df, view=true)
 
-                    if model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
-                        # change current detected cases time_onset_delay by factor
-                        # model.t_onset_to_isol / model.alert_pars.t_onset_to_isol
-                        active_detected = filter(row -> row.active, active_df, view=true)
-
-                        t_onset_to_isol = active_detected.time_isolated .-
-                            active_detected.time_infected .- active_detected.time_onset_delay
-
-                        t_onset_to_isol = t_onset_to_isol .* (model.t_onset_to_isol / model.alert_pars.t_onset_to_isol)
-                        active_detected.time_isolated .= active_detected.time_infected .+ active_detected.time_onset_delay .+ t_onset_to_isol
-
-                        # insert new competing isolation events
-                        for i in 1:nrow(active_detected)
-                            if trackDetectedCases
-                                push!(tau_heap, event(active_detected[i,:time_isolated], :isolation, active_detected[i,:caseID], sSaturation))
-                            end
-                        end
-                    end
+                    # if model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
+                    #     # change current detected cases time_onset_delay by factor
+                    #     # model.t_onset_to_isol / model.alert_pars.t_onset_to_isol
+                    #     active_detected = filter(row -> row.active, active_df, view=true)
+                    #
+                    #     t_onset_to_isol = active_detected.time_isolated .-
+                    #         active_detected.time_infected .- active_detected.time_onset_delay
+                    #
+                    #     # t_onset_to_isol = t_onset_to_isol .* (model.t_onset_to_isol / model.alert_pars.t_onset_to_isol)
+                    #     active_detected.time_isolated .= active_detected.time_infected .+ active_detected.time_onset_delay .+ t_onset_to_isol
+                    #
+                    #     # insert new competing isolation events
+                    #     for i in 1:nrow(active_detected)
+                    #         if trackDetectedCases
+                    #             push!(tau_heap, event(active_detected[i,:time_isolated], :isolation, active_detected[i,:caseID], sSaturation))
+                    #         end
+                    #     end
+                    # end
 
                     if newPTest
                         # active undetected cases. Add iso times for those that meet criteria

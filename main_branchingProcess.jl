@@ -17,6 +17,7 @@ using BranchVerifySoln
 using branchingProcesses
 
 global const PROGRESS__METER__DT = 0.2
+global const DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
 
 function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
 
@@ -47,6 +48,46 @@ function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64
     Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
 
     return hcat(Smean, Imean, Rmean), times
+end
+
+function createNewDir(path)
+    #=
+    Given a path, determine if a folder has been created for the current date in
+    that path. If not, create one - this will allow seperation of figures created
+    on different days.
+    =#
+
+    currentTime = now()
+    folderName = Dates.format(currentTime, "Y_m_d_u")
+
+    newdir = path*"/"*folderName
+
+    if !isdir(newdir)
+        mkdir(newdir)
+    end
+
+    return newdir
+end
+
+function observedCasesAugust2020(daily::Bool)
+    observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
+    122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
+    184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
+
+    if daily
+        observedIDetect = diff(vcat([0],observedIDetect))
+    end
+    tDetect = collect(0:length(observedIDetect)-1)
+
+    return observedIDetect, tDetect
+end
+
+function observedCases()
+    # observedIDetect = cumsum([1,4,4,15,20,26,38,36,56,67,86,75,81])
+    observedIDetect = cumsum([1,4,4,16,20,27,36,37,60,69,79,76,79,54])
+
+    tDetect = collect(0:length(observedIDetect)-1)
+    return observedIDetect, tDetect
 end
 
 function verifySolutions(numSimsScaling::Int64, testRange)
@@ -1916,110 +1957,71 @@ function quantile2D(x, quantileValue)
     return quantiles
 end
 
-function plotDailyCasesOutbreak(dailyConfirmedCases, timesDaily, actualDailyCumCases,
+function plotDailyCasesOutbreak(dailyConfirmedCases, dailyTimes, actualDailyCumCases,
     timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false, conditioned=false, useDates=false)
 
     actualDailyCases = diff(vcat([0],actualDailyCumCases))
-    # timesActual = timesActual[1:end-1]
-    # actualDailyCases = actualDailyCumCases
-    # timesActual = timesActual
+    # dailyTimes=timesDaily
 
-    # dailyIndexes = findall(rem.(times, 1).==0)
-    # dailyIndexes = collect(1:length(times))
-
-    # dailyConfirmedCases = diff(confirmedCases[dailyIndexes, :],dims=1)
-    # dailyConfirmedCases = confirmedCases[dailyIndexes, :]
-
-    # medDailyConfirmedCases = diff(median(confirmedCases,dims=2)[dailyIndexes, :],dims=1)
-    # dailyTimes = times[dailyIndexes][1:end-1]
-    # dailyTimes = times[dailyIndexes]
-    dailyTimes=timesDaily
-
-    # # add on zeroness
-    # dailyTimes = vcat(collect(-6:-1), dailyTimes)
-    # dailyConfirmedCases = vcat(convert.(Int64, zeros(length(dailyIndexes),6)), dailyConfirmedCases)
-
+    # only plot x number of days
     if two21 && false
         finalIndex = findfirst(dailyTimes.==15)
 
         dailyConfirmedCases = dailyConfirmedCases[1:finalIndex, :]
         dailyTimes = dailyTimes[1:finalIndex]
+        actualDailyCases = actualDailyCases[1:min(finalIndex, length(actualDailyCases))]
     end
 
+    # set up figure
     Seaborn.set()
     set_style("ticks")
     Seaborn.set_color_codes("pastel")
     fig = plt.figure(figsize=(8,6),dpi=300)
 
-    quantiles1 = quantile2D(dailyConfirmedCases, 0.025)
-    quantiles3 = quantile2D(dailyConfirmedCases, 0.975)
-
-    # plt.plot(dailyTimes, quantiles1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
-    # plt.plot(dailyTimes, quantiles3, "k--", lw=2, alpha = 0.5)
-
-    # plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.5, color = "r")
-
+    # If using conditioned model ensemble, plot 50% (IQR) quantiles as well ----
     if conditioned
-        # plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.4, color = "b", label="95% Curvewise Quantile Band")
-
 
         quantiles95_1 = quantile2D(dailyConfirmedCases, 0.025)
         quantiles95_2 = quantile2D(dailyConfirmedCases, 0.975)
         quantiles50_1 = quantile2D(dailyConfirmedCases, 0.25)
         quantiles50_2 = quantile2D(dailyConfirmedCases, 0.75)
 
+        # plotting 95% bands ---------------------------------------------------
         plt.plot(dailyTimes, quantiles95_1, "k--", label="95% Curvewise Quantile Bands ", lw=2, alpha = 0.5)
         plt.plot(dailyTimes, quantiles95_2, "k--", lw=2, alpha = 0.5)
 
         plt.fill_between(dailyTimes, quantiles95_1, quantiles50_1, alpha=0.5, color = "r")
         plt.fill_between(dailyTimes, quantiles95_2, quantiles50_2, alpha=0.5, color = "r")
 
-
-        # Confirmed cases since first detect ###################################
-
+        # plotting 50% bands ---------------------------------------------------
         plt.plot(dailyTimes, quantiles50_1, "r--", label="50% Curvewise Quantile Bands", lw=2, alpha = 0.8)
         plt.plot(dailyTimes, quantiles50_2, "r--", lw=2, alpha = 0.8)
         plt.fill_between(dailyTimes, quantiles50_1, quantiles50_2, alpha=0.5, color = "b")
-
-
-        # quantiles1 = quantile2D(dailyConfirmedCases, 0.25)
-        # quantiles3 = quantile2D(dailyConfirmedCases, 0.75)
-        #
-        # plt.plot(dailyTimes, quantiles1, "r--", label="50% Curvewise Quantile Bands", lw=2, alpha = 0.9)
-        # plt.plot(dailyTimes, quantiles3, "r--", lw=2, alpha = 0.9)
 
         if two21
             plt.ylim([0,300])
         end
     else
+        quantiles1 = quantile2D(dailyConfirmedCases, 0.025)
+        quantiles3 = quantile2D(dailyConfirmedCases, 0.975)
         plt.fill_between(dailyTimes, quantiles1, quantiles3, alpha=0.5, color = "r", label="95% Quantile Band")
     end
 
 
+    # plot median daily detected cases and actual cases ------------------------
+    plt.plot(dailyTimes, median(dailyConfirmedCases,dims=2), "r-", label="Median Daily Confirmed Cases", lw=2.5, figure=fig)
 
-
-    # plt.plot(times, x2, "r$x2PlotType", label="I - Geometric Series", lw=1.5, figure=fig, alpha = 1)
-
+    # if in 2021, plot August 2020 data as well
     if two21
-        observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
-        122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
-        184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
-
-        observedIDetect = diff(vcat([0],observedIDetect))
-        tDetect = collect(0:length(observedIDetect)-1)
-
+        observedIDetect, tDetect = observedCasesAugust2020(true)
         plt.plot(tDetect, observedIDetect, color="tab:gray", linestyle="-", label="August 2020 Daily Confirmed Cases", lw=2.5, figure=fig)
     end
-
-    plt.plot(dailyTimes, median(dailyConfirmedCases,dims=2), "r-", label="Median Daily Confirmed Cases", lw=2.5, figure=fig)
     plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Confirmed Cases", lw=2.5, figure=fig)
 
 
     if useDates
-        dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
-
         plt.xticks(collect(dailyTimes[1]:10:dailyTimes[end]),
-            [Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(dailyTimes[1]:10:dailyTimes[end]))-1)])
+            [Dates.format(DAY__ZERO__DATE + Dates.Day(i*10), "u d") for i in 0:(length(collect(dailyTimes[1]:10:dailyTimes[end]))-1)])
         plt.xlabel("Date")
 
     else
@@ -2117,17 +2119,15 @@ function plotDailyCasesMultOutbreak(dailyConfirmedCasesHigh, dailyConfirmedCases
 end
 
 function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedIDetect,
-    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0, conditioned=false, useDates=false, two21=true)
+    tDetect, t_current, title, outputFileName, Display=true, save=false, alphaMultiplier=1.0,
+    conditioned=false, useDates=false, two21=true, confirmedCases_ensemble=[], cumulativeCases_ensemble=[])
     #=
     Plot multiple realisations of confirmedCases and x2 as well as their means.
     =#
 
-    dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
-
     Seaborn.set()
     set_style("ticks")
     set_color_codes("pastel")
-    # fig = plt.figure(dpi=300)
 
     # Initialise plots - need figure size to make them square and nice
     f,ax = Seaborn.subplots(1,2, figsize=(12,6), dpi=300)
@@ -2141,9 +2141,6 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     if conditioned
         type=" Curvewise"
     end
-
-
-
 
     for i in 1:length(confirmedCases[1,:])
         if i == 1
@@ -2162,55 +2159,66 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     end
 
 
-
-    # 2020 Confirmed Cases
-    if outputFileName == "./August2021Outbreak/EstimatedCaseNumbersAfterDetection2020Fit"
-        observedIDetect2020 = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
-            122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
-            184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
-        tDetect2020 = collect(0:length(observedIDetect2020)-1)
-
-        ax[1].plot(tDetect2020, observedIDetect2020, color="b", linestyle="-.", label="August Outbreak 2020", lw=2, alpha = 1)
-    end
-
+    # If using conditioned model ensemble, plot 50% (IQR) quantiles as well ----
     if conditioned
 
+        if !isempty(confirmedCases_ensemble)
+            for i in 1:min(700,length(confirmedCases_ensemble[1,:]))
+                if i == 1
+                    ax[1].plot(times, confirmedCases_ensemble[:,i], "k-", label="Unconditioned Realisations", lw=2, alpha=0.2)
+                else
+                    ax[1].plot(times, confirmedCases_ensemble[:,i], "k-", lw=2, alpha=0.09*alphaMultiplier)
+                end
+            end
+        end
+
+        if !isempty(cumulativeCases_ensemble)
+            for i in 1:min(700,length(cumulativeCases_ensemble[1,:]))
+                if i == 1
+                    ax[2].plot(times, cumulativeCases_ensemble[:,i], "k-", label="Unconditioned Realisations", lw=2, alpha=0.2)
+                else
+                    ax[2].plot(times, cumulativeCases_ensemble[:,i], "k-", lw=2, alpha=0.09*alphaMultiplier)
+                end
+            end
+        end
+
+        # Confirmed cases since first detect ###################################
         quantiles95_1 = quantile2D(confirmedCases, 0.025)
         quantiles95_2 = quantile2D(confirmedCases, 0.975)
         quantiles50_1 = quantile2D(confirmedCases, 0.25)
         quantiles50_2 = quantile2D(confirmedCases, 0.75)
 
+        # plotting 95% bands ---------------------------------------------------
         ax[1].plot(times, quantiles95_1, "k--", label="95%$type Quantile Bands ", lw=2, alpha = 0.5)
         ax[1].plot(times, quantiles95_2, "k--", lw=2, alpha = 0.5)
 
         ax[1].fill_between(times, quantiles95_1, quantiles50_1, alpha=0.3, color = "r")
         ax[1].fill_between(times, quantiles95_2, quantiles50_2, alpha=0.3, color = "r")
 
-
-        # Confirmed cases since first detect ###################################
-
+        # plotting 50% bands ---------------------------------------------------
         ax[1].plot(times, quantiles50_1, "r--", label="50%$type Quantile Bands ", lw=2, alpha = 0.8)
         ax[1].plot(times, quantiles50_2, "r--", lw=2, alpha = 0.8)
         ax[1].fill_between(times, quantiles50_1, quantiles50_2, alpha=0.3, color = "b")
-
-
         ########################################################################
 
-        # Cumulative cases since first detect ######################################
+        # Cumulative cases since first detect ##################################
         quantiles95_1 = quantile2D(cumulativeCases, 0.025)
         quantiles95_2 = quantile2D(cumulativeCases, 0.975)
         quantiles50_1 = quantile2D(cumulativeCases, 0.25)
         quantiles50_2 = quantile2D(cumulativeCases, 0.75)
 
+        # plotting 95% bands ---------------------------------------------------
         ax[2].plot(times, quantiles95_1, "k--", label="95%$type Quantile Bands ", lw=2, alpha = 0.5)
         ax[2].plot(times, quantiles95_2, "k--", lw=2, alpha = 0.5)
 
         ax[2].fill_between(times, quantiles95_1, quantiles50_1, alpha=0.3, color = "r")
         ax[2].fill_between(times, quantiles95_2, quantiles50_2, alpha=0.3, color = "r")
 
+        # plotting 50% bands ---------------------------------------------------
         ax[2].plot(times, quantiles50_1, "r--", label="50%$type Quantile Bands ", lw=2, alpha = 0.7)
         ax[2].plot(times, quantiles50_2, "r--", lw=2, alpha = 0.7)
         ax[2].fill_between(times, quantiles50_1, quantiles50_2, alpha=0.3, color = "b")
+        ########################################################################
 
     else
 
@@ -2225,13 +2233,28 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     end
 
 
-
-
     ax[1].plot(times, median(confirmedCases, dims=2), "r-", label="Median Realisation", lw=3, alpha = 1)
+
+    # 2020 Confirmed Cases
+    if two21
+
+        observedIDetect2020, tDetect2020 = observedCasesAugust2020(false)
+
+        ax[1].plot(tDetect2020, observedIDetect2020, color="b", linestyle="-.", label="August Outbreak 2020", lw=2, alpha = 1)
+    end
+
     ax[1].plot(tDetect, observedIDetect, "k-", label="August Outbreak", lw=2, alpha = 1)
     ax[2].plot(times, median(cumulativeCases, dims=2), "r-", label="Median Realisation", lw=3, alpha = 1)
 
 
+    # plot the current date as a vertical line on the plot. t_current is a number
+    # which
+    if t_current > 0
+        ax[1].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
+        "k--", label=Dates.format(DAY__ZERO__DATE+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
+        ax[2].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
+        "k--", label=Dates.format(DAY__ZERO__DATE+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
+    end
 
     # ax[1].plot(times, median(confirmedCases, dims=2), "b-", label="Median Realisation", lw=4, alpha = 1)
 
@@ -2241,12 +2264,6 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
 
 
 
-    if t_current > 0
-        ax[1].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label=Dates.format(dayZeroDate+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
-        ax[2].plot([t_current, t_current], [minimum(observedIDetect), maximum(cumulativeCases)],
-            "k--", label=Dates.format(dayZeroDate+Dates.Day(t_current), "U d Y"), lw=2, alpha = 1)
-    end
     # ax[1].axvline(10, "k--", label="21/8/2021")
     # ax[2].vline()
 
@@ -2300,11 +2317,11 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
 
     if useDates
         ax[1].set_xticks(collect(times[1]:10:times[end]))
-        ax[1].set_xticklabels([Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
+        ax[1].set_xticklabels([Dates.format(DAY__ZERO__DATE + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
         ax[1].set_xlabel("Date")
 
         ax[2].set_xticks(collect(times[1]:10:times[end]))
-        ax[2].set_xticklabels([Dates.format(dayZeroDate + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
+        ax[2].set_xticklabels([Dates.format(DAY__ZERO__DATE + Dates.Day(i*10), "u d") for i in 0:(length(collect(times[1]:10:times[end]))-1)])
         ax[2].set_xlabel("Date")
 
     else
@@ -2340,12 +2357,8 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     ax[2].set_ylabel("Cumulative Total Cases")
     ax[2].set_title("Total Cases")
 
-
-
-
     plt.suptitle(title)
     # plt.title(title)
-
 
     # Dodge the other plots
     # plt.tight_layout(pad = 0.8, h_pad=0.01, w_pad=0.01)
@@ -2470,8 +2483,8 @@ function probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRan
     xValues = []
     xTitle = ""
     if useDates
-        dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
-        xValues = [Dates.format(dayZeroDate + Dates.Day(i), "u d") for i in collect(daysSinceRange)]
+        # dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
+        xValues = [Dates.format(DAY__ZERO__DATE + Dates.Day(i), "u d") for i in collect(daysSinceRange)]
         xTitle = "Date"
     else
         xValues = collect(daysSinceRange).
@@ -2559,12 +2572,6 @@ function caseNumbersBeginToDrop(dailyConfirmedCases, numCasesRange=0:1, daysSinc
 
 
     return probabilities
-end
-
-function ObservedCases()
-    observedIDetect = cumsum([5,4,15,20,26,38,36,56,50])
-    tDetect = collect(0:length(observedIDetect)-1)
-    return observedIDetect, tDetect
 end
 
 function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxCases=20*10^3, p_test::Array{Float64,1}=[0.1,0.8], R_number=3, R_alert_scaling=0.2,
@@ -2660,7 +2667,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
     println("Kept $(length(indexesToKeep)) Sims or $(length(indexesToKeep)/numSims*100)% of Sims")
 
     # observedIDetect = [1, 10, 20, 30, 51]
-    observedIDetect, tDetect = ObservedCases()
+    observedIDetect, tDetect = observedCases()
 
     return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep]
 end
@@ -2780,7 +2787,7 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
     println("Kept $(length(indexesToKeep)) Sims or $(length(indexesToKeep)/numSims*100)% of Sims")
 
     # observedIDetect = [1, 10, 20, 30, 51]
-    observedIDetect, tDetect = ObservedCases()
+    observedIDetect, tDetect = observedCases()
 
     return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep]
 end
@@ -2846,7 +2853,7 @@ end
 
 function augustOutbreakPostProcess(processRange, Display=true, save=false)
 
-    observedIDetect, tDetect = ObservedCases()
+    observedIDetect, tDetect = observedCases()
 
     println("Process #1: Effect of Alert Level Reff Decrease Speed on Daily Cases: August 2021 Sim using August 2020 Fit")
     if 1 in processRange
@@ -2879,16 +2886,22 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
     println("Process #2: August 2021 Model Ensemble Conditioned on case data using Ccandu")
     if 2 in processRange
 
-        observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 279]
-        tDetect = collect(0:length(observedIDetect)-1)
+        newdir = createNewDir("./August2021Outbreak")
+        # newdir = "./August2021Outbreak/2021_8_26_Aug/"
+
+        # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 279]
+        # tDetect = collect(0:length(observedIDetect)-1)
 
         # tspan = (0.0,70.0)
         # timesDaily = [i for i=tspan[1]:1:tspan[end]]
         title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
-        outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetectionCcandu25Aug"
+        outputFileName = newdir*"/DailyCaseNumbersAfterDetection"
 
         timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_26Aug.csv", false)[1:2]
         cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_26Aug.csv", true)[2:3]
+
+        cumulativeDetectedCases_ensemble = cumulativeDetectedCases .* 1.0
+        cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
 
         # Ccandu filtering
         filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes.csv", header=false))
@@ -2900,28 +2913,30 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
 
         numCasesRange = 80:-10:10
-        daysSinceRange = 10:10:70
+        daysSinceRange = 10:5:40
 
         probabilities = caseNumbersBeginToDrop(dailyDetectedCases, numCasesRange, daysSinceRange)
 
-        t_current = 9
+        t_current = 13
 
         title = "August 2021 Outbreak Conditioned Model Ensemble"
-        outputFileName = "./August2021Outbreak/EstimatedCaseNumbersAfterDetectionCcandu26Aug"
-        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily, observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true)
+        outputFileName = newdir*"/EstimatedCaseNumbersAfterDetection"
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
+            observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
+            true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
 
         title = "Probability of less than N cases per day, x days after detection"
-        outputFileName = "./August2021Outbreak/ProbDaysSinceDetection_August2021Ccandu26Aug"
+        outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
         probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
 
 
         numCasesRange = 80:-4:10
-        daysSinceRange = 10:5:70
+        daysSinceRange = 10:5:40
 
         probabilities = caseNumbersBeginToDrop(dailyDetectedCases, numCasesRange, daysSinceRange)
 
         title = "Probability of less than N cases per day, x days after detection"
-        outputFileName = "./August2021Outbreak/ProbDaysSinceDetection_August2021Ccandu26Aug_Contour"
+        outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
         probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save, true)
 
     end
@@ -3055,7 +3070,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
     Estimate the cumulative number of infections from this time point.
     =#
 
-    observedIDetect, tDetect = ObservedCases()
+    observedIDetect, tDetect = observedCases()
 
     println("Sim #1: Heterogeneous Reproduction Number")
     if 1 in simRange
@@ -4049,6 +4064,12 @@ end
 
 function casesAtDetection()
     detectedCases, cumulativeCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_26Aug.csv", true)[2:3]
+
+    filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes.csv", header=false))
+    filterVector = convert.(Int64, filter_df.Column1)
+    detectedCases = detectedCases[:,filterVector]
+    cumulativeCases = cumulativeCases[:,filterVector]
+
     println(median(cumulativeCases, dims=2)[1])
     println(quantile2D(cumulativeCases, 0.25)[1])
     println(quantile2D(cumulativeCases, 0.75)[1])
@@ -4063,7 +4084,7 @@ function casesAtDetection()
     println(quantile2D(detectedCases, 0.75)[70])
 end
 
-casesAtDetection()
+# casesAtDetection()
 
 
 function main()
@@ -4082,7 +4103,7 @@ function main()
 
     # augustOutbreakSim(1, [13.5])
 
-    # augustOutbreakPostProcess(2,true,true)
+    augustOutbreakPostProcess(2,true,true)
 
     # augustOutbreakPostProcess([4],true,true)
     # augustOutbreakSim(1, [4.1], true, true, [4.1])
@@ -4094,7 +4115,7 @@ function main()
     # times, dailyConfirmedCases, dailyTotalCases = reloadCSV("", true)
 end
 
-# main()
+main()
 
 if false
     # verifySolutions(1, [11,12,13,14,15])
@@ -4222,15 +4243,15 @@ if false
 end
 
 
-# dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
+# DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
 #
-# newDate = dayZeroDate + Dates.Day(1)
+# newDate = DAY__ZERO__DATE + Dates.Day(1)
 #
-# Dates.format(dayZeroDate, "u d")
+# Dates.format(DAY__ZERO__DATE, "u d")
 #
 # Dates.format(newDate, "u d")
 
-dayZeroDate = Date("17-08-2021", dateformat"d-m-y")
-newDate = dayZeroDate + Dates.Day(14)
+DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
+newDate = DAY__ZERO__DATE + Dates.Day(16)
 
-newDate
+Dates.format(newDate, "u d")

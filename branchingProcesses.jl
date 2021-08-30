@@ -8,7 +8,7 @@ module branchingProcesses
     export compilationInit, bpMain!, discrete_branch!, firstReact_branch!,
         nextReact_branch!, init_model_pars, branchModel, ThinNone, ThinSingle,
         ThinTree, ThinFirst, ThinFunction, randRootNode, simpleGraph_branch,
-        initDataframe_thin, initDataframe
+        initDataframe_thin, initDataframe, AlertEvent
 
     function weibullParGridSearch(alpha_par, scale_par)
 
@@ -62,6 +62,19 @@ module branchingProcesses
         name::Union{ThinNone, ThinSingle, ThinTree, ThinFirst}
     end
 
+    struct event
+        time::Union{Float64, Int64}
+        kind::Symbol # ∈ [:recovery, :infection, :isolation, :alertChange]
+        # isRecovery::Bool # false is infection event, true is recovery event
+        parentID::Int64
+        sSaturation::Float64 # ∈ [0,1]
+    end
+
+    struct AlertEvent
+        relativeTime::Union{AbstractFloat,Int}
+        R_scaling::Float64
+    end
+
     mutable struct branchModelAlert_pars
         t_onset_to_isol::Float64
         p_test::Float64 # ∈ [0,1]
@@ -71,8 +84,17 @@ module branchingProcesses
         time_to_alert::Symbol # :instant, :onDay
         alert_level_changed::Bool # init false
         alert_level_scaling_speed::Union{Int64,Float64} # how many days it takes for alert level scaling to come into affect
+        extraALevents::Array{AlertEvent,1}
+        #=
+        For extra AL events - we will assume new AL events only ever have an R_scaling
+        value greater than the current one, so no time based shift between the two values
+        is used. I.e. we move from AL4 to AL3 not the other way around
 
-
+        event.time stores time of AL change relative to the first AL change
+        event.kind == :alertChange
+        event.parentID == -2 - it's not the original alert change (parentID of -1)
+        event.sSaturation stores the new R_scaling value.
+        =#
     end
 
     struct branchModelAlert_nopars; end
@@ -124,14 +146,6 @@ module branchingProcesses
             end
         end
         return model.alert_pars.R_scaling
-    end
-
-    struct event
-        time::Union{Float64, Int64}
-        kind::Symbol # ∈ [:recovery, :infection, :isolation, :alertChange]
-        # isRecovery::Bool # false is infection event, true is recovery event
-        parentID::Int64
-        sSaturation::Float64 # ∈ [0,1]
     end
 
     mutable struct Node
@@ -1964,6 +1978,10 @@ module branchingProcesses
             return true
         elseif !alertLevelChanged
             return true
+        elseif timeAlertChange == -1.0
+            if rand() < alertR_reduction(model, timeAlertChange)
+                return true
+            end
         elseif rand() < alertR_reduction(model, infection_time - timeAlertChange)
             return true
         end
@@ -2158,76 +2176,94 @@ module branchingProcesses
                 end
             elseif reaction.kind === :alertChange
                 alertLevelChanged = true
-                timeAlertChange = infection_time*1
 
-                model.alert_pars.alert_level_changed = true
+                if reaction.parentID == -1
+                    timeAlertChange = infection_time*1
 
-                # edit iso times for currently active cases
-                if newPTest || newPTest_sub || model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
-                    # find active clinical cases
-                    active_df = filter(row -> row.active==true && row.sub_Clin_Case==false, population_df, view=true)
+                    for alertEvent in model.alert_pars.extraALevents
 
-                    # if model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
-                    #     # change current detected cases time_onset_delay by factor
-                    #     # model.t_onset_to_isol / model.alert_pars.t_onset_to_isol
-                    #     active_detected = filter(row -> row.active, active_df, view=true)
-                    #
-                    #     t_onset_to_isol = active_detected.time_isolated .-
-                    #         active_detected.time_infected .- active_detected.time_onset_delay
-                    #
-                    #     # t_onset_to_isol = t_onset_to_isol .* (model.t_onset_to_isol / model.alert_pars.t_onset_to_isol)
-                    #     active_detected.time_isolated .= active_detected.time_infected .+ active_detected.time_onset_delay .+ t_onset_to_isol
-                    #
-                    #     # insert new competing isolation events
-                    #     for i in 1:nrow(active_detected)
-                    #         if trackDetectedCases
-                    #             push!(tau_heap, event(active_detected[i,:time_isolated], :isolation, active_detected[i,:caseID], sSaturation))
-                    #         end
-                    #     end
-                    # end
+                        #update it's time and add to queue
 
-                    if newPTest
-                        # active undetected cases. Add iso times for those that meet criteria
-                        clin_cases = filter(row -> row.detected==false, active_df, view=true)
-                        clin_cases.detected .= rand(Bernoulli(newPTest_effective), nrow(clin_cases))
-                        detected_cases = filter(row -> row.detected==true, clin_cases, view=true)
-                        detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
-                            getOnsetToIsolDelay(model, nrow(detected_cases))
-
-                        # insert new isolation events
-                        for i in 1:nrow(detected_cases)
-                            if trackDetectedCases
-                                push!(tau_heap, event(detected_cases[i,:time_isolated], :isolation, detected_cases[i,:caseID], sSaturation))
-                            end
-                        end
+                        # alertEvent.time += timeAlertChange
+                        push!(tau_heap, event(alertEvent.relativeTime+timeAlertChange, :alertChange, -2, alertEvent.R_scaling))
                     end
 
-                    if newPTest_sub
-                        sub_clin_cases = filter(row -> row.active==true && row.sub_Clin_Case==true, population_df, view=true)
 
-                        sub_clin_cases.detected .= rand(Bernoulli(model.alert_pars.p_test_sub), nrow(sub_clin_cases))
-                        detected_cases = filter(row -> row.detected==true, sub_clin_cases, view=true)
-                        detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
-                            getOnsetToIsolDelay(model, nrow(detected_cases))
+                    model.alert_pars.alert_level_changed = true
 
-                        # insert new isolation events
-                        for i in 1:nrow(detected_cases)
-                            if trackDetectedCases
-                                push!(tau_heap, event(detected_cases[i,:time_isolated], :isolation, detected_cases[i,:caseID], sSaturation))
+                    # edit iso times for currently active cases
+                    if newPTest || newPTest_sub || model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
+                        # find active clinical cases
+                        active_df = filter(row -> row.active==true && row.sub_Clin_Case==false, population_df, view=true)
+
+                        # if model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
+                        #     # change current detected cases time_onset_delay by factor
+                        #     # model.t_onset_to_isol / model.alert_pars.t_onset_to_isol
+                        #     active_detected = filter(row -> row.active, active_df, view=true)
+                        #
+                        #     t_onset_to_isol = active_detected.time_isolated .-
+                        #         active_detected.time_infected .- active_detected.time_onset_delay
+                        #
+                        #     # t_onset_to_isol = t_onset_to_isol .* (model.t_onset_to_isol / model.alert_pars.t_onset_to_isol)
+                        #     active_detected.time_isolated .= active_detected.time_infected .+ active_detected.time_onset_delay .+ t_onset_to_isol
+                        #
+                        #     # insert new competing isolation events
+                        #     for i in 1:nrow(active_detected)
+                        #         if trackDetectedCases
+                        #             push!(tau_heap, event(active_detected[i,:time_isolated], :isolation, active_detected[i,:caseID], sSaturation))
+                        #         end
+                        #     end
+                        # end
+
+                        if newPTest
+                            # active undetected cases. Add iso times for those that meet criteria
+                            clin_cases = filter(row -> row.detected==false, active_df, view=true)
+                            clin_cases.detected .= rand(Bernoulli(newPTest_effective), nrow(clin_cases))
+                            detected_cases = filter(row -> row.detected==true, clin_cases, view=true)
+                            detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
+                                getOnsetToIsolDelay(model, nrow(detected_cases))
+
+                            # insert new isolation events
+                            for i in 1:nrow(detected_cases)
+                                if trackDetectedCases
+                                    push!(tau_heap, event(detected_cases[i,:time_isolated], :isolation, detected_cases[i,:caseID], sSaturation))
+                                end
                             end
                         end
+
+                        if newPTest_sub
+                            sub_clin_cases = filter(row -> row.active==true && row.sub_Clin_Case==true, population_df, view=true)
+
+                            sub_clin_cases.detected .= rand(Bernoulli(model.alert_pars.p_test_sub), nrow(sub_clin_cases))
+                            detected_cases = filter(row -> row.detected==true, sub_clin_cases, view=true)
+                            detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
+                                getOnsetToIsolDelay(model, nrow(detected_cases))
+
+                            # insert new isolation events
+                            for i in 1:nrow(detected_cases)
+                                if trackDetectedCases
+                                    push!(tau_heap, event(detected_cases[i,:time_isolated], :isolation, detected_cases[i,:caseID], sSaturation))
+                                end
+                            end
+                        end
+
+                        # if !population_df[reaction.parentID, :sub_Clin_Case] && !population_df[reaction.parentID, :detected]
+                        #
+                        #     # init iso time w/ prob newPTest_effective
+                        #     if rand(Bernoulli(newPTest_effective))
+                        #         new_iso_row = @view population_df[reaction.parentID, :]
+                        #
+                        #         population_df[reaction.parentID, :time_isolated] = getTimeIsolated(model, new_iso_row)[1]
+                        #         population_df[reaction.parentID, :detected] = true
+                        #     end
+                        # end
                     end
 
-                    # if !population_df[reaction.parentID, :sub_Clin_Case] && !population_df[reaction.parentID, :detected]
-                    #
-                    #     # init iso time w/ prob newPTest_effective
-                    #     if rand(Bernoulli(newPTest_effective))
-                    #         new_iso_row = @view population_df[reaction.parentID, :]
-                    #
-                    #         population_df[reaction.parentID, :time_isolated] = getTimeIsolated(model, new_iso_row)[1]
-                    #         population_df[reaction.parentID, :detected] = true
-                    #     end
-                    # end
+                else
+                    timeAlertChange = -1 # subsequent alert level moves' R_scaling is not time dependent
+
+                    # destructively modify model's R_scaling
+                    model.alert_pars.R_scaling = reaction.sSaturation*1
                 end
             end
         end
@@ -2288,8 +2324,10 @@ module branchingProcesses
             time_to_alert = :oneDay # ∈ [:instant, :onDay, :oneDay]
             alert_level_changed = false
             alert_level_scaling_speed = 5
+            extraALevents = []
             alert_pars = branchModelAlert_pars(t_onset_to_isol_new, p_test_new_clin, p_test_new_sub,
-                R_scaling, num_detected_before_alert, time_to_alert, alert_level_changed, alert_level_scaling_speed)
+                R_scaling, num_detected_before_alert, time_to_alert, alert_level_changed, alert_level_scaling_speed,
+                extraALevents)
         end
 
         model = branchModel(t_init, t_max, population_size, max_cases, state_totals, states,

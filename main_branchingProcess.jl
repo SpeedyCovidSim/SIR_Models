@@ -7,8 +7,7 @@ using ProgressMeter
 using CSV
 using Dates
 using PlotlyJS
-using Parameters
-
+using PyCall
 
 # import required modules
 push!( LOAD_PATH, "./" )
@@ -16,59 +15,23 @@ using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot, plotCumulativeInfec
     plotBenchmarksViolin
 using BranchVerifySoln
 using branchingProcesses
+using BPVerifySolutions
+using outbreakPostProcessing
 
+# import Ccandu conditioning
+py"""
+import sys
+sys.path.append("/Users/joeltrent/Documents/GitHub/ccandu")
+
+from ccandu import conditional_composer as cc
+from ccandu import hbae as hb
+"""
+cc = py"cc"
+hb = py"hb"
+
+# set some globals
 global const PROGRESS__METER__DT = 0.2
 global const DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
-
-function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
-
-    # times to sim on
-    times = [i for i=tspan[1]:time_step:tspan[end]]
-
-    numSims = convert(Int, round(numSimulations / numSimsScaling))
-
-    StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-    i = 1
-    time = @elapsed Threads.@threads for i = 1:numSims
-
-        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-        population_df = initDataframe(models[Threads.threadid()]);
-        t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-        StStep[:,i] = state_totals_all[:,1]
-        ItStep[:,i] = state_totals_all[:,2]
-        RtStep[:,i] = state_totals_all[:,3]
-
-    end
-
-    println("Finished Simulation in $time seconds")
-
-    Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-    return hcat(Smean, Imean, Rmean), times
-end
-
-function createNewDir(path)
-    #=
-    Given a path, determine if a folder has been created for the current date in
-    that path. If not, create one - this will allow seperation of figures created
-    on different days.
-    =#
-
-    currentTime = now()
-    folderName = Dates.format(currentTime, "Y_m_d_u")
-
-    newdir = path*"/"*folderName
-
-    if !isdir(newdir)
-        mkdir(newdir)
-    end
-
-    return newdir
-end
 
 function observedCasesAugust2020(daily::Bool)
     observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
@@ -91,1713 +54,6 @@ function observedCases()
     return observedIDetect, tDetect
 end
 
-function verifySolutions(numSimsScaling::Int64, testRange)
-    #=
-    Discrete is the baseline. We will compare the first and next reaction outputs
-    to it. With a small enough time step it should be very similar.
-
-    1. Average reproduction number should ≈ estimated reproduction number, if
-    number of cases is small relative to population size.
-    - Test where all cases are clinical and have same Ri (no isolation or alert level params)
-    - Test above + subclinical cases
-    - Add in isolation to first test -> only clinical cases and 100% chance
-    of being tested and isolated after T days (either random variable or const)
-    - Test for variable Ri
-
-    2. For each of the above cases check that the model output (epidemic curves)
-    averaged over many sims are ≈ the same. Use the same techniques as we did in
-    ODEVerifySoln.jl.
-    =#
-
-    println("Test #1: Reproduction Number, Deterministic Case")
-    if 1 in testRange
-        # Ri same for all cases and no subclin cases
-        println("Deterministic Case")
-
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(convert(Int, round(1000 / numSimsScaling))))
-        reproduction_number = 0.0
-        meanOffspring = zeros(numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 10000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].sub_clin_prop = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-
-            reproduction_number = models[Threads.threadid()].reproduction_number
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of First Case")
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        meanOffspring = zeros(numSims)
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 3000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].recovery_time = 20
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = firstReact_branch!(population_df, models[Threads.threadid()])
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-
-            reproduction_number = models[Threads.threadid()].reproduction_number
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
-        println("Finished Simulation in $time seconds")
-        println()
-    end
-
-    println("Test #2: Reproduction Number, Stochastic Case")
-    if 2 in testRange
-        # Ri same for all cases and no subclin cases
-        println("Deterministic Case")
-
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(1000 / numSimsScaling))
-        reproduction_number = 0.0
-        meanOffspring = zeros(numSims)
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 10000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].sub_clin_prop = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            reproduction_number = models[Threads.threadid()].reproduction_number
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of First Case")
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        meanOffspring = zeros(numSims)
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 3000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].recovery_time = 20
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = firstReact_branch!(population_df, models[Threads.threadid()])
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            reproduction_number = models[Threads.threadid()].reproduction_number
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $reproduction_number")
-        println("Finished Simulation in $time seconds")
-        println()
-    end
-
-    println("Test #3: Reproduction Number, Deterministic, SubClin Case")
-    if 3 in testRange
-        # Ri same for all cases and no subclin cases
-        println("Deterministic Case")
-
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(1000 / numSimsScaling))
-        reproduction_number = 0.0
-        meanOffspring = zeros(numSims)
-        meanRNumber = zeros(numSims)
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 10000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].sub_clin_prop = 0.5
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            meanRNumber[i] = mean(inactive_df.reproduction_number)
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of First Case")
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        meanOffspring = zeros(numSims)
-        meanRNumber = zeros(numSims)
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 3000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].sub_clin_prop = 0.5
-            models[Threads.threadid()].recovery_time = 20
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = firstReact_branch!(population_df, models[Threads.threadid()])
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            meanRNumber[i] = mean(inactive_df.reproduction_number)
-
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
-        println("Finished Simulation in $time seconds")
-        println()
-    end
-
-    println("Test #4: Reproduction Number, Stochastic, SubClin Case")
-    if 4 in testRange
-        # Ri same for all cases and no subclin cases
-        println("Deterministic Case")
-
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(1000 / numSimsScaling))
-        reproduction_number = 0.0
-        meanOffspring = zeros(numSims)
-        meanRNumber = zeros(numSims)
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 10000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].sub_clin_prop = 0.5
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            meanRNumber[i] = mean(inactive_df.reproduction_number)
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of First Case")
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        meanOffspring = zeros(numSims)
-        meanRNumber = zeros(numSims)
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 3000, [5*10^8-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].sub_clin_prop = 0.5
-            models[Threads.threadid()].recovery_time = 20
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
-
-            meanOffspring[i] = mean(inactive_df.num_offspring)
-            meanRNumber[i] = mean(inactive_df.reproduction_number)
-
-        end
-
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
-        println("Finished Simulation in $time seconds")
-        println()
-    end
-
-    println("Test #5: Epidemic curves")
-    if 5 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 0.02
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0])
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of First Case")
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        # models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0])
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = firstReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "First React vs Discrete. Discrete timestep = $time_step"
-        outputFileName = "./verifiedBranch/FirstVsDiscrete"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, true, true, true)
-        println()
-    end
-
-    println("Test #6: Epidemic curves (Next vs Discrete)")
-    if 6 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 0.02
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Discrete. Discrete timestep = $time_step"
-        outputFileName = "./verifiedBranch/NextvsDiscrete"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #7: Epidemic curves (Next vs Discrete - 1 Day timestep)")
-    if 7 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Discrete. Discrete timestep = $time_step"
-        outputFileName = "./verifiedBranch/NextvsDiscrete1Day"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #8: Epidemic curves - changing Time Steps")
-    if 8 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = [1, 0.2, 0.02]
-        numSims = 200
-
-        discrete_mean_1, times1 = discreteSIR_sim(time_step[1], numSims, tspan, numSimsScaling)
-        discrete_mean_2, times2 = discreteSIR_sim(time_step[2], numSims, tspan, numSimsScaling)
-        discrete_mean_3, times3 = discreteSIR_sim(time_step[3], numSims, tspan, numSimsScaling)
-
-        title = "Discrete solution for fixed inputs when varying time step"
-        outputFileName = "./verifiedBranch/DiscreteVariedTimeStep"
-        branchTimeStepPlot(discrete_mean_1, discrete_mean_2, discrete_mean_3, times1, times2, times3, title, outputFileName, true, true)
-        println()
-    end
-
-    println("Test #9: Epidemic curves (Next vs Discrete, Isolation)")
-    if 9 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 0.01
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(300 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(400 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
-        outputFileName = "./verifiedBranch/NextvsDiscreteIsolationg"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #10: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep)")
-    if 10 in testRange
-        println("Beginning simulation of Discrete Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(200 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
-        outputFileName = "./verifiedBranch/NextvsDiscreteIsol1Day"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #11: Epidemic curves (Next vs Simple BP, S Saturation Thinning)")
-    if 11 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 0.02
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            # Simple branch, random infection times, s saturation thinning
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinTree()), true, true, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Simple Branch with Saturation Thinning"
-        outputFileName = "./verifiedBranch/NextvsSimpleBP"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
-        println()
-    end
-
-    println("Test #12: Epidemic curves (Next vs Simple BP, S Saturation & Isolation Thinning)")
-    if 12 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,100.0)
-        time_step = 0.01
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            # Simple branch, random infection times, s saturation and isolation thinning
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinTree()), false, true, true)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Simple BP with Isolation and S Saturation"
-        outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
-        println()
-    end
-
-    println("Test #13: Initial Epidemic curves (Next vs Simple BP, S Saturation Single Thin)")
-    if 13 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,20.0)
-        time_step = 0.02
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 1*10^3, [5*10^3-10,10,0]);
-
-            # Simple branch, random infection times, s saturation thinning
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinSingle()), true, true, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            if !isnothing(firstDupe)
-                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-            end
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Simple Branch with Saturation (Single) Thinning"
-        outputFileName = "./verifiedBranch/NextvsSimpleBP_SingleThin"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
-        println()
-    end
-
-    println("Test #14: Initial Epidemic curves (Next vs Simple BP, S Saturation & Isolation Single Thin)")
-    if 14 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,20.0)
-        time_step = 0.02
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            # Simple branch, random infection times, s saturation and isolation thinning
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 1*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinSingle()), false, true, true)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-
-        println("Beginning simulation of Next Case")
-        numSims = convert(Int, round(600 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
-            models[Threads.threadid()].p_test = 1.0
-            models[Threads.threadid()].sub_clin_prop = 0
-            models[Threads.threadid()].stochasticIsol = false
-            # models[Threads.threadid()].t_onset_shape = 5.8
-            models[Threads.threadid()].t_onset_to_isol = 0
-
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            if !isnothing(firstDupe)
-                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-            end
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
-        println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
-
-        title = "Next React vs Simple BP with Isolation and S Saturation (Single) Thinning"
-        outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
-        branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
-        println()
-    end
-
-    println("Test #15: Cumulative Infection curve (Simple BP Infections vs Geometric Series)")
-    if 15 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,7.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(500 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        sumOffspring = 0
-        total_cases = 0
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], true, ThinFunction(ThinNone()), true, false, false)
-
-            # filtered_df = filter(row -> row.generation_number < maximum(population_df.generation_number), population_df)
-            #
-            # sumOffspring += sum(filtered_df.num_offspring)
-            # total_cases += nrow(filtered_df)
-
-            # interpolate using linear splines
-
-            StStep[1:length(t), i] = state_totals_all[:,1]
-            ItStep[1:length(t), i] = state_totals_all[:,2]
-            RtStep[1:length(t), i] = state_totals_all[:,3]
-            # StStep[:,i], ItStep[:,i], RtStep[:,i] = state_totals_all
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        # println("average R is $(sumOffspring/total_cases)")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        meanCumI = vcat(Rmean[2:end], Rmean[end]+Imean[end])
-
-        # discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-        println("Solving Exponential equation")
-        model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-        # model.stochasticRi = false
-        # model.sub_clin_prop = 0.0
-        # model.reproduction_number = 1.0
-
-
-        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
-            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(times))
-
-        Iovertime = cumsum(Iovertime)
-
-        St, It, Rt = initSIRArrays(tspan, time_step, numSims)
-
-        It = convert.(Int64, It)
-
-        It[1,:] .= model.state_totals[2]
-        time = @elapsed Threads.@threads for i in 1:numSims
-            # It =
-            # numCases = convert.(Int64, times .* 0.0)
-            # numCases[1] = 10
-            for j in Int(tspan[1]+2):Int(tspan[end]+1)
-                It[j, i] = sum(rand(Poisson(3), It[j-1, i]))
-            end
-        end
-        println("Finished Simulation in $time seconds")
-
-        Itmean= mean(It, dims = 2)
-
-        endminus = 2
-        meanCumI = meanCumI[1:end-endminus]
-
-        Itmean = Itmean[1:end-endminus]
-        Iovertime = Iovertime[1:end-endminus]
-        times = times[1:end-endminus]
-
-        misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
-        println("Mean Abs Error I = $misfitI")
-
-        title = "Geometric Series vs Simple Branch Mean"
-        outputFileName = "./verifiedBranch/ExponentialvsSimpleBP"
-        branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Dots(), true, true)
-        # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
-        println()
-    end
-
-    println("Test #16: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non), Mean + other realisations")
-    if 16 in testRange
-        println("Beginning simulation of Simple BP Case, Homogeneous")
-
-        # time span to sim on
-        tspan = (0.0,9.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(400 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], true, ThinFunction(ThinNone()), true, false, false)
-
-            StStep[1:length(t), i] = state_totals_all[:,1]
-            ItStep[1:length(t), i] = state_totals_all[:,2]
-            RtStep[1:length(t), i] = state_totals_all[:,3]
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Simple BP Case, Heterogeneous")
-
-        x1 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], true, ThinFunction(ThinNone()), true, false, false)
-
-            StStep[1:length(t), i] = state_totals_all[:,1]
-            ItStep[1:length(t), i] = state_totals_all[:,2]
-            RtStep[1:length(t), i] = state_totals_all[:,3]
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x2 = ItStep .+ RtStep
-
-        # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        endminus = 1
-        x1 = x1[1:end-endminus, :]
-        x2 = x2[1:end-endminus, :]
-        times = times[1:end-endminus]
-
-        title = "Generation Based Branching Process Simulation"
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNon"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true)
-
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonSD"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #17: Cumulative Infection curve (Simple BP Infections vs Geometric Series, distributed times)")
-    if 17 in testRange
-        println("Beginning simulation of Simple BP Case")
-
-        # time span to sim on
-        tspan = (0.0,30.0)
-        time_step = 1
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(400 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        sumOffspring = 0
-        total_cases = 0
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinNone()), true, false, false)
-
-            # filtered_df = filter(row -> row.generation_number < maximum(population_df.generation_number), population_df)
-            #
-            # sumOffspring += sum(filtered_df.num_offspring)
-            # total_cases += nrow(filtered_df)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-            # StStep[1:length(t), i] = state_totals_all[:,1]
-            # ItStep[1:length(t), i] = state_totals_all[:,2]
-            # RtStep[1:length(t), i] = state_totals_all[:,3]
-            # StStep[:,i], ItStep[:,i], RtStep[:,i] = state_totals_all
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        # println("average R is $(sumOffspring/total_cases)")
-
-        Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
-
-        # determine cumulative Imean
-        meanCumI = Imean + Rmean
-        # meanCumI = vcat(Rmean[2:end], Rmean[end]+Imean[end])
-
-        # discreteSIR_mean = hcat(Smean, Imean, Rmean)
-
-        println("Solving Exponential equation")
-        model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
-        model.stochasticRi = false
-        # model.sub_clin_prop = 0.0
-        # model.reproduction_number = 1.0
-
-        # Iovertime = model.state_totals[2] .* (((model.reproduction_number*(1-model.sub_clin_prop) +
-        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop)*3.3/3).^times)
-
-        meanGenTime = mean(Weibull(model.t_generation_shape, model.t_generation_scale))
-        # normTimes = (times) ./ (meanGenTime .* log(3))
-        # Inormtime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
-        #     model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(normTimes))
-
-        # times*gentime
-
-        gen = convert.(Int64, collect(0:(tspan[end]/meanGenTime+1)))
-
-        Iovertime = model.state_totals[2] .* ((model.reproduction_number*(1-model.sub_clin_prop) +
-            model.reproduction_number*model.sub_clin_scaling*model.sub_clin_prop).^(gen))
-
-        actualGenTimes = gen .* meanGenTime
-        Iovertime = cumsum(Iovertime)
-
-        Iovertime = singleSpline(Iovertime, actualGenTimes, times)
-
-        # St, It, Rt = initSIRArrays(tspan, time_step, numSims)
-
-        # It = convert.(Int64, It)
-
-        # It[1,:] .= model.state_totals[2]
-        # time = @elapsed Threads.@threads for i in 1:numSims
-        #     # It =
-        #     # numCases = convert.(Int64, times .* 0.0)
-        #     # numCases[1] = 10
-        #     for j in Int(tspan[1]+2):Int(tspan[end]+1)
-        #         It[j, i] = sum(rand(Poisson(3), It[j-1, i]))
-        #     end
-        # end
-        # println("Finished Simulation in $time seconds")
-
-        # Itmean= mean(It, dims = 2)
-
-        # endminus = 2
-        # meanCumI = meanCumI[1:end-endminus]
-        # Itmean = Itmean[1:end-endminus]
-        # Iovertime = Iovertime[1:end-endminus]
-        # times = times[1:end-endminus]
-        # normTimes = normTimes[1:end-endminus]
-
-        misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
-        println("Mean Abs Error I = $misfitI")
-
-        title = "Geometric Series vs Simple Branch Mean, Distributed Times"
-        outputFileName = "./verifiedBranch/ExponentialvsSimpleBPTimes.png"
-        branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Lines(), true, true)
-        # branch2wayVerifyPlot(Inormtime, Iovertime, times, title, outputFileName, Lines(), true, false)
-        println()
-    end
-
-    println("Test #18: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non, distributed times), Mean + other realisations")
-    if 18 in testRange
-        println("Beginning simulation of Simple BP Case, Homogeneous")
-
-        # time span to sim on
-        tspan = (0.0,45.0)
-        time_step = 0.2
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(300 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinNone()), true, false, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Simple BP Case, Heterogeneous")
-
-        x1 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinNone()), true, false, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x2 = ItStep .+ RtStep
-
-        endminus = 1
-        x1 = x1[1:end-endminus, :]
-        x2 = x2[1:end-endminus, :]
-        times = times[1:end-endminus]
-
-        title = "Time Distributed Branching Process Simulation"
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimes"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true)
-
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimesSD"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true)
-        println()
-    end
-
-    println("Test #19: Cumulative Infection curve (Simple BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
-    if 19 in testRange
-        println("Beginning simulation of Simple BP Case, Homogeneous")
-
-        # time span to sim on
-        tspan = (0.0,80.0)
-        time_step = 0.2
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(20 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinTree()), true, true, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Simple BP Case, Heterogeneous")
-
-        x1 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe_thin(models[Threads.threadid()]);
-
-            t, state_totals_all, population_df = bpMain!(population_df, models[Threads.threadid()], false, ThinFunction(ThinTree()), true, true, false)
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x2 = ItStep .+ RtStep
-
-        endminus = 1
-        x1 = x1[1:end-endminus, :]
-        x2 = x2[1:end-endminus, :]
-        times = times[1:end-endminus]
-
-        title = "Time Distributed, Saturation Thinned Branching Process Simulation"
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimesSThin"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true, 3.0)
-
-        outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimesSThinSD"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true, 3.0)
-        println()
-    end
-
-    println("Test #20: Cumulative Infection curve (Next React BP Infections, Heteregenous and Non, Mike et al), Mean + other realisations")
-    if 20 in testRange
-        println("Beginning simulation of Next React BP Case, Homogeneous")
-
-        # time span to sim on
-        tspan = (0.0,80.0)
-        time_step = 0.2
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(40 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Next React BP Case, Heterogeneous")
-
-        x1 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^5, 5*10^5, [5*10^5-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x2 = ItStep .+ RtStep
-
-        endminus = 1
-        x1 = x1[1:end-endminus, :]
-        x2 = x2[1:end-endminus, :]
-        times = times[1:end-endminus]
-
-        title = "Next Reaction Branching Process Simulation"
-        outputFileName = "./verifiedBranch/NextHeterogeneousVsNon"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true, 2.0)
-
-        outputFileName = "./verifiedBranch/NextHeterogeneousVsNonSD"
-        branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true, 2.0)
-        println()
-    end
-
-    println("Test #21: Cumulative Infection curve (Next React BP Infections, Heteregenous and Non, Mike et al, Isolation and Non), Mean + other realisations")
-    if 21 in testRange
-
-        println("Beginning simulation of Next React BP Case, Homogeneous")
-
-        # time span to sim on
-        tspan = (0.0,80.0)
-        time_step = 0.2
-
-        # times to sim on
-        times = [i for i=tspan[1]:time_step:tspan[end]]
-
-        numSims = convert(Int, round(400 / numSimsScaling))
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-            next!(p)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Next React BP Case, Heterogeneous")
-
-        x11 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-            next!(p)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x21 = ItStep .+ RtStep
-
-        println("Beginning simulation of Next React BP Case, Homogeneous Isolation")
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].p_test = 1.0
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-
-            next!(p)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        println("Beginning simulation of Next React BP Case, Heterogeneous Isolation")
-
-        x12 = ItStep .+ RtStep
-
-        StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
-
-        i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
-        time = @elapsed Threads.@threads for i = 1:numSims
-
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].p_test = 1.0
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
-
-            # Simple branch, no infection times
-            population_df = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
-
-            # clean duplicate values of t which occur on the first recovery time
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
-
-            t = vcat(t[1:firstDupe-1], t[lastDupe:end])
-            state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
-
-            # interpolate using linear splines
-            StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-            next!(p)
-        end
-
-        println("Finished Simulation in $time seconds")
-
-        x22 = ItStep .+ RtStep
-
-        endminus = 1
-        x11 = x11[1:end-endminus, :]
-        x12 = x12[1:end-endminus, :]
-        x21 = x21[1:end-endminus, :]
-        x22 = x22[1:end-endminus, :]
-        times = times[1:end-endminus]
-
-        title = "Next Reaction Branching Process Simulation With Isolation"
-        outputFileName = "./verifiedBranch/NextHeterogeneousVsNonIsol"
-        branchSideBySideVerifyPlot2(x11, x12, x21, x22, times, title, outputFileName, true, true, true, 2.0)
-
-        outputFileName = "./verifiedBranch/NextHeterogeneousVsNonSDIsol"
-        branchSideBySideVerifyPlot2(x11, x12, x21, x22, times, title, outputFileName, false, true, true, 2.0)
-        println()
-    end
-end
 
 function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
 
@@ -1944,18 +200,6 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
         # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
         # close()
     end
-end
-
-function quantile2D(x, quantileValue)
-    # x is 2D
-
-    quantiles = zeros(length(x[:,1]))
-
-    for i in 1:length(x[:,1])
-
-        quantiles[i] = quantile(x[i,:], quantileValue)
-    end
-    return quantiles
 end
 
 function plotDailyCasesOutbreak(dailyConfirmedCases, dailyTimes, actualDailyCumCases,
@@ -2432,67 +676,6 @@ function plotReff(models_df, conditionIndexes, title, outputFileName, Display=tr
     return nothing
 end
 
-function indexWhereAllValuesLessThanX(array, x)
-    #=
-    Given an array, return the largest range that represents the range array[index:end]
-    where all values in this range are less than x
-
-    If no range exists, return 0:0
-    =#
-    for i in length(array):-1:1
-        if array[i] >= x
-            if i+1 > length(array)
-                return 0:0
-            else
-                return i+1:length(array)
-            end
-        end
-    end
-
-    return 1:length(array)
-end
-
-function testIndexWhereAll()
-    @assert indexWhereAllValuesLessThanX([1,2,3,4,5], 6) == 1:5
-    @assert indexWhereAllValuesLessThanX([5,4,3,2,1], 4) == 3:5
-end
-
-function probOfLessThanXGivenYDays(dailyConfirmedCases, x, y::Union{UnitRange,StepRange})
-    #=
-    Given a 2D array, where the columns contain individual realisations and the
-    rows represent values at given times, return the proportion of columns that
-    satisfy indexWhereAllValuesLessThanX after y days.
-
-    The first row corresponds to t=0
-    The second row corresponds to t=1 etc.
-    =#
-
-    probability = zeros(length(y))
-
-    caseXranges = [0:0 for _ in 1:length(dailyConfirmedCases[1,:])]
-
-    for col in 1:length(dailyConfirmedCases[1,:])
-        caseXranges[col] = indexWhereAllValuesLessThanX(dailyConfirmedCases[:,col], x)
-    end
-
-    for i in 1:length(y)
-        for j in caseXranges
-            if !isnothing(j) && y[i] in j
-                probability[i] += 1.0
-            end
-        end
-        probability[i] = probability[i] / length(caseXranges)
-    end
-
-    return probability
-end
-
-function testprobOfLess()
-    @assert sum(probOfLessThanXGivenYDays([0 1; 2 3; 5 6; 4 5; 3 2; 2 1; 1 0], 6, 1:7) .== [0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0])==7
-    @assert sum(probOfLessThanXGivenYDays([0 1; 2 3; 5 6; 4 5; 3 2; 2 1; 1 0], 5, 1:7) .== [0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])==7
-end
-testprobOfLess()
-
 function probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange,
     title, outputFileName, Display=true, save=false)
 
@@ -2529,7 +712,6 @@ function probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRan
 
     end
     close()
-
 end
 
 function probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange,
@@ -2592,7 +774,6 @@ function probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRan
 
     end
     close()
-
 end
 
 function caseNumbersBeginToDrop(dailyConfirmedCases, numCasesRange=0:1, daysSinceRange=0:1)
@@ -2735,6 +916,7 @@ struct Ensemble
     alert_level_speed_range::Array
     R_input_range::Array
     init_cases_range::Array{Int64,1}
+    extra_alert_event::Dict{}
 end
 
 function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, ensemble::Ensemble, maxCases=20*10^3,
@@ -2783,6 +965,10 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
         models[Threads.threadid()].alert_pars.R_scaling = rand(Uniform(ensemble.alert_level_scaling_range...))
         models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
         models[Threads.threadid()].alert_pars.alert_level_scaling_speed = rand(Uniform(ensemble.alert_level_speed_range...))
+
+        for key in keys(ensemble.extra_alert_event)
+            push!(models[Threads.threadid()].alert_pars.extraALevents, AlertEvent(ensemble.extra_alert_event[key][:t_relative], rand(Uniform(ensemble.extra_alert_event[key][:R_scaling_range]...))))
+        end
 
         # next React branching process with alert level
         population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
@@ -2851,123 +1037,6 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
     observedIDetect, tDetect = observedCases()
 
     return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep], model_array[indexesToKeep]
-end
-
-function outputCSVDailyCases(dailyConfirmedCases, dailyTotalCases, times, outputFileName, cumulative::Bool)
-
-    case_df = DataFrame()
-    case_df[!, "time"] = times
-
-    type = ""
-    if cumulative
-        type = "cumulative"
-    else
-        type = "daily"
-    end
-
-    for col in 1:length(dailyConfirmedCases[1,:])
-
-        colname = "$type confirmed cases - run_$col"
-        case_df[!, colname] = dailyConfirmedCases[:,col]
-
-        colname = "$type total cases - run_$col"
-        case_df[!, colname] = dailyTotalCases[:,col]
-
-    end
-
-    # outputFileName = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
-
-    CSV.write(outputFileName, case_df)
-
-    return nothing
-end
-
-function outputCSVmodels(models, outputFileName)
-
-    infection_dist = Weibull(models[1].t_generation_shape, models[1].t_generation_scale)
-
-    models_df = DataFrame()
-
-    models_df.reproduction_number = zeros(length(models))
-    models_df.r_scaling = zeros(length(models))
-    models_df.sub_clin_prop = zeros(length(models))
-    models_df.sub_clin_scaling = zeros(length(models))
-    models_df.t2_before_al = zeros(length(models))
-    models_df.t2_after_al = zeros(length(models))
-    models_df.p_test_before_al = zeros(length(models))
-    models_df.p_test_after_al = zeros(length(models))
-    models_df.p_test_sub_after_al = zeros(length(models))
-
-    models_df.R_eff_after_al = zeros(length(models))
-
-    for row in 1:length(models)
-
-        models_df[row, :reproduction_number] = models[row].reproduction_number
-        models_df[row, :r_scaling] = models[row].alert_pars.R_scaling
-        models_df[row, :sub_clin_prop] = models[row].sub_clin_prop
-        models_df[row, :sub_clin_scaling] = models[row].sub_clin_scaling
-        models_df[row, :t2_before_al] = models[row].t_onset_to_isol
-        models_df[row, :t2_after_al] = models[row].alert_pars.t_onset_to_isol
-        models_df[row, :p_test_before_al] = models[row].p_test
-        models_df[row, :p_test_after_al] = models[row].alert_pars.p_test
-        models_df[row, :p_test_sub_after_al] = models[row].alert_pars.p_test_sub
-
-        T1 = mean(Gamma(models[row].t_onset_shape, models[row].t_onset_scale))
-        T2 = models[row].alert_pars.t_onset_to_isol * 1
-
-        q = cdf(infection_dist, T1 + T2)
-
-        models_df[row, :R_eff_after_al] = models_df[row, :r_scaling] * models_df[row,:reproduction_number] * (
-            (1-models_df[row, :sub_clin_prop]) * (1-models_df[row, :p_test_after_al] +
-                models_df[row, :p_test_after_al]*(q + models[row].isolation_infectivity*(1-q))) +
-            models_df[row, :sub_clin_prop] * (1-models_df[row, :p_test_sub_after_al] +
-                models_df[row, :p_test_sub_after_al]*(q + models[row].isolation_infectivity*(1-q))) * models_df[row, :sub_clin_scaling])
-
-    end
-
-    models_df.R_eff_before_al = models_df.reproduction_number .* ((1.0 .- models_df.sub_clin_prop) .+ models_df.sub_clin_scaling .* models_df.sub_clin_prop)
-
-    CSV.write(outputFileName, models_df)
-
-    return nothing
-end
-
-
-function reloadCSV(CSVpath::String, cumulative::Bool)
-
-    type = ""
-    if cumulative
-        type = "cumulative"
-    else
-        type = "daily"
-    end
-
-    # CSVpath = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
-
-    case_df = DataFrame(CSV.File(CSVpath))
-
-    times = case_df.time
-
-    dailyConfirmedCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
-    dailyTotalCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
-
-    for col in 1:length(dailyConfirmedCases[1,:])
-        colname = "$type confirmed cases - run_$col"
-        dailyConfirmedCases[:,col] = case_df[:, colname]
-
-        colname = "$type total cases - run_$col"
-        dailyTotalCases[:,col] = case_df[:, colname]
-
-    end
-
-    return times, dailyConfirmedCases, dailyTotalCases
-end
-
-function reloadCSVmodels(CSVpath::String)::DataFrame
-
-    models_df = DataFrame(CSV.File(CSVpath))
-
-    return models_df
 end
 
 function augustOutbreakPostProcess(processRange, Display=true, save=false)
@@ -3169,21 +1238,6 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
     return nothing
 end
 
-function removeNaNs(array::Array{Float64,2})
-    #=
-    Replace all NaNs in a 2d array with 0.0
-    =#
-
-    for i in 1:length(array[1,:])
-        for j in 1:length(array[:,1])
-            if isnan(array[j,i])
-                array[j,i]=0.0
-            end
-        end
-    end
-
-    return array
-end
 
 function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Display=true, save=true, CSVOutputRange=[])
     #=
@@ -3455,7 +1509,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         num_detected_before_alert=1
 
         # ensemble = Ensemble([[0.05,0.15],[0.6,1.0]],[0.0,0.0], [[1.0,3.0],[0.5,2.0]],[0.10,0.30],[2,10],[5,7], [1,2])
-        ensemble = Ensemble([[0.05,0.1],[0.8,1.0]], [0.0,0.0], [[1.0,3.0],[0.5,1.5]],[0.20,0.30],[2,10],[3.5,4.5], [1,2])
+        ensemble = Ensemble([[0.05,0.1],[0.8,1.0]], [0.0,0.0], [[1.0,3.0],[0.5,1.5]],[0.20,0.30],[2,10],[3.5,4.5], [1,2], Dict())
 
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 ensemble, maxCases, num_detected_before_alert)
@@ -3515,7 +1569,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         num_detected_before_alert=1
 
         # ensemble = Ensemble([[0.05,0.15],[0.6,1.0]],[0.0,0.0], [[1.0,3.0],[0.5,2.0]],[0.10,0.30],[2,10],[5,7], [1,2])
-        ensemble = Ensemble([[0.05,0.1],[0.6,0.8]], [0.6,0.8], [[1.0,3.0],[0.5,2.0]],[0.20,0.30],[2,10],[3.5,4.5], [1,2])
+        ensemble = Ensemble([[0.05,0.1],[0.6,0.8]], [0.6,0.8], [[1.0,3.0],[0.5,2.0]],[0.20,0.30],[2,10],[3.5,4.5], [1,2], Dict())
 
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 ensemble, maxCases, num_detected_before_alert)
@@ -3579,7 +1633,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         num_detected_before_alert=1
 
         # ensemble = Ensemble([[0.05,0.15],[0.6,1.0]],[0.0,0.0], [[1.0,3.0],[0.5,2.0]],[0.10,0.30],[2,10],[5,7], [1,2])
-        ensemble = Ensemble([[0.05,0.1],[0.6,0.8]], [0.6,0.8], [[1.0,3.0],[0.5,2.0]],[0.30,0.40],[2,10],[2.5,3.5], [1,2])
+        ensemble = Ensemble([[0.05,0.1],[0.6,0.8]], [0.6,0.8], [[1.0,3.0],[0.5,2.0]],[0.30,0.40],[2,10],[2.5,3.5], [1,2], Dict())
 
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 ensemble, maxCases, num_detected_before_alert)
@@ -3616,6 +1670,70 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
             outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
 
             outputFileName = "August2020OutbreakFit/CSVOutputs/Models/BP2020ensemble_cumulativecases_asymptomatic+lowR.csv"
+            outputCSVmodels(model_array, outputFileName)
+        end
+    end
+
+    println("Sim #4.4: August 2020 Sim Model Ensemble for Ccandu fitting. Detection of asymptomatic and more authentic Reff for reg covid, Al3->AL2")
+    if 4.4 in simRange
+
+        # better estimate of Reff for regular COVID is 2.3. Rather than current 3.3 (4 * 5/6).
+        # centre Reff around 2.3 (R around 2.76)
+
+        ################################################################################
+        # Simulating Delta Outbreak 18 August 2020
+        # time span to sim on
+        tspan = (0.0,60.0)
+        time_step = 1.0
+
+        # times to sim on
+        times = [i for i=tspan[1]:time_step:tspan[end]]
+        numSims = convert(Int, round(40000/numSimsScaling))
+
+        detection_tspan = (10,25) # increase from 6,14
+
+        maxCases=5*10^3
+
+        num_detected_before_alert=1
+
+        # ensemble = Ensemble([[0.05,0.15],[0.6,1.0]],[0.0,0.0], [[1.0,3.0],[0.5,2.0]],[0.10,0.30],[2,10],[5,7], [1,2])
+        ensemble = Ensemble([[0.05,0.1],[0.6,0.8]], [0.6,0.8], [[1.0,3.0],[0.5,2.0]],[0.30,0.40],[2,10],[2.5,3.5], [1,2], Dict(2=>Dict(:t_relative=>20, :R_scaling_range=>[0.45,0.5])))
+
+        cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
+                ensemble, maxCases, num_detected_before_alert)
+
+        t_current = 0
+
+        cumulativeCases = removeNaNs(cumulativeCases)
+
+        observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
+            122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
+            184,185,187,187,188,191,191,192,192,192,192,192,192,192,192,193,193,193,193,193,193,193,193]
+        tDetect = collect(0:length(observedIDetect)-1)
+
+
+        modPDailyDetect = dailyDetectCases
+
+        timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "August 2020 Ensemble, Daily Case Numbers After Detection"
+        outputFileName = "./August2020OutbreakFit/Asymptomatic+LowerR+AL2/DailyCaseNumbersAfterDetectionEnsemble26Aug"
+        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, false)
+        # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
+
+        title = "August 2021 Outbreak Model Ensemble for Ccandu"
+        outputFileName = "./August2020OutbreakFit/Asymptomatic+LowerR+AL2/EstimatedCaseNumbersAfterDetectionEnsemble26Aug"
+        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, Display, save, 0.1)
+
+        # output CSVs
+        if 4.4 in CSVOutputRange
+            @assert time_step == 1.0
+            outputFileName = "August2020OutbreakFit/CSVOutputs/BP2020ensemble_dailycases_asymptomatic+lowR+AL2.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+
+            outputFileName = "August2020OutbreakFit/CSVOutputs/BP2020ensemble_cumulativecases_asymptomatic+lowR+AL2.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+
+            outputFileName = "August2020OutbreakFit/CSVOutputs/Models/BP2020ensemble_cumulativecases_asymptomatic+lowR+AL2.csv"
             outputCSVmodels(model_array, outputFileName)
         end
     end
@@ -3699,7 +1817,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         num_detected_before_alert=1
 
         # ensemble = Ensemble([[0.05,0.15],[0.6,1.0]], [0.0,0.0], [[1.0,3.0],[0.5,2.0]],[0.10,0.30],[2,10],[5,7], [1,2])
-        ensemble = Ensemble([[0.05,0.1],[0.8,1.0]], [0.0,0.0], [[1.0,3.0],[0.5,1.5]],[0.20,0.25],[2,10],[5.5,6.5], [1,2])
+        ensemble = Ensemble([[0.05,0.1],[0.8,1.0]], [0.0,0.0], [[1.0,3.0],[0.5,1.5]],[0.20,0.25],[2,10],[5.5,6.5], [1,2], Dict())
 
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 ensemble, maxCases, num_detected_before_alert)
@@ -4338,9 +2456,6 @@ function casesAtDetection()
     println(quantile2D(detectedCases, 0.75)[70])
 end
 
-# casesAtDetection()
-
-
 function main()
 
     compilationInit()
@@ -4359,8 +2474,8 @@ function main()
 
     # augustOutbreakPostProcess(2,true,true)
 
-    # augustOutbreakSim(1, [4.3], true, true, [4.3])
-    augustOutbreakPostProcess([4],true,true)
+    augustOutbreakSim(10, [4.4], true, true, [4.4])
+    # augustOutbreakPostProcess([4.3],true,true)
 
 
     # augustOutbreakSim(1, [5, 6, 7], true, true)
@@ -4505,7 +2620,7 @@ end
 #
 # Dates.format(newDate, "u d")
 
-DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
-newDate = DAY__ZERO__DATE + Dates.Day(16)
-
-Dates.format(newDate, "u d")
+# DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
+# newDate = DAY__ZERO__DATE + Dates.Day(16)
+#
+# Dates.format(newDate, "u d")

@@ -65,11 +65,14 @@ module branchingProcesses
     mutable struct branchModelAlert_pars
         t_onset_to_isol::Float64
         p_test::Float64 # ∈ [0,1]
+        p_test_sub::Float64 # ∈ [0,1]
         R_scaling::Float64 # ∈ [0,1]
         num_detected_before_alert::Int64 # 1
         time_to_alert::Symbol # :instant, :onDay
         alert_level_changed::Bool # init false
         alert_level_scaling_speed::Union{Int64,Float64} # how many days it takes for alert level scaling to come into affect
+
+
     end
 
     struct branchModelAlert_nopars; end
@@ -1933,15 +1936,45 @@ module branchingProcesses
         return t, state_totals_all[1:num_events,:], num_cases
     end
 
+    function detectionRejection(population_df::DataFrame, model::branchModel, reaction::event, infection_time::Union{AbstractFloat, Int})::Bool
+        #=
+        Returns true if infection event is not rejected.
+        Returns false if infection event is rejected.
+        =#
+
+        # effectively (short circuit OR)
+        if !population_df[reaction.parentID,:detected]
+            return true
+        elseif infection_time < population_df[reaction.parentID,:time_isolated]
+            return true
+        elseif rand() < model.isolation_infectivity
+            return true
+        end
+        # else
+        return false
+    end
+
+    function alertRejection(model::branchModel, infection_time::Union{AbstractFloat,Int},
+        timeAlertChange::Union{AbstractFloat,Int}, usingAlert::Bool, alertLevelChanged::Bool)
+        #=
+        Return true if infection event is not rejected due to alert level effects.
+        Returns false if infection event is rejected.
+        =#
+        if !usingAlert
+            return true
+        elseif !alertLevelChanged
+            return true
+        elseif rand() < alertR_reduction(model, infection_time - timeAlertChange)
+            return true
+        end
+        return false
+    end
+
     function nextReact_branch!(population_df::DataFrame, model::branchModel)
 
         # are we using alert level paramaters ##################################
-        alertLevelChanged = false
-        usingAlert = false
-        trackDetectedCases = false
-        newPTest = false
-        newPTest_effective = 0.0
-        timeAlertChange = -1.0
+        alertLevelChanged = false; usingAlert = false; trackDetectedCases = false
+        newPTest = false; newPTest_sub = false; newPTest_effective = 0.0; timeAlertChange = -1.0
         if model.alert_pars != branchModelAlert_nopars()
             push!(model.state_totals, 0)
             usingAlert = true
@@ -1950,8 +1983,11 @@ module branchingProcesses
             # assumed that test rate is greater than previous test rate
             if model.alert_pars.p_test > model.p_test
                 newPTest = true
-
                 newPTest_effective = (model.alert_pars.p_test - model.p_test) / (1-model.p_test)
+            end
+
+            if model.alert_pars.p_test_sub > 0 && model.alert_pars.p_test_sub < 1
+                newPTest_sub = true
             end
 
             isolated = BitArray(undef, nrow(population_df)) .* false
@@ -1977,8 +2013,6 @@ module branchingProcesses
         # filter df on active infections
         active_df = filter(row -> row.active, population_df[1:num_cases, :], view=true)
 
-        # num_tau_events = model.max_cases * (model.reproduction_number*1.2 + 1)
-        # tau_i = [event(model.t_max+i,false,0,0) for i=1:num_tau_events]
         tau_heap = MutableBinaryHeap{event, DataStructures.FasterForward}()
 
         sSaturation = (model.state_totals[1]/model.population_size)
@@ -2022,13 +2056,12 @@ module branchingProcesses
                 # rejection step for population saturation
                 if rand() < sSaturation/reaction.sSaturation
 
-                    # rejection step for detection and subsequent isolation (short circuit OR)
-                    if !population_df[reaction.parentID,:detected] ||
-                        infection_time < population_df[reaction.parentID,:time_isolated] ||
-                        rand() < model.isolation_infectivity
+                    # rejection step for detection and subsequent isolation
+                    if detectionRejection(population_df, model, reaction, infection_time)
 
                         # rejection step for alert level change
-                        if !usingAlert || !alertLevelChanged || rand() < alertR_reduction(model, infection_time - timeAlertChange)
+                        if alertRejection(model, infection_time, timeAlertChange, usingAlert, alertLevelChanged)
+
                             num_cases += 1
                             initNewCase!(population_df, model, infection_time, reaction.parentID, num_cases)
 
@@ -2040,6 +2073,8 @@ module branchingProcesses
                                 # init iso time for case
 
                                 if newPTest
+                                    # there is still a chance this person has been detected.
+                                    # this is with prob newPTest_effective
                                     if !population_df[num_cases, :sub_Clin_Case] && !population_df[num_cases, :detected]
 
                                         # init iso time w/ prob newPTest_effective
@@ -2050,6 +2085,19 @@ module branchingProcesses
                                             population_df[num_cases, :detected] = true
                                         end
                                     end
+                                elseif newPTest_sub
+                                    # sub_Clin_Cases were never detected prior to Alert Level change
+                                    if population_df[num_cases, :sub_Clin_Case]
+
+                                        # init iso time w/ prob newPTest_effective
+                                        if rand(Bernoulli(model.alert_pars.p_test_sub))
+                                            new_iso_row = @view population_df[num_cases, :]
+
+                                            population_df[num_cases, :time_isolated] = getTimeIsolated(model, new_iso_row)[1]
+                                            population_df[num_cases, :detected] = true
+                                        end
+                                    end
+
                                 end
                             end
 
@@ -2115,7 +2163,7 @@ module branchingProcesses
                 model.alert_pars.alert_level_changed = true
 
                 # edit iso times for currently active cases
-                if newPTest || model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
+                if newPTest || newPTest_sub || model.t_onset_to_isol != model.alert_pars.t_onset_to_isol
                     # find active clinical cases
                     active_df = filter(row -> row.active==true && row.sub_Clin_Case==false, population_df, view=true)
 
@@ -2143,6 +2191,22 @@ module branchingProcesses
                         clin_cases = filter(row -> row.detected==false, active_df, view=true)
                         clin_cases.detected .= rand(Bernoulli(newPTest_effective), nrow(clin_cases))
                         detected_cases = filter(row -> row.detected==true, clin_cases, view=true)
+                        detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
+                            getOnsetToIsolDelay(model, nrow(detected_cases))
+
+                        # insert new isolation events
+                        for i in 1:nrow(detected_cases)
+                            if trackDetectedCases
+                                push!(tau_heap, event(detected_cases[i,:time_isolated], :isolation, detected_cases[i,:caseID], sSaturation))
+                            end
+                        end
+                    end
+
+                    if newPTest_sub
+                        sub_clin_cases = filter(row -> row.active==true && row.sub_Clin_Case==true, population_df, view=true)
+
+                        sub_clin_cases.detected .= rand(Bernoulli(model.alert_pars.p_test_sub), nrow(sub_clin_cases))
+                        detected_cases = filter(row -> row.detected==true, sub_clin_cases, view=true)
                         detected_cases.time_isolated .= max.(detected_cases.time_infected.+detected_cases.time_onset_delay, infection_time) .+
                             getOnsetToIsolDelay(model, nrow(detected_cases))
 
@@ -2217,14 +2281,15 @@ module branchingProcesses
 
         if alert
             t_onset_to_isol_new=2.2
-            p_test_new = 0.8
+            p_test_new_clin = 0.8
+            p_test_new_sub = 0.7
             R_scaling = 0.2
             num_detected_before_alert = 1
             time_to_alert = :oneDay # ∈ [:instant, :onDay, :oneDay]
             alert_level_changed = false
             alert_level_scaling_speed = 5
-            alert_pars = branchModelAlert_pars(t_onset_to_isol_new, p_test_new, R_scaling, num_detected_before_alert,
-                    time_to_alert, alert_level_changed, alert_level_scaling_speed)
+            alert_pars = branchModelAlert_pars(t_onset_to_isol_new, p_test_new_clin, p_test_new_sub,
+                R_scaling, num_detected_before_alert, time_to_alert, alert_level_changed, alert_level_scaling_speed)
         end
 
         model = branchModel(t_init, t_max, population_size, max_cases, state_totals, states,

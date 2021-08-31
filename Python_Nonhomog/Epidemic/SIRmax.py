@@ -34,18 +34,15 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
     sim_time = 0
     entry_times = np.zeros(N)
 
-    # initialise random variate generation with set seed
-    rng = random.default_rng(123)
-
     while t[-1] < tMax and iTotal != 0:
         # get sum of maximum bounds
         rateMax = np.concatenate((maxbeta*numSusNei,maxalpha*(1-np.abs(susceptible))))
         H = np.sum(rateMax)
-        deltaT = rng.exponential(1/H)
+        deltaT = -np.log(1-random())/H
         eventIndex = random.choice(a=N,p=rateMax/H)
         eventType = "I" if eventIndex < N else "R"
         trueIndex = eventIndex if eventIndex < N else (eventIndex-N)
-        r = rng.uniform()
+        r = random.uniform()
         if r <= rateFunction(eventType, numSusNei[trueIndex], entry_times[trueIndex],  maxbeta, maxalpha, sim_time)/rateMax[eventIndex]:
             # update local neighbourhood attributes
             if eventType == "I":  # (S->I)

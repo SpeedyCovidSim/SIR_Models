@@ -23,7 +23,7 @@ def selectEventIndex(rates, probs, rng, N):
     return deltaT, eventIndex
 
 
-def gillespieSEIR(tMax, network, eTotal, pTotal, iTotal, sTotal, rTotal, numInfNei, numPreNei, rates, susceptible, alpha, beta, gamma, zeta, tInit = 0.0):
+def gillespieSEPIR(tMax, network, eTotal, pTotal, iTotal, sTotal, rTotal, numInfNei, numPreNei, rates, susceptible, alpha, beta, gamma, zeta, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling

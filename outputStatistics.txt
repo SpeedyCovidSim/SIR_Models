@@ -1,0 +1,8 @@
+
+Daily cases are projected to drop:
+Cases numbers on average begin to drop 12 days after detection on Aug 29
+Median max case number is 72.0
+Cases numbers 75% quartile begin to drop 12 days after detection on Aug 29
+75% Quartile max case number is 77.0
+Cases numbers 25% quartile begin to drop 12 days after detection on Aug 29
+25% Quartile max case number is 68.0

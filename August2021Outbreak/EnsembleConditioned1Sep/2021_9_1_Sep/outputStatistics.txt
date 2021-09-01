@@ -1,0 +1,16 @@
+Cumulative cases at detection
+Median cumulative cases of 163.0
+IQR of [153.0, 174.0]
+Detected and cumulative cases at Oct 26
+Median cumulative cases of 4049.0
+IQR of [3240.0, 5050.0]
+Median detected cases of 2379.0
+IQR of [1960.0, 2910.0]
+
+Daily cases are projected to drop:
+Cases numbers on average begin to drop 14 days after detection on Aug 31
+Median max case number is 70.0
+Cases numbers 75% quartile begin to drop 15 days after detection on Sep 1
+75% Quartile max case number is 79.0
+Cases numbers 25% quartile begin to drop 14 days after detection on Aug 31
+25% Quartile max case number is 63.0

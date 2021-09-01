@@ -2318,7 +2318,7 @@ module branchingProcesses
         if alert
             t_onset_to_isol_new=2.2
             p_test_new_clin = 0.8
-            p_test_new_sub = 0.7
+            p_test_new_sub = 0.0
             R_scaling = 0.2
             num_detected_before_alert = 1
             time_to_alert = :oneDay # ∈ [:instant, :onDay, :oneDay]

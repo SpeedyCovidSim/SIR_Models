@@ -44,7 +44,7 @@ def gillespieMax(tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, susce
         rateMax = np.concatenate((maxbeta*numSusNei*(susceptible==0),maxalpha*(susceptible==1),maxgamma*(susceptible==2)))
         H = np.sum(rateMax)
         deltaT = rng.exponential(1/H)
-        eventIndex = random.choice(a=N,p=rateMax/H)
+        eventIndex = random.choice(a=len(rateMax),p=rateMax/H)
         eventType = "E" if eventIndex < N else "R" if eventIndex < 2*N else "I"
         trueIndex = eventIndex if eventIndex < N else (eventIndex-N)
         r = rng.uniform()

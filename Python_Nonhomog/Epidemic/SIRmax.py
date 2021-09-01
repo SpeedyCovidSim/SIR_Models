@@ -39,7 +39,7 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
         rateMax = np.concatenate((maxbeta*numSusNei,maxalpha*(1-np.abs(susceptible))))
         H = np.sum(rateMax)
         deltaT = -np.log(1-random())/H
-        eventIndex = random.choice(a=N,p=rateMax/H)
+        eventIndex = random.choice(a=len(rateMax),p=rateMax/H)
         eventType = "I" if eventIndex < N else "R"
         trueIndex = eventIndex if eventIndex < N else (eventIndex-N)
         r = random.uniform()

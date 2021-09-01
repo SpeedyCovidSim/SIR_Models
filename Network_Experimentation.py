@@ -4,6 +4,7 @@ import time
 import igraph as ig
 import copy
 from matplotlib import pyplot as plt
+from pythonCompartment.sirNetworksData import gillespieDirectNetwork
 
 
 def setNetwork(network, prop_i=0.05):
@@ -49,13 +50,13 @@ def initHazards(network, infecteds, N):
     numInfNei = np.zeros(N)
     numSusNei = np.zeros(N)
     # loop over all infected vertices
-    for inf_vert in network.vs(infecteds):
+    for inf_ind,inf_vert in enumerate(network.vs(infecteds)):
         # Increase number of infected neighbours for neighbouring vertices
         neighbours = network.neighbors(inf_vert)
         for n in neighbours:
             numInfNei[n] += 1
             if not(n in infecteds):
-                numSusNei[inf_vert] += 1
+                numSusNei[infecteds[inf_ind]] += 1
     # don't count infecteds for speed-up
     numInfNei[infecteds] = 0
     return numInfNei, numSusNei
@@ -70,7 +71,7 @@ def main():
     tMax = 200
     maxalpha = 0.4
     maxgamma = 0.1
-    maxbeta = 0.2
+    maxbeta = 4
     t = np.linspace(0,tMax,1000)
 
     # iterate through populations for complete graphs
@@ -82,13 +83,6 @@ def main():
     Sn = {}
     In = {}
     Rn = {}
-
-    def rateFunction(eventType, numSusNei, entry_time,  maxbeta, maxalpha, sim_time): 
-        if eventType == "R": 
-            return (maxalpha*(sim_time-entry_time))/(25+(sim_time-entry_time)**2)  
-        else:
-            return (maxbeta*(sim_time-entry_time))/(25+(sim_time-entry_time)**2)
-
 
     network = ig.Graph.Full(1000)
     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -104,7 +98,7 @@ def main():
     plt.plot(tp, Sp, color="#82c7a5",label="Susceptible",lw = 2, alpha=0.5,figure=fig)
     plt.plot(tp, Ip, color="#f15e22",label="Infected",lw = 2, alpha=0.5,figure=fig)
     plt.plot(tp, Rp, color="#7890cd",label="Recovered",lw = 2, alpha=0.5,figure=fig)
-    plt.plt.legend()
+    plt.legend()
     plt.xlabel("Time", fontsize=20)
     plt.ylabel("Number of Individuals in State", fontsize=16)
     plt.title(f"SIR model with a fully connected population size of {N}", fontsize=20)

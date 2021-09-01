@@ -1,6 +1,7 @@
 import numpy as np
 import igraph as ig
 from numpy import random
+from random import random as unif
 
 def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, alpha, beta, tInit = 0.0):
     '''
@@ -38,8 +39,8 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
 
     while t[-1] < tMax and iTotal != 0:
         # get next event time and next event index
-        deltaT = -np.log(1-random())/sum(rates)
-        eventIndex = random.choice(a=N,p=rates/sum(rates))
+        deltaT = -np.log(1-unif())/sum(rates)
+        eventIndex = random.choice(a=len(rates),p=rates/sum(rates))
         eventType = "I" if eventIndex < N else "R"
         trueIndex = eventIndex if eventIndex < N else(eventIndex-N)
         # update local neighbourhood attributes
@@ -57,7 +58,7 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
             # update infection hazards of neighbouring infected vertices
             for n in neighbors:
                 if susceptible[n]==0:
-                    numSusNei[infectedIndex] -= 1
+                    numSusNei[n] -= 1
                     rates[n] = beta*numSusNei[n]/network.degree(n)
             # update network totals
             sTotal-= 1
@@ -67,7 +68,7 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
             # change individual recovery and infection hazards and state
             rates[eventIndex] = 0
             rates[trueIndex] = 0
-            susceptible[eventIndex] = -1
+            susceptible[trueIndex] = -1
             # update network totals
             iTotal -= 1
             rTotal += 1

@@ -3,8 +3,7 @@ from numpy import random
 import time
 import igraph as ig
 import copy
-from plots import plotSIR, plotSIRK
-from Python_Nonhomog.Epidemic import SIRmax, seirNetworks
+from matplotlib import pyplot as plt
 
 
 def setNetwork(network, prop_i=0.05):
@@ -66,13 +65,12 @@ def main():
     Main loop for testing within this Python file
     '''
     # initialise variables
-    N = 100
+    N = 1000
   
     tMax = 200
     maxalpha = 0.4
     maxgamma = 0.1
-    maxbeta = 10 / N
-    lamb = 0.1
+    maxbeta = 0.2
     t = np.linspace(0,tMax,1000)
 
     # iterate through populations for complete graphs
@@ -92,45 +90,53 @@ def main():
             return (maxbeta*(sim_time-entry_time))/(25+(sim_time-entry_time)**2)
 
 
-    network = ig.Graph.Erdos_Renyi(100,0.1)
+    network = ig.Graph.Full(1000)
     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
-    for i in range(100):
-        print(f"Nonhomog Iteration {i} commencing")
-        tp, Sp, Ip, Rp = SIRmax.gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, maxalpha, maxbeta, rateFunction)
-        Sn[i] = np.interp(t, tp, Sp, right=Sp[-1])
-        In[i] = np.interp(t, tp, Ip, right=Ip[-1])
-        Rn[i] = np.interp(t, tp, Rp, right=Rp[-1])
-    Snmed = np.median(np.array(list(Sn.values())),0)
-    Inmed = np.median(np.array(list(In.values())),0)
-    Rnmed = np.median(np.array(list(Rn.values())),0)
-    #daily counts for epinow2
-    Snmeddaily = np.interp(np.linspace(0,tMax,tMax+1),t,Snmed)
-    np.savetxt("Sn daily.csv", Snmeddaily, delimiter=",")
+    rates = np.zeros(2*N)
+    for inf in infecteds:
+        # set recovery hazard
+        rates[N+inf] = maxalpha
+        # set infection hazard
+        rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+    
+    tp, Sp, Ip, Rp = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta)
+    fig = plt.figure()
+    plt.plot(tp, Sp, color="#82c7a5",label="Susceptible",lw = 2, alpha=0.5,figure=fig)
+    plt.plot(tp, Ip, color="#f15e22",label="Infected",lw = 2, alpha=0.5,figure=fig)
+    plt.plot(tp, Rp, color="#7890cd",label="Recovered",lw = 2, alpha=0.5,figure=fig)
+    plt.plt.legend()
+    plt.xlabel("Time", fontsize=20)
+    plt.ylabel("Number of Individuals in State", fontsize=16)
+    plt.title(f"SIR model with a fully connected population size of {N}", fontsize=20)
+    plt.show()
 
-    eTotal = 0
-    rates = np.zeros(N)
-    # loop over all infected vertices
-    for inf_vert in network.vs(infecteds):
-        # Increase number of infected neighbours for neighbouring vertices
-        neighbours = network.neighbors(inf_vert)
-        for n in neighbours:
-            rates[n] += maxbeta
-    rates[infecteds] = maxalpha
+    # for i in range(100):
+    #     print(f"Nonhomog Iteration {i} commencing")
+    #     tp, Sp, Ip, Rp = SIRmax.gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, maxalpha, maxbeta, rateFunction)
+    #     Sn[i] = np.interp(t, tp, Sp, right=Sp[-1])
+    #     In[i] = np.interp(t, tp, Ip, right=Ip[-1])
+    #     Rn[i] = np.interp(t, tp, Rp, right=Rp[-1])
+    # Snmed = np.median(np.array(list(Sn.values())),0)
+    # Inmed = np.median(np.array(list(In.values())),0)
+    # Rnmed = np.median(np.array(list(Rn.values())),0)
+    # #daily counts for epinow2
+    # Snmeddaily = np.interp(np.linspace(0,tMax,tMax+1),t,Snmed)
+    # np.savetxt("Sn daily.csv", Snmeddaily, delimiter=",")
 
-    for i in range(100):
-        print(f"Homog Iteration {i} commencing")
-        tp, Sp, Ep, Ip, Rp = seirNetworks.gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, copy.copy(rates), susceptible, maxalpha, maxbeta, maxgamma)
-        Sh[i] = np.interp(t, tp, Sp, right=Sp[-1])
-        Eh[i] = np.interp(t, tp, Ep, right=Ep[-1])
-        Ih[i] = np.interp(t, tp, Ip, right=Ip[-1])
-        Rh[i] = np.interp(t, tp, Rp, right=Rp[-1])
-    Shmed = np.median(np.array(list(Sh.values())),0)
-    Ehmed = np.median(np.array(list(Eh.values())),0)
-    Ihmed = np.median(np.array(list(Ih.values())),0)
-    Rhmed = np.median(np.array(list(Rh.values())),0)
-    #daily counts for epinow2
-    Shmeddaily = np.interp(np.linspace(0,tMax,tMax+1),t,Snmed)
-    np.savetxt("Sh daily.csv", Shmeddaily, delimiter=",")
+    # for i in range(100):
+    #     print(f"Homog Iteration {i} commencing")
+    #     tp, Sp, Ep, Ip, Rp = seirNetworks.gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, copy.copy(rates), susceptible, maxalpha, maxbeta, maxgamma)
+    #     Sh[i] = np.interp(t, tp, Sp, right=Sp[-1])
+    #     Eh[i] = np.interp(t, tp, Ep, right=Ep[-1])
+    #     Ih[i] = np.interp(t, tp, Ip, right=Ip[-1])
+    #     Rh[i] = np.interp(t, tp, Rp, right=Rp[-1])
+    # Shmed = np.median(np.array(list(Sh.values())),0)
+    # Ehmed = np.median(np.array(list(Eh.values())),0)
+    # Ihmed = np.median(np.array(list(Ih.values())),0)
+    # Rhmed = np.median(np.array(list(Rh.values())),0)
+    # #daily counts for epinow2
+    # Shmeddaily = np.interp(np.linspace(0,tMax,tMax+1),t,Snmed)
+    # np.savetxt("Sh daily.csv", Shmeddaily, delimiter=",")
 
 if __name__=="__main__":
     main()

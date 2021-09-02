@@ -1,0 +1,43 @@
+Cumulative cases at detection
+Median cumulative cases of 162.0
+IQR of [150.0, 173.0]
+Detected and cumulative cases at Oct 26
+Median cumulative cases of 3774.0
+IQR of [3150.0, 4440.0]
+Median detected cases of 2194.0
+IQR of [1860.0, 2580.0]
+
+Daily cases are projected to drop:
+Cases numbers on average begin to drop 14 days after detection on Aug 31
+Median max case number is 66.0
+Cases numbers 75% quartile begin to drop 14 days after detection on Aug 31
+75% Quartile max case number is 75.0
+Cases numbers 25% quartile begin to drop 13 days after detection on Aug 30
+25% Quartile max case number is 60.0
+
+Projected cases for the next 5 days are:
+September 3 2021: 62.0, IQR = [55.0,70.0]
+September 4 2021: 60.0, IQR = [54.0,67.0]
+September 5 2021: 58.0, IQR = [51.0,67.0]
+September 6 2021: 55.0, IQR = [49.0,63.0]
+September 7 2021: 55.0, IQR = [47.0,62.0]
+September 8 2021: 53.0, IQR = [47.0,62.0]
+
+Projected cases for the next 5 days are (overleaf table format):
+\begin{table}[h] 
+ \centering 
+ \begin{tabular}{c|c|c|c|c|c}
+Data Quartiles & September 3 2021 & September 4 2021 & September 5 2021 & September 6 2021 & September 7 2021 & September 8 2021\\
+\hline
+25\% Quartile & 55.0 & 54.0 & 51.0 & 49.0 & 47.0 & 47.0\\
+Median & 62.0 & 60.0 & 58.0 & 55.0 & 55.0 & 53.0\\
+75\% Quartile & 70.0 & 67.0 & 67.0 & 63.0 & 62.0 & 62.0\\
+\end{tabular}
+\caption{}
+\label{tab:}
+\end{table}
+
+Cases numbers are projected to hit 10 per day by:
+On average: October 24 2021
+IQR = [October 9 2021, May 23 2024]
+95% Quartile Range = [September 26 2021, May 23 2024]

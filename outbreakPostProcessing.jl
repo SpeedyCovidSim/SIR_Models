@@ -220,7 +220,7 @@ module outbreakPostProcessing
         return models_df
     end
 
-    function removeNaNs(array::Array{Float64,2})
+    function removeNaNs(array::Array{Float64,2}, newVal=0.0)
         #=
         Replace all NaNs in a 2d array with 0.0
         =#
@@ -228,7 +228,7 @@ module outbreakPostProcessing
         for i in 1:length(array[1,:])
             for j in 1:length(array[:,1])
                 if isnan(array[j,i])
-                    array[j,i]=0.0
+                    array[j,i]=newVal
                 end
             end
         end

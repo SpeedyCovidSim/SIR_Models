@@ -381,9 +381,9 @@ module BranchVerifySoln
     end
 
     function multipleLinearSplines(state_totals_all::Array{}, t::Array{}, times::Array{})
-        splineS = Spline1D(t, state_totals_all[:,1], k=1)
-        splineI = Spline1D(t, state_totals_all[:,2], k=1)
-        splineR = Spline1D(t, state_totals_all[:,3], k=1)
+        splineS = Spline1D(t, state_totals_all[:,1], k=1, bc="nearest")
+        splineI = Spline1D(t, state_totals_all[:,2], k=1, bc="nearest")
+        splineR = Spline1D(t, state_totals_all[:,3], k=1, bc="nearest")
 
         return splineS(times), splineI(times), splineR(times)
     end
@@ -395,7 +395,7 @@ module BranchVerifySoln
     end
 
     function singleLinearSpline(x::Array{}, t::Array, times::Array)
-        spline = Spline1D(t, x, k=1)
+        spline = Spline1D(t, x, k=1, bc="nearest")
 
         return spline(times)
     end

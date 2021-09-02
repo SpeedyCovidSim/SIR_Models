@@ -18,6 +18,10 @@ using branchingProcesses
 using BPVerifySolutions
 using outbreakPostProcessing
 
+# set some globals
+global const PROGRESS__METER__DT = 0.2
+global const DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
+
 # import Ccandu conditioning
 py"""
 import sys
@@ -26,6 +30,10 @@ from transpose import transposeCSV
 """
 # conditionEnsemble = py"condition"
 transposeCSV = py"transposeCSV"
+
+function daysSinceZero()
+    return Dates.value(Date(now()) - DAY__ZERO__DATE)
+end
 
 function convertCSVtoConditioning(origPath, newPath)
 
@@ -78,10 +86,6 @@ end
 #
 # convertCSVtoConditioning(origPath, newPath);
 
-# set some globals
-global const PROGRESS__METER__DT = 0.2
-global const DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
-
 function observedCasesAugust2020(daily::Bool)
     observedIDetect = [1,4,17,29,34,47,59,68,78,83,85,92,94,101,108,111,116,
     122,131,135,139,141,145,149,151,154,159,161,165,171,172,174,176,177,178,179,179,184,
@@ -103,7 +107,6 @@ function observedCases()
     tDetect = collect(0:length(observedIDetect)-1)
     return observedIDetect, tDetect
 end
-
 
 function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
 
@@ -821,7 +824,7 @@ function simulateHospDaily(dailyTimes, dailyDetectedCases, propHosp, propofHosp_
                 currentHosp_df = filter(row -> row.hospCase && row.hospEntryTime <= dailyTimes[k] &&
                     row.hospExitTime >= dailyTimes[k], detected_df, view=true)
 
-                currentCrit_df = filter(row -> row.critCase && row.critEntryTime < dailyTimes[k] &&
+                currentCrit_df = filter(row -> row.critCase && (row.critEntryTime .+row.hospEntryTime) < dailyTimes[k] &&
                     row.hospExitTime >= dailyTimes[k], currentHosp_df, view=true)
 
                 dailyHosp[k, hospIndex] = nrow(currentHosp_df)
@@ -835,7 +838,6 @@ function simulateHospDaily(dailyTimes, dailyDetectedCases, propHosp, propofHosp_
 
     return dailyHosp, dailyCrit
 end
-
 
 function plotHospEstimate(dailyTimes, cumulativeConfirmedCases, proportion, title, outputFileName, Display=true, save=false)
 
@@ -906,14 +908,14 @@ function plotHospEstimateDaily(dailyTimes, dailyConfirmedCases, title, outputFil
     quantiles50_2 = quantile2D(dailyConfirmedCases, 0.75)
 
     # plotting 95% bands ---------------------------------------------------
-    plt.plot(dailyTimes, quantiles95_1, "k--", label="95% Curvewise Quantile Bands ", lw=2, alpha = 0.5)
+    plt.plot(dailyTimes, quantiles95_1, "k--", label="95% Quantile Bands ", lw=2, alpha = 0.5)
     plt.plot(dailyTimes, quantiles95_2, "k--", lw=2, alpha = 0.5)
 
     plt.fill_between(dailyTimes, quantiles95_1, quantiles50_1, alpha=0.5, color = "r")
     plt.fill_between(dailyTimes, quantiles95_2, quantiles50_2, alpha=0.5, color = "r")
 
     # plotting 50% bands ---------------------------------------------------
-    plt.plot(dailyTimes, quantiles50_1, "r--", label="50% Curvewise Quantile Bands", lw=2, alpha = 0.8)
+    plt.plot(dailyTimes, quantiles50_1, "r--", label="50% Quantile Bands", lw=2, alpha = 0.8)
     plt.plot(dailyTimes, quantiles50_2, "r--", lw=2, alpha = 0.8)
     plt.fill_between(dailyTimes, quantiles50_1, quantiles50_2, alpha=0.5, color = "b")
 
@@ -1642,7 +1644,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         # write stats to file
         io_output = casesAtDetection(cumulativeDetectedCases, cumulativeTotalCases, io_output)
 
-        t_current = 16
+        t_current = daysSinceZero()
         plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
             observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
             true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
@@ -1662,7 +1664,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save, true)
 
 
-        # estimated hospitilisations
+        # estimated hospitilisations ###########################################
         title = "Estimated cumulative hospitalisations"
         outputFileName = newdir*"/cumulativeHospitalisations_7_5%"
         plotHospEstimate(timesDaily[1:61], cumulativeDetectedCases[1:61,:], 0.075, title, outputFileName, Display, save)
@@ -1676,7 +1678,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         title = "Estimated daily critical hospitalisations"
         outputFileName = newdir*"/dailyCritHospitalisations"
         plotHospEstimateDaily(timesDaily[1:61], dailyCrit[1:61,:], title, outputFileName, Display, save)
-
+        ########################################################################
 
         models_df = reloadCSVmodels("./August2021Outbreak/CSVOutputs/Models/BP2021ensemble_cumulativecases_26Aug.csv")
         title = "Value of Reff pre and post Alert Level, conditioned and unconditioned"
@@ -1726,7 +1728,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         value = 10
         io_output = caseNumbersHitValue(dailyDetectedCases, io_output, value)
 
-        t_current = 15
+        t_current = daysSinceZero()
         plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
             observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
             true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
@@ -1741,6 +1743,14 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         # outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
         # probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
 
+        dailyHosp, dailyCrit = simulateHospDaily(timesDaily, dailyDetectedCases, 0.1, 0.5, 0.5)
+        title = "Estimated daily hospitalisations"
+        outputFileName = newdir*"/dailyHospitalisations"
+        plotHospEstimateDaily(timesDaily[1:61], dailyHosp[1:61,:], title, outputFileName, Display, save)
+
+        title = "Estimated daily critical hospitalisations"
+        outputFileName = newdir*"/dailyCritHospitalisations"
+        plotHospEstimateDaily(timesDaily[1:61], dailyCrit[1:61,:], title, outputFileName, Display, save)
 
         numCasesRange = 90:-1:0
         daysSinceRange = 5:1:40
@@ -2689,7 +2699,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases, dailyTotalCases, model_array = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
                 ensemble, maxCases, num_detected_before_alert)
 
-        t_current = 15
+        t_current = daysSinceZero()
 
         cumulativeCases = removeNaNs(cumulativeCases)
 
@@ -3302,9 +3312,6 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
 end
 
 
-
-
-
 function main()
 
     compilationInit()
@@ -3321,7 +3328,7 @@ function main()
 
     # augustOutbreakSim(1, [13.5])
 
-    augustOutbreakPostProcess([2.2],true,true)
+    augustOutbreakPostProcess([2.1],true,true)
 
     # augustOutbreakSim(10, [5.2], true)
     # augustOutbreakSim(1, [5.2], true, true,[5.2])
@@ -3463,11 +3470,9 @@ end
 
 
 # DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
-#
 # newDate = DAY__ZERO__DATE + Dates.Day(1)
 #
 # Dates.format(DAY__ZERO__DATE, "u d")
-#
 # Dates.format(newDate, "u d")
 
 # DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")

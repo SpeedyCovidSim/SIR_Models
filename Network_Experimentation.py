@@ -67,7 +67,6 @@ def main(erdos_renyi_test=True, ring_k_test=True):
     '''
     # initialise variables
     N = 1000
-  
     tMax = 30
     maxalpha = 0.4
     maxgamma = 0.1
@@ -76,10 +75,9 @@ def main(erdos_renyi_test=True, ring_k_test=True):
 
     # iterate through populations for complete graphs
     print("Beginning toy network simulations")
-    S = {}
-    I = {}
-    R = {}
+
     if (erdos_renyi_test):
+        print("Beginning Erdos-Renyi prob. tests")
         network = ig.Graph.Full(1000)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
         rates = np.zeros(2*N)
@@ -88,9 +86,11 @@ def main(erdos_renyi_test=True, ring_k_test=True):
             rates[N+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        
+        S = {}
+        I = {}
+        R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             tfulli, Sfulli, Ifulli, Rfulli = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, tfulli, Sfulli, right=Sfulli[-1])
             I[i] = np.interp(t, tfulli, Ifulli, right=Ifulli[-1])
@@ -118,12 +118,11 @@ def main(erdos_renyi_test=True, ring_k_test=True):
             rates[N+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        
         S = {}
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t5i, S5i, I5i, R5i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t5i, S5i, right=S5i[-1])
             I[i] = np.interp(t, t5i, I5i, right=I5i[-1])
@@ -141,8 +140,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Individuals in State", fontsize=16)
         plt.title(f"SIR model with a connectivity of 0.5, population size of {N}", fontsize=20)
-        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/0.5_Connected")
-
+        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/05_Connected")
 
         network = ig.Graph.Erdos_Renyi(1000,0.1)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -152,12 +150,11 @@ def main(erdos_renyi_test=True, ring_k_test=True):
             rates[N+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        
         S = {}
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t1i, S1i, I1i, R1i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t1i, S1i, right=S1i[-1])
             I[i] = np.interp(t, t1i, I1i, right=I1i[-1])
@@ -175,7 +172,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Individuals in State", fontsize=16)
         plt.title(f"SIR model with a connectivity of 0.1, population size of {N}", fontsize=20)
-        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/0.1_Connected")
+        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/01_Connected")
 
         network = ig.Graph.Erdos_Renyi(1000,0.01)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -190,7 +187,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t01i, S01i, I01i, R01i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t01i, S01i, right=S01i[-1])
             I[i] = np.interp(t, t01i, I01i, right=I01i[-1])
@@ -208,13 +205,13 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Individuals in State", fontsize=16)
         plt.title(f"SIR model with a connectivity of 0.1, population size of {N}", fontsize=20)
-        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/0.01_Connected")
+        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/001_Connected")
 
         fig = plt.figure()
-        plt.plot(t, Ifull, color="red",label="Full",lw = 2,figure=fig)
-        plt.plot(t, I5, color="blue",label="P = 0.5",lw = 2,figure=fig)
-        plt.plot(t, I1, color="green",label="P = 0.1",lw = 2,figure=fig)
-        plt.plot(t, I01, color="yellow",label="P = 0.01",lw = 2,figure=fig)
+        plt.plot(t, Ifull, color="red",label="Full",lw = 2,alpha=0.5,figure=fig)
+        plt.plot(t, I5, color="blue",label="P = 0.5",lw = 2,alpha=0.5,figure=fig)
+        plt.plot(t, I1, color="green",label="P = 0.1",lw = 2,alpha=0.5,figure=fig)
+        plt.plot(t, I01, color="yellow",label="P = 0.01",lw = 2,alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Infected Individuals", fontsize=16)
@@ -222,9 +219,9 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/P_Comparison")
 
     if(ring_k_test):
+        print("Beginning Lattice Ring k tests")
         # initialise variables
         N = 1000
-    
         tMax = 30
         maxalpha = 0.4
         maxgamma = 0.1
@@ -243,7 +240,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             tfulli, Sfulli, Ifulli, Rfulli = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, tfulli, Sfulli, right=Sfulli[-1])
             I[i] = np.interp(t, tfulli, Ifulli, right=Ifulli[-1])
@@ -275,7 +272,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t4i, S4i, I4i, R4i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t4i, S4i, right=S4i[-1])
             I[i] = np.interp(t, t4i, I4i, right=I4i[-1])
@@ -307,7 +304,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t2i, S2i, I2i, R2i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t2i, S2i, right=S2i[-1])
             I[i] = np.interp(t, t2i, I2i, right=I2i[-1])
@@ -339,7 +336,7 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         I = {}
         R = {}
         fig = plt.figure()
-        for i in range(10):
+        for i in range(30):
             t1i, S1i, I1i, R1i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
             S[i] = np.interp(t, t1i, S1i, right=S1i[-1])
             I[i] = np.interp(t, t1i, I1i, right=I1i[-1])
@@ -371,4 +368,4 @@ def main(erdos_renyi_test=True, ring_k_test=True):
         plt.savefig(f"PythonPlotting/Lattice_K_Tests/K_Comparison")
 
 if __name__=="__main__":
-    main(True, False)
+    main(False, False)

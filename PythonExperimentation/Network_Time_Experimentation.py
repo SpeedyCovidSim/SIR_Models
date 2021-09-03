@@ -92,7 +92,7 @@ def main():
             return (maxbeta*(sim_time-entry_time))/(25+(sim_time-entry_time)**2)
 
 
-    network = ig.Graph.Erdos_Renyi(100,0.1)
+    network = ig.Graph.Erdos_Renyi(100,0.01)
     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
     for i in range(100):
         print(f"Nonhomog Iteration {i} commencing")

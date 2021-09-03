@@ -1,6 +1,7 @@
 import numpy as np
 import igraph as ig
 from numpy import random
+from random import random as unif
 
 def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, maxalpha, maxbeta, rateFunction, tInit = 0.0):
     '''
@@ -33,17 +34,17 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
     i = 1
     sim_time = 0
     entry_times = np.zeros(N)
-
+    num_neighbours = np.array(network.degree())
     while t[-1] < tMax and iTotal != 0:
         # get sum of maximum bounds
-        rateMax = np.concatenate((maxbeta*numSusNei,maxalpha*(1-np.abs(susceptible))))
+        rateMax = np.concatenate((maxbeta*numSusNei/num_neighbours,maxalpha*(1-np.abs(susceptible))))
         H = np.sum(rateMax)
         deltaT = -np.log(1-random())/H
         eventIndex = random.choice(a=len(rateMax),p=rateMax/H)
         eventType = "I" if eventIndex < N else "R"
         trueIndex = eventIndex if eventIndex < N else (eventIndex-N)
         r = random.uniform()
-        if r <= rateFunction(eventType, numSusNei[trueIndex], entry_times[trueIndex],  maxbeta, maxalpha, sim_time)/rateMax[eventIndex]:
+        if r <= rateFunction(eventType, numSusNei[trueIndex], num_neighbours[trueIndex], entry_times[trueIndex],  maxbeta, maxalpha, sim_time)/rateMax[eventIndex]:
             # update local neighbourhood attributes
             if eventType == "I":  # (S->I)
                 # choose infected person
@@ -51,15 +52,13 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
                 # change state and entry time
                 susceptible[infectedIndex] = 0
                 entry_times[infectedIndex] = t[i-1]+deltaT
+                # update infected vertex's number of susceptible neighbours
+                numSusNei[infectedIndex] = len(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(infectedIndex)))
                 # get neighbouring vertices
                 neighbors = network.neighbors(infectedIndex)
-                # update numfSusNei
+                # update numSusNei of neighbouring infected vertices
                 for n in neighbors:
-                    # if neighbour is susceptible increase own NumSusNei
-                    if susceptible[n] == 1:
-                        numSusNei[infectedIndex] += 1
-                    # if neighbour is infected decrease their NumSusNei
-                    elif susceptible[n] == 0:
+                    if susceptible[n] == 0:
                         numSusNei[n] -= 1
                 # update network totals
                 sTotal -= 1
@@ -68,8 +67,6 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
             else: # (I->R)
                 # change individual state
                 susceptible[trueIndex] = -1
-                # get neighbouring vertices
-                neighbors = network.neighbors(trueIndex)
                 # update numSusNei
                 numSusNei[trueIndex] = 0
                 # update network totals

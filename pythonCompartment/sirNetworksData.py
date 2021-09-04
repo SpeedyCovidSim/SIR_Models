@@ -59,7 +59,7 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
             for n in neighbors:
                 if susceptible[n]==0:
                     numSusNei[n] -= 1
-                    rates[n] = beta*numSusNei[n]/network.degree(n)
+                    rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
             # update network totals
             sTotal-= 1
             iTotal += 1

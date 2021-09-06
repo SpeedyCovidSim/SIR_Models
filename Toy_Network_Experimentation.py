@@ -4,7 +4,7 @@ import time
 import igraph as ig
 import copy
 from matplotlib import pyplot as plt
-from pythonCompartment.sirNetworksData import gillespieDirectNetwork
+from pythonCompartment.sirNetworksFrequency import gillespieDirectNetwork
 from scipy.interpolate import interp1d as lint
 
 def create_linked_neighbourhood(N, n):
@@ -394,7 +394,7 @@ def main(single_lattices=True, multi_lattices=True):
         plt.savefig(f"PythonPlotting/Multi_Household/N_Comparison")
 
     if(False):
-        print("Beginning Multi Seed Increasing Households tests")
+        print("Beginning Increasing Link Household Testing")
         # initialise variables
         tMax = 30
         maxalpha = 0.4
@@ -402,11 +402,11 @@ def main(single_lattices=True, multi_lattices=True):
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
 
-        N = 8
-        n = 4
+        N = 3
+        n = 5
         num = N*n
         network = create_linked_neighbourhood(N,n)
-        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n,int(n/2))
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n)
         rates = np.zeros(2*num)
         for inf in infecteds:
             # set recovery hazard

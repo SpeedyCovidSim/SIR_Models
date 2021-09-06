@@ -4,7 +4,7 @@ import time
 import igraph as ig
 import copy
 from matplotlib import pyplot as plt
-from pythonCompartment.sirNetworksData import gillespieDirectNetwork
+from pythonCompartment.sirNetworksFrequency import gillespieDirectNetwork
 
 
 def setNetwork(network, prop_i=0.05):

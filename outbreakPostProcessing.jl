@@ -9,11 +9,33 @@ module outbreakPostProcessing
     using CSV
     using Dates
     # using PlotlyJS
+    using branchingProcesses: branchModel
 
     export createNewDir, quantile2D, probOfLessThanXGivenYDays, outputCSVDailyCases,
-        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs
+        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff
 
-    function createNewDir(path)
+    function modelReff(model::branchModel)::AbstractFloat
+        #=
+        Given a set of branching process model parameters, return the equivalent Reff
+        value that occurs when within an intervention state.
+        =#
+
+        infection_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
+
+        T1 = mean(Gamma(model.t_onset_shape, model.t_onset_scale))
+        T2 = model.alert_pars.t_onset_to_isol * 1
+
+        q = cdf(infection_dist, T1 + T2)
+
+        return model.alert_pars.R_scaling * model.reproduction_number * (
+            (1-model.sub_clin_prop) * (1-model.alert_pars.p_test +
+                model.alert_pars.p_test*(q + model.isolation_infectivity*(1-q))) +
+            model.sub_clin_prop * (1-model.alert_pars.p_test_sub +
+                model.alert_pars.p_test_sub*(q + model.isolation_infectivity*(1-q))) * model.sub_clin_scaling)
+
+    end
+
+    function createNewDir(path, daily=false)
         #=
         Given a path, determine if a folder has been created for the current date in
         that path. If not, create one - this will allow seperation of figures created
@@ -24,6 +46,10 @@ module outbreakPostProcessing
         folderName = Dates.format(currentTime, "Y_m_d_u")
 
         newdir = path*"/"*folderName
+
+        if daily
+            newdir = newdir*"_daily"
+        end
 
         if !isdir(newdir)
             mkdir(newdir)

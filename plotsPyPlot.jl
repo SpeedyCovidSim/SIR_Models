@@ -38,7 +38,7 @@ module plotsPyPlot
         catch
         end
         plt.xlabel("Time")
-        plt.ylabel("Population Number")
+        plt.ylabel("Number of Individuals in State")
         plt.suptitle("SIR model over time with a population size of $N")
         plt.title("For alpha = $alpha and beta $beta")
         plt.legend()
@@ -191,7 +191,7 @@ module plotsPyPlot
         plt.plot(t, SIR[:,3], label="Recovered", lw=2, figure=fig)
 
         plt.xlabel("Time")
-        plt.ylabel("Population Number")
+        plt.ylabel("Number of Individuals in State")
         plt.suptitle("Branching SIR model over time with a population size of $N")
         plt.title("$subtitle")
         plt.legend()
@@ -233,7 +233,7 @@ module plotsPyPlot
         plt.plot(t, SIR[:,3] ,"x", label="Recovered", lw=2, figure=fig)
 
         plt.xlabel("Time")
-        plt.ylabel("Population Number")
+        plt.ylabel("Number of Individuals in State")
         plt.suptitle("Branching SIR model over time with a population size of $N")
         plt.title("$subtitle")
         plt.legend()
@@ -265,7 +265,7 @@ module plotsPyPlot
         # plt.title("For alpha = $alpha and beta $beta")
         plt.legend(loc = "upper left")
 
-        fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
+        # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
 
         if Display
             # required to display graph on plots.

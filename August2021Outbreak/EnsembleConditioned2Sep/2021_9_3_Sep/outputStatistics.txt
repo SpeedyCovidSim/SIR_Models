@@ -41,3 +41,5 @@ Cases numbers are projected to hit 10 per day by:
 On average: October 24 2021
 IQR = [October 9 2021, May 23 2024]
 95% Quartile Range = [September 26 2021, May 23 2024]
+
+Probability that Reff is less than 1 is: 0.828

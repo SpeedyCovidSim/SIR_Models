@@ -71,6 +71,64 @@ module BranchVerifySoln
 
     end
 
+    function branchVerifyPlot(meanDetect, meanDetect_disc, meanDetect_disc_match, times, title,
+        outputFileName, ChangeDisc=true, Display=true, save=false, lowR=false)
+
+        meanDetectDaily = diff(vcat([0],meanDetect))
+        meanDetectDaily_disc = diff(vcat([0],meanDetect_disc))
+        meanDetectDaily_disc_match = diff(vcat([0],meanDetect_disc_match))
+        # meanDetectDaily = meanDetect
+        # meanDetectDaily_disc = meanDetect_disc
+
+        #PyPlot.rcParams["figure.dpi"] = 300
+
+        typeSim = "Next"
+
+        typeSim2 = "Discrete"
+
+
+        Seaborn.set()
+        set_style("ticks")
+        Seaborn.set_color_codes("pastel")
+        fig = plt.figure(dpi=300)
+
+        if ChangeDisc
+            plt.plot(times, meanDetectDaily, "k-", label="$typeSim", lw=2.5, figure=fig)
+
+            plt.plot(times, meanDetectDaily_disc, "b-.", label="$typeSim2, identical model", lw=1.5, figure=fig, alpha = 1)
+            plt.plot(times, meanDetectDaily_disc_match, "r-.", label="$typeSim2, higher Reff model", lw=1.5, figure=fig, alpha = 1)
+        else
+            plt.plot(times, meanDetectDaily, "b-", label="$typeSim2", lw=2.5, figure=fig)
+
+            plt.plot(times, meanDetectDaily_disc, color="tab:gray", linestyle="-.", label="$typeSim, lower seed cases", lw=1.5, figure=fig, alpha = 1)
+            plt.plot(times, meanDetectDaily_disc_match, "k-.", label="$typeSim, lower seed cases + higher Reff", lw=1.5, figure=fig, alpha = 1)
+        end
+
+        plt.xlabel("Time")
+        plt.ylabel("Number of Detected Cases per Day")
+        plt.suptitle("Branching Process Simulation")
+        plt.title(title)
+        plt.legend(loc = "lower right")
+
+        if lowR
+            plt.ylim([0,20])
+        else
+            plt.ylim([0,75])
+        end
+
+        if Display
+            # required to display graph on plots.
+            display(fig)
+        end
+        if save
+            # Save graph as pngW
+            fig.savefig(outputFileName)
+
+        end
+        close()
+
+    end
+
     function branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName,
         allRealisations=true, Display=true, save=false, alphaMultiplier=1.0)
         #=

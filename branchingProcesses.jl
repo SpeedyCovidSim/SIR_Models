@@ -85,6 +85,8 @@ module branchingProcesses
         alert_level_changed::Bool # init false
         alert_level_scaling_speed::Union{Int64,Float64} # how many days it takes for alert level scaling to come into affect
         extraALevents::Array{AlertEvent,1}
+        p_contact::Float64
+        p_contact_time::Union{Int, AbstractFloat}
         #=
         For extra AL events - we will assume new AL events only ever have an R_scaling
         value greater than the current one, so no time based shift between the two values
@@ -159,6 +161,11 @@ module branchingProcesses
         rootNodes::Array{Node,1}
     end
 
+    mutable struct Node_simple
+        caseID::Int64
+        children::Array{Base.RefValue{Node_simple}}
+    end
+
     function Base.isequal(x::Node, y::Node); x.caseID === y.caseID; end
 
     function deleteChildNode!(childNode::Node)
@@ -213,6 +220,10 @@ module branchingProcesses
         Ri = Ri .* model.reproduction_number .* (1 .- model.sub_clin_scaling.*sub_Clin_Case)
 
         return Ri
+    end
+
+    function getContactTracingTime(model::branchModel)
+        return rand(Exponential(model.alert_pars.p_contact_time))
     end
 
     function getOnsetDelay(model::branchModel)
@@ -1663,6 +1674,18 @@ module branchingProcesses
 
         =#
 
+        # Tracking of detected cases - for comparing to next react branch with
+        # no affect of Alert Level intervention
+        trackDetectedCases = false
+        if model.alert_pars != branchModelAlert_nopars()
+            push!(model.state_totals, 0)
+
+            trackDetectedCases = true
+
+            isolated = BitArray(undef, nrow(population_df)) .* false
+            population_df.isolated = isolated
+        end
+
         num_cases = model.state_totals[2]*1
         infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
 
@@ -1697,6 +1720,15 @@ module branchingProcesses
 
             # determine which cases are isolating (if any)
             case_isolated = active_df.time_isolated .< t[current_step]
+
+            # count total isolations / detections. Slightly crude implementation
+            if trackDetectedCases
+
+                numIsolatedInStep = sum(case_isolated .& (active_df.time_isolated .> t[current_step-1]))
+
+                model.state_totals[4] += numIsolatedInStep
+            end
+
 
             # if reached max cases / other stopping criterion
             # MAX CASE CRITERION WILL NEVER GET HIT - WILL BREAK DATAFRAME FIRST
@@ -1993,6 +2025,7 @@ module branchingProcesses
         # are we using alert level paramaters ##################################
         alertLevelChanged = false; usingAlert = false; trackDetectedCases = false
         newPTest = false; newPTest_sub = false; newPTest_effective = 0.0; timeAlertChange = -1.0
+        usingContactTracing = false;
         if model.alert_pars != branchModelAlert_nopars()
             push!(model.state_totals, 0)
             usingAlert = true
@@ -2010,6 +2043,12 @@ module branchingProcesses
 
             isolated = BitArray(undef, nrow(population_df)) .* false
             population_df.isolated = isolated
+
+            # if using 'contact tracing'
+            if model.alert_pars.p_contact > 0
+                usingContactTracing = true
+                population_df.nodes = [Node_simple(i,[]) for i in 1:nrow(population_df)]
+            end
         end
 
         num_cases::Int64 = model.state_totals[2]*1
@@ -2082,6 +2121,12 @@ module branchingProcesses
 
                             num_cases += 1
                             initNewCase!(population_df, model, infection_time, reaction.parentID, num_cases)
+
+                            # insert child into parent's children array
+                            if usingContactTracing
+                                push!(population_df[reaction.parentID, :nodes].children, Ref(population_df[num_cases, :nodes]))
+                            end
+
 
                             # add recovery event
                             push!(tau_heap, event(population_df[num_cases,:time_recovery], :recovery, population_df[num_cases,:caseID], sSaturation))
@@ -2168,6 +2213,17 @@ module branchingProcesses
                         # add alert level event
                         push!(tau_heap, event(timeAlert, :alertChange, -1, sSaturation))
                         model.t_max += timeAlert
+                    end
+
+                    if usingContactTracing
+                        for child in population_df[reaction.parentID, :nodes].children
+                            # add isolation events to compete with current isolation events for these children
+                            if rand() < model.alert_pars.p_contact
+
+                                timeIso = infection_time + getContactTracingTime(model)
+                                push!(tau_heap, event(timeIso, :isolation, child[].caseID, sSaturation))
+                            end
+                        end
                     end
 
                     num_events += 1
@@ -2325,9 +2381,10 @@ module branchingProcesses
             alert_level_changed = false
             alert_level_scaling_speed = 5
             extraALevents = []
+            p_contact=0.0; p_contact_time=0
             alert_pars = branchModelAlert_pars(t_onset_to_isol_new, p_test_new_clin, p_test_new_sub,
                 R_scaling, num_detected_before_alert, time_to_alert, alert_level_changed, alert_level_scaling_speed,
-                extraALevents)
+                extraALevents, p_contact, p_contact_time)
         end
 
         model = branchModel(t_init, t_max, population_size, max_cases, state_totals, states,

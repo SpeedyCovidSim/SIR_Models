@@ -1,0 +1,45 @@
+Cumulative cases at detection
+Median cumulative cases of 192.0
+IQR of [166.0, 217.0]
+Detected and cumulative cases at Oct 26
+Median cumulative cases of 2064.0
+IQR of [1760.0, 2390.0]
+Median detected cases of 1244.0
+IQR of [1060.0, 1460.0]
+
+Cases numbers are projected to hit 10 per day by:
+On average: September 21 2021
+IQR = [September 17 2021, September 27 2021]
+95% Quartile Range = [September 12 2021, October 15 2021]
+
+Daily cases are projected to drop:
+Cases numbers on average begin to drop 13 days after detection on Aug 30
+Median max case number is 60.0
+Cases numbers 75% quartile begin to drop 14 days after detection on Aug 31
+75% Quartile max case number is 69.0
+Cases numbers 25% quartile begin to drop 13 days after detection on Aug 30
+25% Quartile max case number is 52.0
+
+Projected cases for the next 5 days are:
+September 4 2021: 46.0, IQR = [39.0,53.0]
+September 5 2021: 43.0, IQR = [36.0,50.0]
+September 6 2021: 39.0, IQR = [32.0,46.0]
+September 7 2021: 36.0, IQR = [29.0,43.0]
+September 8 2021: 33.0, IQR = [26.0,40.0]
+September 9 2021: 29.0, IQR = [23.0,36.0]
+
+Projected cases for the next 5 days are (overleaf table format):
+\begin{table}[h] 
+ \centering 
+ \begin{tabular}{c|c|c|c|c|c}
+Data Quartiles & September 4 2021 & September 5 2021 & September 6 2021 & September 7 2021 & September 8 2021 & September 9 2021\\
+\hline
+25\% Quartile & 39.0 & 36.0 & 32.0 & 29.0 & 26.0 & 23.0\\
+Median & 46.0 & 43.0 & 39.0 & 36.0 & 33.0 & 29.0\\
+75\% Quartile & 53.0 & 50.0 & 46.0 & 43.0 & 40.0 & 36.0\\
+\end{tabular}
+\caption{}
+\label{tab:}
+\end{table}
+
+Probability that Reff is less than 1 is: 1.0

@@ -6,6 +6,9 @@ module BPVerifySolutions
     using LightGraphs, GraphPlot, NetworkLayout
     using PyPlot, Seaborn
     using ProgressMeter
+    using BranchVerifySoln
+    using branchingProcesses
+    using outbreakPostProcessing: modelReff
 
     export verifySolutions
 
@@ -321,7 +324,7 @@ module BPVerifySolutions
             println()
         end
 
-        println("Test #5: Epidemic curves")
+        println("Test #5: Epidemic curves, (First Vs Discrete)")
         if 5 in testRange
             println("Beginning simulation of Discrete Case")
 
@@ -357,7 +360,7 @@ module BPVerifySolutions
 
 
             println("Beginning simulation of First Case")
-            numSims = convert(Int, round(40 / numSimsScaling))
+            numSims = convert(Int, round(80 / numSimsScaling))
 
             StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -721,6 +724,89 @@ module BPVerifySolutions
             println()
         end
 
+        println("Test #10.5: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep, try to match)")
+        if 10.5 in testRange
+            println("Beginning simulation of Discrete Case")
+
+            # time span to sim on
+            tspan = (0.0,100.0)
+            time_step = 1
+
+            # times to sim on
+            times = [i for i=tspan[1]:time_step:tspan[end]]
+
+            numSims = convert(Int, round(200 / numSimsScaling))
+
+            StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+            models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
+            i = 1
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+                models[Threads.threadid()].p_test = 1.0
+                models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = false
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 0
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
+
+                # interpolate using linear splines
+                StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+            discreteSIR_mean = hcat(Smean, Imean, Rmean)
+
+
+            println("Beginning simulation of Next Case")
+            numSims = convert(Int, round(200 / numSimsScaling))
+
+            StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+
+            i = 1
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]);
+                models[Threads.threadid()].p_test = 1.0
+                models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = false
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 0
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+
+                # clean duplicate values of t which occur on the first recovery time
+                firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
+                lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+                # interpolate using linear splines
+                StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+            misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+            println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
+
+            title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
+            outputFileName = "./verifiedBranch/NextvsDiscreteIsol1Day_to_make_equiv"
+            branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
+            println()
+        end
+
+
         println("Test #11: Epidemic curves (Next vs Simple BP, S Saturation Thinning)")
         if 11 in testRange
             println("Beginning simulation of Simple BP Case")
@@ -1049,7 +1135,7 @@ module BPVerifySolutions
             # times to sim on
             times = [i for i=tspan[1]:time_step:tspan[end]]
 
-            numSims = convert(Int, round(500 / numSimsScaling))
+            numSims = convert(Int, round(2000 / numSimsScaling))
 
             StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -1230,7 +1316,7 @@ module BPVerifySolutions
             # times to sim on
             times = [i for i=tspan[1]:time_step:tspan[end]]
 
-            numSims = convert(Int, round(400 / numSimsScaling))
+            numSims = convert(Int, round(1600 / numSimsScaling))
 
             StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -1746,6 +1832,340 @@ module BPVerifySolutions
             branchSideBySideVerifyPlot2(x11, x12, x21, x22, times, title, outputFileName, false, true, true, 2.0)
             println()
         end
+
+        println("Test #22: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep, try to match detection curves, vary disc)")
+        if 22 in testRange
+            println("Beginning simulation of Discrete Case")
+
+            # time span to sim on
+            tspan = (0.0,100.0)
+            time_step = 1
+
+            # times to sim on
+            times = [i for i=tspan[1]:time_step:tspan[end]]
+
+            timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
+            tspanNew = (tspan[1],tspan[2]+1)
+
+            numSims = convert(Int, round(800 / numSimsScaling))
+
+            IDetect_daily_disc, IDetect_daily_disc_match, IDetect_daily = initSIRArrays(tspanNew, 1, numSims)
+
+            # same param discrete ######################################################
+            models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true);
+                models[Threads.threadid()].p_test = 0.6
+                models[Threads.threadid()].alert_pars.p_test = 0.6
+                # models[Threads.threadid()].reproduction_number = 3.0
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 1.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 1.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
+
+                IDetect_daily_disc[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                next!(p)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect_disc = mean(IDetect_daily_disc, dims=2)
+
+            modelReff_disc = round(modelReff(models[1]), sigdigits=4)
+
+            # matching discrete ########################################################
+            models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true);
+                models[Threads.threadid()].p_test = 0.55
+                models[Threads.threadid()].alert_pars.p_test = 0.55
+                models[Threads.threadid()].reproduction_number = 3.4
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 1.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 1.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
+
+                IDetect_daily_disc_match[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                # interpolate using linear splines
+                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+                next!(p)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect_disc_match = mean(IDetect_daily_disc_match, dims=2)
+            modelReff_disc_match = round(modelReff(models[1]),sigdigits = 4)
+            ############################################################################
+
+            println("Beginning simulation of Next Case")
+            numSims = convert(Int, round(800 / numSimsScaling))
+
+
+            # IDetect_daily, ItStep, RtStep = initSIRArrays(tspanNew, 1, numSims)
+
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true);
+
+                # models[Threads.threadid()].reproduction_number = 2.8
+                models[Threads.threadid()].p_test = 0.6
+                models[Threads.threadid()].alert_pars.p_test = 0.6
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 1.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 1.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+
+                # clean duplicate values of t which occur on the first recovery time
+                firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
+                lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+
+                IDetect_daily[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                next!(p)
+
+                # # interpolate using linear splines
+                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect = mean(IDetect_daily, dims=2)
+            modelReff_next = round(modelReff(models[1]), sigdigits=4)
+
+            println("Model Reff for next = $modelReff_next, for discrete (same param) = $modelReff_disc, for discrete (match) = $modelReff_disc_match")
+
+            misfitDetect = sum(abs.(meanDetect - meanDetect_disc))/length(meanDetect)
+            misfitDetect_match = sum(abs.(meanDetect - meanDetect_disc_match))/length(meanDetect)
+
+            # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+            # misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+            println("Mean Abs Error Detected Cases = $misfitDetect, Detected Cases match = $misfitDetect_match")
+
+            title = "Next React vs Discrete Detected Daily Cases with isolation. Discrete timestep = $time_step"
+            outputFileName = "./verifiedBranch/NextvsDiscreteIsol_Detections_equivDisc"
+            branchVerifyPlot([meanDetect...], [meanDetect_disc...], [meanDetect_disc_match...], timesDaily, title, outputFileName, true, true, true)
+            println()
+        end
+
+        println("Test #23: Epidemic curves (Next vs Discrete, Isolation - 1 Day timestep, try to match detection curves, vary next)")
+        if 23 in testRange
+            println("Beginning simulation of Discrete Case")
+
+            # time span to sim on
+            tspan = (0.0,100.0)
+            time_step = 1
+
+            # times to sim on
+            times = [i for i=tspan[1]:time_step:tspan[end]]
+
+            timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
+            tspanNew = (tspan[1],tspan[2]+1)
+
+            numSims = convert(Int, round(800 / numSimsScaling))
+
+            IDetect_daily_disc, IDetect_daily_disc_match, IDetect_daily = initSIRArrays(tspanNew, 1, numSims)
+
+            # same param discrete ######################################################
+            models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true);
+                models[Threads.threadid()].p_test = 0.6
+                models[Threads.threadid()].alert_pars.p_test = 0.6
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 1.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 1.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = discrete_branch!(population_df, models[Threads.threadid()], time_step)
+
+                IDetect_daily_disc[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                next!(p)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect_disc = mean(IDetect_daily_disc, dims=2)
+
+            modelReff_disc = round(modelReff(models[1]), sigdigits=4)
+
+            # matching next, lower initCases ###########################################
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-5,5,0], true);
+
+                # models[Threads.threadid()].reproduction_number = 2.8
+                models[Threads.threadid()].p_test = 0.6
+                models[Threads.threadid()].alert_pars.p_test = 0.6
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 1.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 1.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+
+                # clean duplicate values of t which occur on the first recovery time
+                firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
+                lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+
+                IDetect_daily[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                next!(p)
+
+                # # interpolate using linear splines
+                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect_match = mean(IDetect_daily, dims=2)
+
+            modelReff_match = round(modelReff(models[1]),sigdigits = 4)
+            ############################################################################
+
+            # matching next, Higher Reff, lower initCases ##############################
+            println("Beginning simulation of Next Case")
+            numSims = convert(Int, round(800 / numSimsScaling))
+
+
+            # IDetect_daily, ItStep, RtStep = initSIRArrays(tspanNew, 1, numSims)
+
+            i = 1
+            p = Progress(numSims,PROGRESS__METER__DT)
+            time = @elapsed Threads.@threads for i = 1:numSims
+
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-7,7,0], true);
+
+                # models[Threads.threadid()].reproduction_number = 2.8
+                models[Threads.threadid()].p_test = 0.5
+                models[Threads.threadid()].alert_pars.p_test = 0.5
+                # models[Threads.threadid()].sub_clin_prop = 0
+                models[Threads.threadid()].stochasticIsol = true
+                # models[Threads.threadid()].t_onset_shape = 5.8
+                models[Threads.threadid()].t_onset_to_isol = 5.0
+                models[Threads.threadid()].alert_pars.t_onset_to_isol = 5.0
+
+                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+
+                models[Threads.threadid()].alert_pars.R_scaling = 1.0
+                models[Threads.threadid()].alert_pars.num_detected_before_alert = 1
+                models[Threads.threadid()].alert_pars.alert_level_scaling_speed = 0
+
+
+                population_df = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+
+                # clean duplicate values of t which occur on the first recovery time
+                firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
+                lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+
+                t = vcat(t[1:firstDupe-1], t[lastDupe:end])
+                state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
+
+
+                IDetect_daily[:,i] = singleLinearSpline(state_totals_all[:, 4], t, timesDaily)
+
+                next!(p)
+
+                # # interpolate using linear splines
+                # StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
+            end
+
+            println("Finished Simulation in $time seconds")
+
+            meanDetect = mean(IDetect_daily, dims=2)
+            modelReff_next = round(modelReff(models[1]), sigdigits=4)
+
+            println("Model Reff for next = $modelReff_next, for discrete (same param) = $modelReff_disc, for next (match) = $modelReff_match")
+
+            misfitDetect = sum(abs.(meanDetect - meanDetect_disc))/length(meanDetect)
+            misfitDetect_match = sum(abs.(meanDetect_match - meanDetect_disc))/length(meanDetect)
+
+            # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
+
+            # misfitS, misfitI, misfitR = meanAbsError(Smean, Imean, Rmean, discreteSIR_mean)
+            println("Mean Abs Error Detected Cases (next high Reff) = $misfitDetect, Detected Cases match = $misfitDetect_match")
+
+            title = "Next React vs Discrete Detected Daily Cases with isolation. Discrete timestep = $time_step"
+            outputFileName = "./verifiedBranch/NextvsDiscreteIsol_Detections_equivNext"
+            branchVerifyPlot([meanDetect_disc...], [meanDetect_match...], [meanDetect...], timesDaily, title, outputFileName, false, true, true)
+            println()
+        end
+
     end
 
 end

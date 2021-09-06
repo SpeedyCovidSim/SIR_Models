@@ -1,3 +1,5 @@
 config_0 is ensemble created on 26 Aug (CSVs have been relabelled 26Aug_old)
 
 config 1 is ensemble created on 1 Sep with asymptomatic detection and slightly lower lowerbound on R_scaling
+
+config 5 is ensemble created on 6 - very wide based on config 4 and has contact tracing built in

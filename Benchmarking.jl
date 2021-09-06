@@ -27,7 +27,7 @@ using ProgressMeter
 # import required modules
 push!( LOAD_PATH, "./" )
 using sirModels: gillespieDirect2Processes_rand # don't use 'include'
-using PyPlot: plotBenchmarksViolin
+using plotsPyPlot: plotBenchmarksViolin
 
 
 function gillespieDirect_pyVsJl()
@@ -105,7 +105,7 @@ function gillespieDirect_pyVsJl()
 
     outputFileName = "Benchmarks/SimulationTimes"
     xlabel = "Population Size"
-    plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
+    plotBenchmarksViolin(time_df.population, time_df.time, time_df.language, outputFileName,
         xlabel, true, true)
 
     # Seaborn.set()

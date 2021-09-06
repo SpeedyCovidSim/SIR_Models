@@ -1,1 +1,2 @@
 config_0 is ensemble created on 1 Sep with asymptomatic cases, low R
+config_1 is ensemble created on 6 Sep with parameters trying to match those of Mike et. al.

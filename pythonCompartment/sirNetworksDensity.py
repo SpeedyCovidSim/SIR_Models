@@ -45,27 +45,26 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
         trueIndex = eventIndex if eventIndex < N else(eventIndex-N)
         # update local neighbourhood attributes
         if eventType == "I":  # (S->I)
-            # thin based on density
-            
-            # choose infected vertex and update state
-            infectedIndex = random.choice(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(trueIndex)))
-            susceptible[infectedIndex] = 0
-            # update infected vertex's number of susceptible neighbours
-            numSusNei[infectedIndex] = len(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(infectedIndex)))
-            # update infected vertex's infection and recovery hazards
-            rates[N+infectedIndex] = alpha
-            rates[infectedIndex] = beta*numSusNei[infectedIndex]/network.degree(infectedIndex)
-            # get neighbouring vertices
-            neighbors = network.neighbors(infectedIndex)
-            # update infection hazards of neighbouring infected vertices
-            for n in neighbors:
-                if susceptible[n]==0:
-                    numSusNei[n] -= 1
-                    rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
-            # update network totals
-            sTotal-= 1
-            iTotal += 1
-
+            # thin based on density - if thinned just skip to time update, system state hasn't changed
+            if unif() <= network.degree(trueIndex)/Nmax:
+                # choose infected vertex and update state
+                infectedIndex = random.choice(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(trueIndex)))
+                susceptible[infectedIndex] = 0
+                # update infected vertex's number of susceptible neighbours
+                numSusNei[infectedIndex] = len(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(infectedIndex)))
+                # update infected vertex's infection and recovery hazards
+                rates[N+infectedIndex] = alpha
+                rates[infectedIndex] = beta*numSusNei[infectedIndex]/network.degree(infectedIndex)
+                # get neighbouring vertices
+                neighbors = network.neighbors(infectedIndex)
+                # update infection hazards of neighbouring infected vertices
+                for n in neighbors:
+                    if susceptible[n]==0:
+                        numSusNei[n] -= 1
+                        rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
+                # update network totals
+                sTotal-= 1
+                iTotal += 1
         else: # (I->R)
             # change individual recovery and infection hazards and state
             rates[eventIndex] = 0

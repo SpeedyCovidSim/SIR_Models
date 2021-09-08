@@ -159,7 +159,7 @@ module outbreakPostProcessing
         return nothing
     end
 
-    function outputCSVmodels(models, outputFileName)
+    function outputCSVmodels(models, outputFileName, meanOffspring=[], alertIncrease=[])
 
         infection_dist = Weibull(models[1].t_generation_shape, models[1].t_generation_scale)
 
@@ -176,6 +176,11 @@ module outbreakPostProcessing
         models_df.p_test_sub_after_al = zeros(length(models))
 
         models_df.R_eff_after_al = zeros(length(models))
+
+
+        if !isempty(alertIncrease)
+            models_df.alertIncrease = alertIncrease
+        end
 
         for row in 1:length(models)
 
@@ -201,6 +206,11 @@ module outbreakPostProcessing
                     models_df[row, :p_test_sub_after_al]*(q + models[row].isolation_infectivity*(1-q))) * models_df[row, :sub_clin_scaling])
 
         end
+
+        if !isempty(meanOffspring)
+            models_df.R_eff_after_al_estimate = meanOffspring
+        end
+
 
         models_df.R_eff_before_al = models_df.reproduction_number .* ((1.0 .- models_df.sub_clin_prop) .+ models_df.sub_clin_scaling .* models_df.sub_clin_prop)
 

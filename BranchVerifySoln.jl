@@ -108,7 +108,7 @@ module BranchVerifySoln
         plt.ylabel("Number of Detected Cases per Day")
         plt.suptitle("Branching Process Simulation")
         plt.title(title)
-        plt.legend(loc = "lower right")
+        plt.legend(loc = "upper right")
 
         if lowR
             plt.ylim([0,20])
@@ -383,17 +383,17 @@ module BranchVerifySoln
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
 
-        plt.plot(times1, Array1[:,1], "g-", label="S - stepsize = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times1, Array1[:,2], "k-", label="I - stepsize = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times1, Array1[:,3], "r-", label="R - stepsize = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times1, Array1[:,1], "k-", label="S, Δt = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times1, Array1[:,2], "b-", label="I, Δt = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times1, Array1[:,3], "r-", label="R, Δt = $(times1[2]-times1[1])", lw=1.5, figure=fig, alpha = 0.7)
 
-        plt.plot(times2, Array2[:,1], "g-.", label="S - stepsize = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times2, Array2[:,2], "k-.", label="I - stepsize = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times2, Array2[:,3], "r-.", label="R - stepsize = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times2, Array2[:,1], "k-.", label="S, Δt = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times2, Array2[:,2], "b-.", label="I, Δt = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times2, Array2[:,3], "r-.", label="R, Δt = $(times2[2]-times2[1])", lw=1.5, figure=fig, alpha = 0.7)
 
-        plt.plot(times3, Array3[:,1], "g:", label="S - stepsize = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times3, Array3[:,2], "k:", label="I - stepsize = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
-        plt.plot(times3, Array3[:,3], "r:", label="R - stepsize = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times3, Array3[:,1], "k:", label="S, Δt = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times3, Array3[:,2], "b:", label="I, Δt = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
+        plt.plot(times3, Array3[:,3], "r:", label="R, Δt = $(times3[2]-times3[1])", lw=1.5, figure=fig, alpha = 0.7)
 
         plt.xlabel("Time")
         plt.ylabel("Number of Individuals in State")

@@ -1,5 +1,18 @@
-config_0 is ensemble created on 26 Aug (CSVs have been relabelled 26Aug_old)
+config_0 is ensemble created on 26 Aug (CSVs have been relabelled 26Aug_old).
+This is the config used for the 26 Aug report
 
 config 1 is ensemble created on 1 Sep with asymptomatic detection and slightly lower lowerbound on R_scaling
 
-config 5 is ensemble created on 6 - very wide based on config 4 and has contact tracing built in
+config 4 is ensemble created on Sep 5
+
+config 5 is ensemble created on Sep 6 - very wide based on config 4 and has contact tracing built in
+
+config 6 is config 4 but with a lower upper bound on Reff after AL intervention
+
+config 6 is the ensemble created on the 5th but re-run on Sep 7
+
+config 7 is the contact tracing ensemble from Sep 7 (actually Sep 8)
+
+config 8 is the ensemble created on the 5th but with a limit on Reff (1.3) within the outbreak sim
+
+config 9 is identical to 8 but with Alert level 3 hitting 30 days after detection with increases on Reff of 1.5, 2.0 and 3.0

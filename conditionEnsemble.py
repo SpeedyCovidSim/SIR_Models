@@ -20,8 +20,8 @@ def condition(dir):
     output_dict = ggm.condition_linear_sample(dir, t_coeff, daily, net, full_return=True)
 
     # August 2021
-    # data = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807]
-    data = [1, 9, 10, 12, 19, 23, 33, 41, 62, 68, 70, 82, 83, 53, 49, 75, 49, 28, 20, 20, 20]
+    # data = [1, 10, 20, 32, 51, 74, 107, 148, 210]#, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807, 827, 848, 863]
+    data = [1, 9, 10, 12, 19, 23, 33, 41, 62, 68, 70, 82, 83, 53, 49, 75, 49, 28, 20, 20, 20, 21, 15]
 
     # data = [1,5,9,25,45,72,108,145,205,274,353,429,508,562,627,686,731,759]
 
@@ -48,6 +48,6 @@ dir = '/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutput
 DF = pd.DataFrame(condition(dir))
 
 # save the dataframe as a csv file
-DF.to_csv('/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/indexes_ensemble_created6Sep_6Sepcontact.csv', header=False, index=False)
+DF.to_csv('/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/indexes_ensemble_config_8_8Sep.csv', header=False, index=False)
 
 # DF.to_csv('/Users/joeltrent/Documents/GitHub/SIR_Models/August2020OutbreakFit/CSVOutputs/indexes_ensemble_6Sep_MatchMike.csv', header=False, index=False)

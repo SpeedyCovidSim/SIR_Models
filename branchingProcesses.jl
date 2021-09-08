@@ -2194,7 +2194,7 @@ module branchingProcesses
                 end
             elseif reaction.kind === :isolation
 
-                if !population_df[reaction.parentID, :isolated]
+                if !population_df[reaction.parentID, :isolated] && population_df[reaction.parentID, :active]
 
                     model.state_totals[4] += 1
                     population_df[reaction.parentID, :isolated] = true
@@ -2287,6 +2287,7 @@ module branchingProcesses
                             end
                         end
 
+                        # new active detected subclin cases. Note. they were not detectable prior to AL
                         if newPTest_sub
                             sub_clin_cases = filter(row -> row.active==true && row.sub_Clin_Case==true, population_df, view=true)
 

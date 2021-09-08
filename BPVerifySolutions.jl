@@ -12,6 +12,8 @@ module BPVerifySolutions
 
     export verifySolutions
 
+    global const PROGRESS__METER__DT = 0.2
+
     function discreteSIR_sim(time_step::Union{Float64, Int64}, numSimulations::Int64, tspan, numSimsScaling)
 
         # times to sim on

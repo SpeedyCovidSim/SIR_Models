@@ -298,23 +298,24 @@ module BPVerifySolutions
             println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(mean(meanRNumber))")
             println("Finished Simulation in $time seconds")
 
-            println("Beginning simulation of First Case")
-            numSims = convert(Int, round(40 / numSimsScaling))
+            println("Beginning simulation of Next Case")
+            numSims = convert(Int, round(1000 / numSimsScaling))
 
             meanOffspring = zeros(numSims)
             meanRNumber = zeros(numSims)
             i = 1
+            population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()]
             time = @elapsed Threads.@threads for i = 1:numSims
 
-                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 3000, [5*10^8-10,10,0]);
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^8, 10000, [5*10^8-10,10,0]);
                 models[Threads.threadid()].stochasticRi = true
                 models[Threads.threadid()].sub_clin_prop = 0.5
                 models[Threads.threadid()].recovery_time = 20
 
-                population_df = initDataframe(models[Threads.threadid()]);
-                t, state_totals_all, num_cases = nextReact_branch!(population_df, models[Threads.threadid()])
+                population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
+                t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
 
-                inactive_df = filter(row -> row.active==false && row.parentID!=0, population_df[1:num_cases, :], view=true)
+                inactive_df = filter(row -> row.active==false && row.parentID!=0, population_dfs[Threads.threadid()][1:num_cases, :], view=true)
 
                 meanOffspring[i] = mean(inactive_df.num_offspring)
                 meanRNumber[i] = mean(inactive_df.reproduction_number)

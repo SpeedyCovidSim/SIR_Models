@@ -21,8 +21,9 @@ module BranchVerifySoln
     struct Dots; end
     struct Lines; end
 
-    function branchVerifyPlot(Smean, Imean, Rmean, discreteArray, times, title,
-        outputFileName, First=true, Display=true, save=false, Discrete=true)
+    function branchVerifyPlot(Smean::Array{Float64,2}, Imean::Array{Float64,2},
+        Rmean::Array{Float64,2}, discreteArray::Array{Float64,2}, times::Array{Float64,1}, title::String,
+        outputFileName::String, First=true, Display=true, save=false, Discrete=true)
 
         #PyPlot.rcParams["figure.dpi"] = 300
         typeSim = ""
@@ -71,8 +72,9 @@ module BranchVerifySoln
 
     end
 
-    function branchVerifyPlot(meanDetect, meanDetect_disc, meanDetect_disc_match, times, title,
-        outputFileName, ChangeDisc=true, Display=true, save=false, lowR=false)
+    function branchVerifyPlot(meanDetect::Array{Float64,1}, meanDetect_disc::Array{Float64,1},
+        meanDetect_disc_match::Array{Float64,1}, times::Array{Float64,1}, title::String,
+        outputFileName::String, ChangeDisc=true, Display=true, save=false, lowR=false)
 
         meanDetectDaily = diff(vcat([0],meanDetect))
         meanDetectDaily_disc = diff(vcat([0],meanDetect_disc))

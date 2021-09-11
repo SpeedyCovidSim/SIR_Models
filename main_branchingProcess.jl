@@ -23,7 +23,7 @@ global const PROGRESS__METER__DT = 0.2
 global const DAY__ZERO__DATE = Date("17-08-2021", dateformat"d-m-y")
 global ALERT__REFF__MAX__VAL = 1.3
 global USING__ALERT__MAX__VAL = true
-global CHANGING__ALERT__LEVELS = true
+global CHANGING__ALERT__LEVELS = false
 global ALERT__CHANGE__DATE = Date("16-09-2021", dateformat"d-m-y")
 
 # import Ccandu conditioning
@@ -31,9 +31,12 @@ py"""
 import sys
 sys.path.append("/Users/joeltrent/Documents/GitHub/SIR_Models")
 from transpose import transposeCSV
+from SeabornDistplot import seabornDist, plotReffHist
 """
 # conditionEnsemble = py"condition"
 transposeCSV = py"transposeCSV"
+plotReffAL3 = py"seabornDist"
+plotReffHist = py"plotReffHist"
 
 function daysSinceZero()
     return Dates.value(Date(now()) - DAY__ZERO__DATE)
@@ -43,13 +46,28 @@ function daysFromZeroToALChange()
     return Dates.value(ALERT__CHANGE__DATE - DAY__ZERO__DATE)
 end
 
-function convertCSVtoConditioning(origPath, newPath)
+function Df_transpose(df)
+    #=
+    Given a DataFrame, return it's transpose
+    =#
+    return DataFrame([[names(df)]; collect.(eachrow(df))], [:column; Symbol.(axes(df, 1))])
+end
 
-    case_df = DataFrame(CSV.File(origPath))
-    case_df.time = convert.(Int64, case_df.time)
-    CSV.write(newPath, case_df)
+function convertCSVtoConditioning(origPath, newPath, alreadyTransposed=false)
 
-    transposeCSV(newPath, newPath)
+    case_df = DataFrame()
+
+    if !alreadyTransposed
+        case_df = DataFrame(CSV.File(origPath))
+        # case_df.time = convert.(Int64, case_df.time)
+        CSV.write(newPath, case_df)
+
+        transposeCSV(newPath, newPath)
+    else
+        case_df = DataFrame(CSV.File(origPath,header=2))
+        # case_df = select(case_df, 2:ncol(case_df))
+        CSV.write(newPath, case_df)
+    end
 
     case_df = DataFrame(CSV.File(newPath))
 
@@ -89,8 +107,8 @@ end
 # newPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2020OutbreakFit/CSVOutputs/config_1_MatchMike.timeseries.csv"
 # convertCSVtoConditioning(origPath, newPath);
 
-# origPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_created5Sep_8SepAL3.csv";
-# newPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/config_9_created5SepAL3.timeseries.csv";
+# origPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_10Sep_contact.csv";
+# newPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/config_10_created10Sep.timeseries.csv";
 # convertCSVtoConditioning(origPath, newPath);
 
 # origPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_created5Sep_8Sep.csv";
@@ -113,7 +131,7 @@ end
 function observedCases()
     # observedIDetect = cumsum([1,4,4,15,20,26,38,36,56,67,86,75,81])
     # observedIDetect = cumsum([5,4,16,20,27,36,37,60,69,79,76,79,54,65,59,45])
-    observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807, 827, 848, 863]
+    observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807, 827, 848, 863, 876]
 
     tDetect = collect(0:length(observedIDetect)-1)
     return observedIDetect, tDetect
@@ -801,7 +819,7 @@ function plotAndStatsOutbreak(confirmedCases, cumulativeCases, times, observedID
     close()
 end
 
-function plotReff(models_df, conditionIndexes, io, title, outputFileName, Display=true, save=false)
+function plotReff(models_df, conditionIndexes, io, title, outputFileName, Display=true, save=false, useEstimate=false)
 
     Seaborn.set()
     Seaborn.set_style("ticks")
@@ -810,12 +828,18 @@ function plotReff(models_df, conditionIndexes, io, title, outputFileName, Displa
 
     randIndexes = sample(collect(1:nrow(models_df)), length(conditionIndexes), replace=false)
 
+    Reff1 = []; Reff2 = [];
+
     # Reff1 = vcat(models_df.R_eff_before_al[randIndexes], models_df.R_eff_after_al[randIndexes])
     # Reff2 = vcat(models_df.R_eff_before_al[conditionIndexes], models_df.R_eff_after_al[conditionIndexes])
     # Reff = vcat(Reff1, Reff2)
-    Reff1 = vcat(models_df.R_eff_before_al[randIndexes], models_df.R_eff_before_al[conditionIndexes])
-    Reff2 = vcat(models_df.R_eff_after_al[randIndexes], models_df.R_eff_after_al[conditionIndexes])
-
+    if useEstimate
+        Reff1 = vcat(models_df.R_eff_before_al[randIndexes], models_df.R_eff_before_al[conditionIndexes])
+        Reff2 = vcat(models_df.R_eff_after_al_estimate[randIndexes], models_df.R_eff_after_al_estimate[conditionIndexes])
+    else
+        Reff1 = vcat(models_df.R_eff_before_al[randIndexes], models_df.R_eff_before_al[conditionIndexes])
+        Reff2 = vcat(models_df.R_eff_after_al[randIndexes], models_df.R_eff_after_al[conditionIndexes])
+    end
     # x_vector = vcat(["Before" for _ in 1:length(conditionIndexes)], ["After" for _ in 1:length(conditionIndexes)])
     # x_vector2 = vcat(["Before" for _ in 1:length(conditionIndexes)], ["After" for _ in 1:length(conditionIndexes)])
     # x_vector = vcat(x_vector,x_vector2)
@@ -872,6 +896,8 @@ function plotReff(models_df, conditionIndexes, io, title, outputFileName, Displa
     close()
 
 
+    plotReffHist(models_df.R_eff_after_al[conditionIndexes], "Conditioned value of Reff post Alert Level", outputFileName*"_hist_py", Display, save)
+
     # set up figure # histogram of Reff in AL4
     Seaborn.set()
     set_style("ticks")
@@ -899,10 +925,48 @@ function plotReff(models_df, conditionIndexes, io, title, outputFileName, Displa
     end
     close()
 
+    # println(io, "The median value of \$R_\\text{eff}\$ is $(median(models_df.R_eff_after_al[conditionIndexes])) with IQR between [$(quantile(models_df.R_eff_after_al[conditionIndexes], 0.25)), $(quantile(models_df.R_eff_after_al[conditionIndexes], 0.75))]" )
+
     # println(io, "\nWe estimate that the probability of \$R_\\text{eff}\$ being less than 1 is: $(round(sum(models_df.R_eff_after_al[conditionIndexes] .< 1.0)/length(conditionIndexes),sigdigits=3))")
 
     return io
 end
+
+# function plotReffAL3(x_vector, hue_vector, io, title, outputFileName, Display=true, save=false)
+#
+#     # set up figure # histogram of Reff in AL4
+#     Seaborn.set()
+#     set_style("ticks")
+#     Seaborn.set_color_codes("pastel")
+#     fig = plt.figure(figsize=(10,6),dpi=300)
+#
+#     # Seaborn.hist(x=models_df.R_eff_after_al[conditionIndexes], bins=16, weights=ones(length(conditionIndexes))/length(conditionIndexes))
+#
+#     Seaborn.distplot(x=x_vector,hist=false,kde=true)
+#
+#     # else
+#     # end
+#     plt.xlabel("Reff")
+#     plt.ylabel("Probability")
+#
+#     plt.title("Conditioned value of Reff post Alert Level")
+#     plt.legend(loc = "upper right")
+#
+#     if Display
+#         # required to display graph on plots.
+#         display(fig)
+#     end
+#     if save
+#         # Save graph as pngW
+#         fig.savefig(outputFileName*"_hist")
+#
+#     end
+#     close()
+#
+#     # println(io, "\nWe estimate that the probability of \$R_\\text{eff}\$ being less than 1 is: $(round(sum(models_df.R_eff_after_al[conditionIndexes] .< 1.0)/length(conditionIndexes),sigdigits=3))")
+#
+#     return io
+# end
 
 function simulateHospDaily(dailyTimes, dailyDetectedCases, propHosp, propofHosp_critical, propofCritical_recover)
 
@@ -1340,10 +1404,10 @@ function caseNumbersHitValue(dailyConfirmedCases, io, value)
     lower95CC = quantile2D(dailyConfirmedCases, 0.025)
     upper95CC = quantile2D(dailyConfirmedCases, 0.975)
 
-    indexMed = findfirst(medianDCC[11:end] .<= value) + 10
-    indexLQCC = findfirst(lowerQCC[11:end] .<= value) + 10
+    indexMed = nothingConvert(findfirst(medianDCC[11:end] .<= value)) + 10
+    indexLQCC = nothingConvert(findfirst(lowerQCC[11:end] .<= value)) + 10
     indexUQCC = nothingConvert(findfirst(upperQCC[11:end] .<= value)) + 10
-    indexL95CC = findfirst(lower95CC[11:end] .<= value) + 10
+    indexL95CC = nothingConvert(findfirst(lower95CC[11:end] .<= value)) + 10
     indexU95CC = nothingConvert(findfirst(upper95CC[11:end] .<= value)) + 10
 
     # println(io, "On average: $(Dates.format(DAY__ZERO__DATE + Dates.Day(indexMed), "U d Y"))")
@@ -1450,9 +1514,12 @@ function caseChangeAfterAlertChange(dailyConfirmedCases, io, alertIncrease)
 
         println(io, "Data Quartiles"*" & "*newDatesString)
         println(io, "\\hline")
+        # println(io, "25\\% Quartile"*" & "*overleafTableFormat(string.(round.(lowerQCC[t_range] .- lowerQCC[t_ind]))))
+        # println(io, "Median"*" & "*overleafTableFormat(string.(round.(medianDCC[t_range] .- lowerQCC[t_ind]))))
+        # println(io, "75\\% Quartile"*" & "*overleafTableFormat(string.(round.(upperQCC[t_range] .- lowerQCC[t_ind]))))
         println(io, "25\\% Quartile"*" & "*overleafTableFormat(string.(round.(lowerQCC[t_range] .- lowerQCC[t_ind]))))
-        println(io, "Median"*" & "*overleafTableFormat(string.(round.(medianDCC[t_range] .- lowerQCC[t_ind]))))
-        println(io, "75\\% Quartile"*" & "*overleafTableFormat(string.(round.(upperQCC[t_range] .- lowerQCC[t_ind]))))
+        println(io, "Median"*" & "*overleafTableFormat(string.(round.(medianDCC[t_range] .- medianDCC[t_ind]))))
+        println(io, "75\\% Quartile"*" & "*overleafTableFormat(string.(round.(upperQCC[t_range] .- upperQCC[t_ind]))))
         print(io, "\\end{tabular}\n\\caption{Relative change in daily cases from the value on $(Dates.format(ALERT__CHANGE__DATE, "U d Y")), ")
         print(io,"3, 7, 10 and 14 days after moving to Alert Level 3. For an increase in \$R_\\text{eff}\$ of $increase times. ")
         print(io, "If values in this table are positive, daily case numbers are increasing and vice versa.}\n\\label{tab:BP_predicted_cases_$increase}\n\\end{table}")
@@ -1696,17 +1763,19 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
 
                 timeToHitAlertLower = t_first_detect+models[Threads.threadid()].alert_pars.alert_level_scaling_speed+1
 
-                timeAfterHitAlertAllow = models[Threads.threadid()].t_max+t_first_detect - models[Threads.threadid()].recovery_time
+                timeAfterHitAlertAllow = models[Threads.threadid()].t_max
+
                 if CHANGING__ALERT__LEVELS
-                    timeAfterHitAlertAllow = 4 + daysFromZeroToALChange() - 1 - models[Threads.threadid()].alert_pars.alert_level_scaling_speed
+                    timeAfterHitAlertAllow = min(timeToHitAlertLower+models[Threads.threadid()].recovery_time+10+models[Threads.threadid()].alert_pars.alert_level_scaling_speed,  models[Threads.threadid()].t_max)
                 end
 
                 highAlert_df = filter(row -> row.parentID!=0 &&
                     row.time_infected > timeToHitAlertLower &&
-                    row.time_recovery < timeToHitAlertLower + timeAfterHitAlertAllow,
+                    row.active===false,
                     population_dfs[Threads.threadid()][1:num_cases, :], view=true)
 
                 meanOffspring[i] = mean(highAlert_df.num_offspring)
+                # meanOffspring[i] = nrow(highAlert_df)
                 # meanRNumber[i] = mean(inactive_df.reproduction_number)
 
 
@@ -2255,7 +2324,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
 
         # Ccandu filtering
-        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_8_8Sep.csv", header=false))
+        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_8_9Sep.csv", header=false))
         filterVector = convert.(Int64, filter_df.Column1)
         dailyDetectedCases = dailyDetectedCases[:,filterVector]
         cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
@@ -2316,6 +2385,17 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         outputFileName = newdir*"/Reff_violinplot"
         plotReff(models_df, filterVector, io_output, title, outputFileName, Display, save)
 
+        medReff = round(median(models_df[filterVector, :R_eff_after_al]),sigdigits=2)
+        lowerQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
+
         # write model info to io
         close(io_output); close(io_model)
     end
@@ -2346,12 +2426,14 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
 
         alertIncrease_vector = models_df[filterVector, :alertIncrease]
+        Reff_vector = models_df[filterVector, :R_eff_after_al] .* alertIncrease_vector
 
         ####################################################################
         # load base-line and append
 
         timesDaily_base, dailyDetectedCases_base = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_created5Sep_8Sep.csv", false)[1:2]
         cumulativeDetectedCases_base, cumulativeTotalCases_base = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_created5Sep_8Sep.csv", true)[2:3]
+        models_df_base = reloadCSVmodels("./August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_created5Sep_8Sep.csv")
 
         # cumulativeDetectedCases_ensemble = cumulativeDetectedCases .* 1.0
         # cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
@@ -2365,6 +2447,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
 
         dailyDetectedCases = hcat(dailyDetectedCases, dailyDetectedCases_base[1:length(timesDaily), :])
         alertIncrease_vector = vcat(alertIncrease_vector, [1.0 for _ in 1:length(filterVector_base)])
+        Reff_vector = vcat(Reff_vector, models_df_base[filterVector_base, :R_eff_after_al])
         #######################################################################
 
         io_output = caseChangeAfterAlertChange(dailyDetectedCases, io_output, alertIncrease_vector)
@@ -2429,8 +2512,139 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
 
         # # HAVE TO REDO FOR THIS SCENARIO
         title = "Value of Reff pre and post Alert Level, conditioned and unconditioned"
+        outputFileName = newdir*"/Reff_distplot"
+        # plotReff(models_df, filterVector[1:end-length(filterVector_base)], io_output, title, outputFileName, Display, save)
+
+        alertString_vector = ["" for _ in 1:length(alertIncrease_vector)]
+        for i in 1:length(alertIncrease_vector)
+            if alertIncrease_vector[i] == 3.0
+                alertString_vector[i] = "High Increase ($(3)x)"
+            elseif alertIncrease_vector[i] == 2.0
+                alertString_vector[i] = "Moderate Increase ($(2)x)"
+            elseif alertIncrease_vector[i] == 1.5
+                alertString_vector[i] = "Low Increase ($(1.5)x)"
+            else
+                alertString_vector[i] = "No Change"
+            end
+        end
+
+        # ["$(i)x increase" for i in alertIncrease_vector]
+
+        plotReffAL3(Reff_vector, alertString_vector, ["High Increase ($(3)x)", "Moderate Increase ($(2)x)", "Low Increase ($(1.5)x)", "No Change"], title, outputFileName, true, true)
+
+        medReff = round(median(models_df_base[filterVector_base, :R_eff_after_al]),sigdigits=2)
+        lowerQReff = round(quantile(models_df_base[filterVector_base,:R_eff_after_al], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df_base[filterVector_base,:R_eff_after_al], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
+        println(io_output)
+
+        for i in sort(alertIncreases)
+
+            println(io_output, "\nFor $(i)x increase:")
+            io_output = caseNumbersHitValue(dailyDetectedCases[:, findall(alertIncrease_vector .== i)], io_output, 0.5)
+
+        end
+
+
+        # write model info to io
+        close(io_output); close(io_model)
+    end
+
+    println("Process #2.52: August 2021 Model Ensemble Created 5 Sep, conditioned on cumulative using ABC") # current
+    if 2.52 in processRange
+
+        newdir = createNewDir("./August2021Outbreak/EnsembleCreated5Sep/ABC",false)
+        # newdir = "./August2021Outbreak/2021_8_26_Aug/"
+
+        io_output, io_model = newStatsTxt(newdir)
+
+        # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566]
+        # tDetect = collect(0:length(observedIDetect)-1)
+
+        timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_created5Sep_8Sep.csv", false)[1:2]
+        cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_created5Sep_8Sep.csv", true)[2:3]
+
+        cumulativeDetectedCases_ensemble = cumulativeDetectedCases .* 1.0
+        cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
+
+        # Ccandu filtering
+        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_8_10Sep_ABC.csv", header=false))
+        filterVector = convert.(Int64, filter_df.Column1)
+        dailyDetectedCases = dailyDetectedCases[:,filterVector]
+        cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
+        cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
+
+        # tspan = (0.0,70.0)
+        # timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
+        outputFileName = newdir*"/DailyCaseNumbersAfterDetection"
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
+
+        title = "August 2021 Outbreak Conditioned Model Ensemble"
+        outputFileName = newdir*"/EstimatedCaseNumbersAfterDetection"
+
+        # write stats to file
+        # io_output = casesAtDetection(cumulativeDetectedCases, cumulativeTotalCases, io_output)
+
+        t_current = daysSinceZero()
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
+            observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
+            true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
+
+        # numCasesRange = 80:-10:10
+        # daysSinceRange = 10:5:40
+        # probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, numCasesRange, daysSinceRange)
+
+
+
+        # title = "Probability of less than N cases per day, x days after detection"
+        # outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        # probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
+
+        # estimated hospitalisations ###########################################
+        dailyHosp, dailyCrit = simulateHospDaily(timesDaily, dailyDetectedCases, 0.1, 0.17, 0.16)
+        title = "Estimated hospitalised cases"
+        outputFileName = newdir*"/dailyInHospital"
+        plotHospEstimateDaily(timesDaily[1:61], dailyHosp[1:61,:], title, outputFileName, Display, save)
+
+        title = "Estimated critically hospitalised cases"
+        outputFileName = newdir*"/dailyCritInHospital"
+        plotHospEstimateDaily(timesDaily[1:61], dailyCrit[1:61,:], title, outputFileName, Display, save)
+        ########################################################################
+
+        numCasesRange = 90:-1:0
+        daysSinceRange = 5:1:40
+
+        probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, t_current, numCasesRange, daysSinceRange)
+
+        title = "Probability of less than N cases per day, x days after detection"
+        outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save, true)
+
+        value = 10
+        io_output = caseNumbersHitValue(dailyDetectedCases, io_output, value)
+
+        models_df = reloadCSVmodels("./August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_created5Sep_8Sep.csv")
+        title = "Value of Reff pre and post Alert Level, conditioned and unconditioned"
         outputFileName = newdir*"/Reff_violinplot"
-        plotReff(models_df, filterVector[1:end-length(filterVector_base)], io_output, title, outputFileName, Display, save)
+        plotReff(models_df, filterVector, io_output, title, outputFileName, Display, save)
+
+        medReff = round(median(models_df[filterVector, :R_eff_after_al]),sigdigits=2)
+        lowerQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
 
         # write model info to io
         close(io_output); close(io_model)
@@ -2623,7 +2837,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
 
         # Ccandu filtering
-        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_created7Sep_7Sepcontact.csv", header=false))
+        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_7_9Sep.csv", header=false))
         filterVector = convert.(Int64, filter_df.Column1)
         dailyDetectedCases = dailyDetectedCases[:,filterVector]
         cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
@@ -2684,10 +2898,214 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         outputFileName = newdir*"/Reff_violinplot"
         plotReff(models_df, filterVector, io_output, title, outputFileName, Display, save)
 
+        medReff = round(median(models_df[filterVector, :R_eff_after_al]),sigdigits=2)
+        lowerQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df[filterVector,:R_eff_after_al], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
+
+
+
         # write model info to io
         close(io_output); close(io_model)
     end
 
+    println("Process #2.71: August 2021 Model Ensemble Created 7(8) Sep (contact tracing), conditioned on cumulative using ABC")
+    if 2.71 in processRange
+
+        newdir = createNewDir("./August2021Outbreak/EnsembleCreated10Sep_contact",true)
+        # newdir = "./August2021Outbreak/2021_8_26_Aug/"
+
+        io_output, io_model = newStatsTxt(newdir)
+
+        # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566]
+        # tDetect = collect(0:length(observedIDetect)-1)
+
+        timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_10Sep_contact.csv", false)[1:2]
+        cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_10Sep_contact.csv", true)[2:3]
+
+        cumulativeDetectedCases_ensemble = cumulativeDetectedCases .* 1.0
+        cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
+
+        # Ccandu filtering
+        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_10_10Sep_ABC.csv", header=false))
+        filterVector = convert.(Int64, filter_df.Column1)
+        dailyDetectedCases = dailyDetectedCases[:,filterVector]
+        cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
+        cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
+
+        # tspan = (0.0,70.0)
+        # timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
+        outputFileName = newdir*"/DailyCaseNumbersAfterDetection"
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
+
+        title = "August 2021 Outbreak Conditioned Model Ensemble"
+        outputFileName = newdir*"/EstimatedCaseNumbersAfterDetection"
+
+        # write stats to file
+        # io_output = casesAtDetection(cumulativeDetectedCases, cumulativeTotalCases, io_output)
+
+        t_current = daysSinceZero()
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
+            observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
+            true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
+
+        # numCasesRange = 80:-10:10
+        # daysSinceRange = 10:5:40
+        # probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, numCasesRange, daysSinceRange)
+
+
+
+        # title = "Probability of less than N cases per day, x days after detection"
+        # outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        # probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
+
+        # estimated hospitilisations ###########################################
+        # dailyHosp, dailyCrit = simulateHospDaily(timesDaily, dailyDetectedCases, 0.1, 0.17, 0.16)
+        # title = "Estimated hospitalised cases"
+        # outputFileName = newdir*"/dailyInHospital"
+        # plotHospEstimateDaily(timesDaily[1:61], dailyHosp[1:61,:], title, outputFileName, Display, save)
+        #
+        # title = "Estimated critically hospitalised cases"
+        # outputFileName = newdir*"/dailyCritInHospital"
+        # plotHospEstimateDaily(timesDaily[1:61], dailyCrit[1:61,:], title, outputFileName, Display, save)
+        ########################################################################
+
+        numCasesRange = 90:-1:0
+        daysSinceRange = 5:1:40
+
+        probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, t_current, numCasesRange, daysSinceRange)
+
+        title = "Probability of less than N cases per day, x days after detection"
+        outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save, true)
+
+        value = 10
+        io_output = caseNumbersHitValue(dailyDetectedCases, io_output, value)
+
+        models_df = reloadCSVmodels("./August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_10Sep_contact.csv")
+        title = "Value of Reff pre and post Alert Level, conditioned and unconditioned"
+        outputFileName = newdir*"/Reff_violinplot"
+        plotReff(models_df, filterVector, io_output, title, outputFileName, Display, save, true)
+
+        medReff = round(median(models_df[filterVector, :R_eff_after_al_estimate]),sigdigits=2)
+        lowerQReff = round(quantile(models_df[filterVector,:R_eff_after_al_estimate], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df[filterVector,:R_eff_after_al_estimate], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
+
+
+
+        # write model info to io
+        close(io_output); close(io_model)
+    end
+
+    println("Process #2.72: August 2021 Model Ensemble Created 11 Sep (contact tracing) [transpose], conditioned on cumulative using ABC")
+    if 2.72 in processRange
+
+        newdir = createNewDir("./August2021Outbreak/EnsembleCreated11Sep_contact",true)
+        # newdir = "./August2021Outbreak/2021_8_26_Aug/"
+
+        io_output, io_model = newStatsTxt(newdir)
+
+        # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 278, 348, 430, 513, 566]
+        # tDetect = collect(0:length(observedIDetect)-1)
+
+        timesDaily, dailyDetectedCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv", false, true)[1:2]
+        cumulativeDetectedCases, cumulativeTotalCases = reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_11Sep_contact_transpose.csv", true, true)[2:3]
+
+        cumulativeDetectedCases_ensemble = cumulativeDetectedCases .* 1.0
+        cumulativeTotalCases_ensemble = cumulativeTotalCases .* 1.0
+
+        # Ccandu filtering
+        filter_df = DataFrame(CSV.File("./August2021Outbreak/CSVOutputs/indexes_ensemble_config_11_11Sep_ABC.csv", header=false))
+        filterVector = convert.(Int64, filter_df.Column1)
+        dailyDetectedCases = dailyDetectedCases[:,filterVector]
+        cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
+        cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
+
+        # tspan = (0.0,70.0)
+        # timesDaily = [i for i=tspan[1]:1:tspan[end]]
+        title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
+        outputFileName = newdir*"/DailyCaseNumbersAfterDetection"
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
+
+        title = "August 2021 Outbreak Conditioned Model Ensemble"
+        outputFileName = newdir*"/EstimatedCaseNumbersAfterDetection"
+
+        # write stats to file
+        # io_output = casesAtDetection(cumulativeDetectedCases, cumulativeTotalCases, io_output)
+
+        t_current = daysSinceZero()
+        plotAndStatsOutbreak(cumulativeDetectedCases, cumulativeTotalCases, timesDaily,
+            observedIDetect, tDetect, t_current, title, outputFileName, true, true, 0.1, true, true,
+            true, cumulativeDetectedCases_ensemble, cumulativeTotalCases_ensemble)
+
+        # numCasesRange = 80:-10:10
+        # daysSinceRange = 10:5:40
+        # probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, numCasesRange, daysSinceRange)
+
+
+
+        # title = "Probability of less than N cases per day, x days after detection"
+        # outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        # probOfLessThanXGivenYHeatMap(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save)
+
+        # estimated hospitilisations ###########################################
+        # dailyHosp, dailyCrit = simulateHospDaily(timesDaily, dailyDetectedCases, 0.1, 0.17, 0.16)
+        # title = "Estimated hospitalised cases"
+        # outputFileName = newdir*"/dailyInHospital"
+        # plotHospEstimateDaily(timesDaily[1:61], dailyHosp[1:61,:], title, outputFileName, Display, save)
+        #
+        # title = "Estimated critically hospitalised cases"
+        # outputFileName = newdir*"/dailyCritInHospital"
+        # plotHospEstimateDaily(timesDaily[1:61], dailyCrit[1:61,:], title, outputFileName, Display, save)
+        ########################################################################
+
+        numCasesRange = 90:-1:0
+        daysSinceRange = 5:1:40
+
+        probabilities, io_output = caseNumbersBeginToDrop(dailyDetectedCases, io_output, t_current, numCasesRange, daysSinceRange)
+
+        title = "Probability of less than N cases per day, x days after detection"
+        outputFileName = newdir*"/ProbDaysSinceDetection_August2021"
+        probOfLessThanXGivenYContour(probabilities, numCasesRange, daysSinceRange, title, outputFileName, Display, save, true)
+
+        value = 10
+        io_output = caseNumbersHitValue(dailyDetectedCases, io_output, value)
+
+        models_df = reloadCSVmodels("./August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_11Sep_contact.csv")
+        title = "Value of Reff pre and post Alert Level, conditioned and unconditioned"
+        outputFileName = newdir*"/Reff_violinplot"
+        plotReff(models_df, filterVector, io_output, title, outputFileName, Display, save, true)
+
+        medReff = round(median(models_df[filterVector, :R_eff_after_al_estimate]),sigdigits=2)
+        lowerQReff = round(quantile(models_df[filterVector,:R_eff_after_al_estimate], 0.25),sigdigits=2)
+        upperQReff = round(quantile(models_df[filterVector,:R_eff_after_al_estimate], 0.75),sigdigits=2)
+        print(io_model, "The median value of \$R_\\text{eff}\$ is $(medReff) ")
+        println(io_model, "with IQR between [$lowerQReff, $upperQReff]" )
+
+        println(io_model, "For 1.5x is $(medReff*1.5) and IQR [$(1.5*lowerQReff), $(1.5*upperQReff)] ")
+        println(io_model, "For 2.0x is $(medReff*2) and IQR [$(2*lowerQReff), $(2*upperQReff)] ")
+        println(io_model, "For 3.0x is $(medReff*3) and IQR [$(3*lowerQReff), $(3*upperQReff)] ")
+
+
+
+
+        # write model info to io
+        close(io_output); close(io_model)
+    end
 
     println("Process #3: August 2021 Orig Fit for Aug 25")
     if 3 in processRange
@@ -3965,7 +4383,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
 
         # times to sim on
         times = [i for i=tspan[1]:time_step:tspan[end]]
-        numSims = convert(Int, round(14000/numSimsScaling))
+        numSims = convert(Int, round(100000/numSimsScaling))
 
         detection_tspan = (6,20) # increase from 6,14
 
@@ -3977,7 +4395,10 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         # ensemble = Ensemble([[0.05,0.15],[0.5,1.0]], [0.0,0.0], [[2.0,5.0],[0.5,4.0]],[0.01,0.3],[2,10],[5.5,6.5], collect(1:4), Dict(:contact=>Dict(:p_contact=>[0.0,0.7], :time=>[2.0,6.0])))
 
         # 7 Sep
-        ensemble = Ensemble([[0.05,0.15],[0.4,0.8]], [0.0,0.0], [[2.0,5.0],[1.0,4.0]],[0.01,0.4],[2,10],[5.5,6.5], collect(1:4), Dict(:contact=>Dict(:p_contact=>[0.5,0.9], :time=>[2.0,6.0])))
+        # ensemble = Ensemble([[0.05,0.15],[0.4,0.8]], [0.0,0.0], [[2.0,5.0],[1.0,4.0]],[0.01,0.4],[2,10],[5.5,6.5], collect(1:4), Dict(:contact=>Dict(:p_contact=>[0.5,0.9], :time=>[2.0,6.0])))
+
+        # 11 Sep, 100,000 sims, tranposed CSV
+        ensemble = Ensemble([[0.05,0.15],[0.3,0.8]], [0.0,0.0], [[2.0,5.0],[1.0,4.0]],[0.01,0.4],[2,10],[5.5,6.5], collect(1:4), Dict(:contact=>Dict(:p_contact=>[0.5,0.95], :time=>[2.0,6.0])))
 
         cumulativeCases, IDetect_tStep, observedIDetect, tDetect, dailyDetectCases,
             dailyTotalCases, model_array, meanOffspringAL = ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan,
@@ -3994,25 +4415,27 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         modPDailyDetect = dailyDetectCases
 
         timesDaily = [i for i=tspan[1]:1:tspan[end]]
-        title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
-        outputFileName = "./August2021Outbreak/EnsembleCreated6Sep_contact/DailyCaseNumbersAfterDetectionEnsemble7Sep"
-        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true)
-        # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
+        if Display || save
+            title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
+            outputFileName = "./August2021Outbreak/EnsembleCreated6Sep_contact/DailyCaseNumbersAfterDetectionEnsemble10Sep"
+            plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true)
+            # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
 
-        title = "August 2021 Outbreak Model Ensemble for Ccandu"
-        outputFileName = "./August2021Outbreak/EnsembleCreated6Sep_contact/EstimatedCaseNumbersAfterDetectionEnsemble7Sep"
-        plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, Display, save, 0.1)
+            title = "August 2021 Outbreak Model Ensemble for Ccandu"
+            outputFileName = "./August2021Outbreak/EnsembleCreated6Sep_contact/EstimatedCaseNumbersAfterDetectionEnsemble10Sep"
+            plotAndStatsOutbreak(IDetect_tStep, cumulativeCases, times, observedIDetect, tDetect, t_current, title, outputFileName, Display, save, 0.1)
+        end
 
         # output CSVs
         if 5.5 in CSVOutputRange
             @assert time_step == 1.0
-            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_7Sep_contact.csv"
-            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false)
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv"
+            outputCSVDailyCases(dailyDetectCases, dailyTotalCases, timesDaily, outputFileName, false, true)
 
-            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_7Sep_contact.csv"
-            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true)
+            outputFileName = "August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_11Sep_contact_transpose.csv"
+            outputCSVDailyCases(IDetect_tStep, cumulativeCases, timesDaily, outputFileName, true, true)
 
-            outputFileName = "August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_7Sep_contact.csv"
+            outputFileName = "August2021Outbreak/CSVOutputs/Models/BP2021ensemble_models_11Sep_contact.csv"
             outputCSVmodels(model_array, outputFileName, meanOffspringAL)
         end
     end
@@ -4600,7 +5023,7 @@ function main()
     # ALERT__REFF__MAX__VAL = 1.3
 
     compilationInit()
-    # verifySolutions(1, [10.5])
+    # verifySolutions(1, [4])
     # verifySolutions(1, collect(5:18))
     # verifySolutions(1, collect(22:23))
 
@@ -4613,11 +5036,11 @@ function main()
 
     # augustOutbreakSim(1, [13.5])
 
-    augustOutbreakPostProcess([2.51],true,true)
+    augustOutbreakPostProcess([2.72],true,true)
 
-    # augustOutbreakSim(30, [5.41], true, false)
+    # augustOutbreakSim(1, [5.5], false, false,[5.5])
 
-    # augustOutbreakSim(1, [5.4], true, true,[5.4])
+    # augustOutbreakSim(1, [1], true, false,[1])
 
     # augustOutbreakPostProcess([2.1],true,true)
 
@@ -4768,13 +5191,13 @@ end
 # Dates.format(newDate, "u d")
 
 # original 26 aug worst case and best case Reff in intervention
-model = init_model_pars(0,0, 0, 0, [0,0,0], true)
+# model = init_model_pars(0,0, 0, 0, [0,0,0], true)
 # model.alert_pars.p_test=0.8
 # model.alert_pars.t_onset_to_isol=1.5
 # model.alert_pars.R_scaling=0.25
 # model.alert_pars.alert_level_scaling_speed=10
 # model.reproduction_number=6.5
-println(modelReff(model))
+# println(modelReff(model))
 #
 # model = init_model_pars(0,0, 0, 0, [0,0,0], true)
 # model.alert_pars.p_test=1.0
@@ -4789,3 +5212,69 @@ println(modelReff(model))
 # infection_time_dist = Weibull(model.t_generation_shape, model.t_generation_scale)
 #
 # cdf(infection_time_dist, 21)
+
+
+# Current (Sep 9) worst case and best case Reff in intervention
+# model = init_model_pars(0,0, 0, 0, [0,0,0], true)
+# model.alert_pars.p_test=0.7
+# model.alert_pars.t_onset_to_isol=1.5
+# model.alert_pars.R_scaling=0.5
+# model.alert_pars.alert_level_scaling_speed=10
+# model.reproduction_number=6.5
+# println(modelReff(model))
+#
+# model = init_model_pars(0,0, 0, 0, [0,0,0], true)
+# model.alert_pars.p_test=1.0
+# model.alert_pars.t_onset_to_isol=0.5
+# model.alert_pars.R_scaling=0.01
+# model.alert_pars.alert_level_scaling_speed=10
+# model.reproduction_number=5.5
+# println(modelReff(model))
+
+
+# function reloadCSV_test(CSVpath::String, cumulative::Bool)
+#
+#     type = ""
+#     if cumulative
+#         type = "cumulative"
+#     else
+#         type = "daily"
+#     end
+#
+#     # CSVpath = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
+#
+#     case_df = DataFrame(CSV.File(CSVpath))
+#
+#     case_df = Df_transpose(case_df)
+#
+#     times = case_df.time
+#
+#     dailyConfirmedCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
+#     dailyTotalCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
+#
+#     for col in 1:length(dailyConfirmedCases[1,:])
+#         colname = "$type confirmed cases - run_$col"
+#         dailyConfirmedCases[:,col] = case_df[:, colname]
+#
+#         colname = "$type total cases - run_$col"
+#         dailyTotalCases[:,col] = case_df[:, colname]
+#
+#     end
+#
+#     return times, dailyConfirmedCases, dailyTotalCases
+# end
+
+
+# reloadCSV("August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv", false, true)
+# CSVpath = "August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_10Sep_contact_test.csv"
+# case_df = DataFrame(CSV.File(CSVpath,transpose=false,header=2))
+#
+# CSVpath = "August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_10Sep_contact.csv"
+# case_df = DataFrame(CSV.File(CSVpath))
+#
+#
+# case_df = Df_transpose(case_df)
+#
+# # case_df.time
+#
+convertCSVtoConditioning("August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_11Sep_contact_transpose.csv", "August2021Outbreak/CSVOutputs/config_11_created11Sep.timeseries.csv", true)

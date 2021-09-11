@@ -130,10 +130,18 @@ module outbreakPostProcessing
         @assert sum(probOfLessThanXGivenYDays([0 1; 2 3; 5 6; 4 5; 3 2; 2 1; 1 0], 5, 1:7) .== [0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])==7
     end
 
-    function outputCSVDailyCases(dailyConfirmedCases, dailyTotalCases, times, outputFileName, cumulative::Bool)
+    function Df_transpose(df)
+        #=
+        Given a DataFrame, return it's transpose
+        =#
+        return DataFrame([[names(df)]; collect.(eachrow(df))], [:column; Symbol.(axes(df, 1))])
+    end
+
+    function outputCSVDailyCases(dailyConfirmedCases, dailyTotalCases, times, outputFileName, cumulative::Bool, transpose_df::Bool=false)
 
         case_df = DataFrame()
         case_df[!, "time"] = times
+        case_df.time = convert.(Int64, case_df.time)
 
         type = ""
         if cumulative
@@ -153,6 +161,10 @@ module outbreakPostProcessing
         end
 
         # outputFileName = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
+
+        if transpose_df
+            case_df = Df_transpose(case_df)
+        end
 
         CSV.write(outputFileName, case_df)
 
@@ -219,7 +231,7 @@ module outbreakPostProcessing
         return nothing
     end
 
-    function reloadCSV(CSVpath::String, cumulative::Bool)
+    function reloadCSV(CSVpath::String, cumulative::Bool, transposed_df::Bool=false)
 
         type = ""
         if cumulative
@@ -230,9 +242,13 @@ module outbreakPostProcessing
 
         # CSVpath = "August2021Outbreak/CSVOutputs/BP2021fit_$(type)cases.csv"
 
-        case_df = DataFrame(CSV.File(CSVpath))
+        case_df = DataFrame(CSV.File(CSVpath, transpose=transposed_df))
 
         times = case_df.time
+
+        if transposed_df
+            case_df = select(case_df, 2:ncol(case_df))
+        end
 
         dailyConfirmedCases = zeros(length(times), Int64((ncol(case_df)-1) /2))
         dailyTotalCases = zeros(length(times), Int64((ncol(case_df)-1) /2))

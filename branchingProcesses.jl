@@ -2109,15 +2109,15 @@ module branchingProcesses
                 push!(t, infection_time*1)
             elseif reaction.kind === :infection # infection event
 
-                sSaturation = (model.state_totals[1]/model.population_size)
-                # rejection step for population saturation
-                if rand() < sSaturation/reaction.sSaturation
+                # rejection step for alert level change - perform first as when level changed is in general the most likely to cause a rejection
+                if alertRejection(model, infection_time, timeAlertChange, usingAlert, alertLevelChanged)
 
-                    # rejection step for detection and subsequent isolation
-                    if detectionRejection(population_df, model, reaction, infection_time)
-
-                        # rejection step for alert level change
-                        if alertRejection(model, infection_time, timeAlertChange, usingAlert, alertLevelChanged)
+                    sSaturation = (model.state_totals[1]/model.population_size)
+                    # rejection step for population saturation
+                    if rand() < sSaturation/reaction.sSaturation
+                        
+                        # rejection step for detection and subsequent isolation
+                        if detectionRejection(population_df, model, reaction, infection_time)
 
                             num_cases += 1
                             initNewCase!(population_df, model, infection_time, reaction.parentID, num_cases)
@@ -2173,7 +2173,7 @@ module branchingProcesses
                             expOff = sSaturation * population_df[num_cases, :reproduction_number]
                             num_off = rand(Poisson(expOff))
 
-                            population_df[num_cases, :num_offspring] = num_off * 1
+                            # population_df[num_cases, :num_offspring] = num_off * 1
 
                             # new infections
                             for j in 1:num_off
@@ -2183,14 +2183,14 @@ module branchingProcesses
                             num_events += 1
                             state_totals_all[num_events, :] .= copy(model.state_totals)
                             push!(t, infection_time*1)
-                        else
-                            population_df[reaction.parentID, :num_offspring] -= 1
+                        # else
+                            # population_df[reaction.parentID, :num_offspring] -= 1
                         end
-                    else
-                        population_df[reaction.parentID, :num_offspring] -= 1
+                    # else
+                        # population_df[reaction.parentID, :num_offspring] -= 1
                     end
-                else
-                    population_df[reaction.parentID, :num_offspring] -= 1
+                # else
+                    # population_df[reaction.parentID, :num_offspring] -= 1
                 end
             elseif reaction.kind === :isolation
 
@@ -2212,7 +2212,7 @@ module branchingProcesses
 
                         # add alert level event
                         push!(tau_heap, event(timeAlert, :alertChange, -1, sSaturation))
-                        model.t_max += timeAlert
+                        model.t_max += timeAlert # destructively edit t_max
                     end
 
                     if usingContactTracing

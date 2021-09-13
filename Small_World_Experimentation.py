@@ -65,7 +65,7 @@ def main(er_small_test=True, ring_small_test=True):
     '''
     Main loop for testing within this Python file
     '''
-    print("Beginning toy network simulations")
+    print("Beginning small world simulations")
     if (er_small_test):
         # initialise variables
         N = 1000
@@ -114,7 +114,7 @@ def main(er_small_test=True, ring_small_test=True):
             # set recovery hazard
             rates[N+inf] = maxalpha
             # set infection hazard
-            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         S = {}
         I = {}
         R = {}
@@ -430,4 +430,4 @@ def main(er_small_test=True, ring_small_test=True):
 
 
 if __name__=="__main__":
-    main(False, False)
+    main(True, True)

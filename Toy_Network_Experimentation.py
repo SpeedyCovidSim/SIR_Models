@@ -112,7 +112,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
     if(single_lattices):
         print("Beginning Single Seed Increasing Households tests")
         # initialise variables
-        tMax = 12
+        tMax = 15
         maxalpha = 0.4
         maxgamma = 0.1
         maxbeta = 4
@@ -269,7 +269,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
     if(multi_lattices):
         print("Beginning Multi Seed Increasing Households tests")
         # initialise variables
-        tMax = 30
+        tMax = 15
         maxalpha = 0.4
         maxgamma = 0.1
         maxbeta = 4
@@ -426,7 +426,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
     if(k_random):
         print("Beginning k Random Inter-Household Links Testing")
         # initialise variables
-        tMax = 30
+        tMax = 15
         maxalpha = 0.4
         maxgamma = 0.1
         maxbeta = 4
@@ -587,7 +587,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
     if(k_workplace):
         print("Beginning k Workplace Links Testing")
         # initialise variables
-        tMax = 30
+        tMax = 15
         maxalpha = 0.4
         maxgamma = 0.1
         maxbeta = 4
@@ -747,4 +747,4 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
 
 
 if __name__=="__main__":
-    main(False, False, False, True)
+    main(True, True, True, True)

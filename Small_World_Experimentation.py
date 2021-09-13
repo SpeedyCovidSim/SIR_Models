@@ -69,7 +69,7 @@ def main(er_small_test=True, ring_small_test=True):
     if (er_small_test):
         # initialise variables
         N = 1000
-        tMax = 30
+        tMax = 20
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
@@ -102,10 +102,10 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, Ifull, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, Rfull, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a fully connected population size of {N}", fontsize=20)
-        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/Fully_Connected")
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a fully connected population size of {N}")
+        plt.savefig(f"PythonPlotting/Small_ER_Tests/Fully_Connected")
 
         network = ig.Graph.Erdos_Renyi(1000,0.005)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -134,9 +134,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I5, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R5, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with an arc prob. of 0.005, population size of {N}", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with an arc prob. of 0.005, population size of {N}")
         plt.savefig(f"PythonPlotting/Small_ER_Tests/005_Connected")
 
         network = ig.Graph.Erdos_Renyi(1000,0.003)
@@ -166,9 +166,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I3, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R3, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with an arc prob. of 0.003, population size of {N}", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with an arc prob. of 0.003, population size of {N}")
         plt.savefig(f"PythonPlotting/Small_ER_Tests/003_Connected")
 
         network = ig.Graph.Erdos_Renyi(1000,0.001)
@@ -198,27 +198,27 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with an arc prob. of 0.001, population size of {N}", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with an arc prob. of 0.001, population size of {N}")
         plt.savefig(f"PythonPlotting/Small_ER_Tests/001_Connected")
 
         fig = plt.figure()
         plt.plot(t, Ifull, color="red",label="Full",lw = 2,alpha=0.5,figure=fig)
         plt.plot(t, I5, color="blue",label="P = 0.005",lw = 2,alpha=0.5,figure=fig)
         plt.plot(t, I3, color="green",label="P = 0.003",lw = 2,alpha=0.5,figure=fig)
-        plt.plot(t, I1, color="yellow",label="P = 0.001",lw = 2,alpha=0.5,figure=fig)
+        plt.plot(t, I1, color="orange",label="P = 0.001",lw = 2,alpha=0.5,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Infected Individuals", fontsize=16)
-        plt.title(f"SIR model with varying probabilities of arcs existing", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Infected Individuals")
+        plt.title(f"SIR model with varying probabilities of arcs existing")
         plt.savefig(f"PythonPlotting/Small_ER_Tests/P_Comparison")
 
     if(ring_small_test):
         print("Beginning Small Ring k tests")
         # initialise variables
         N = 1000
-        tMax = 30
+        tMax = 20
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
@@ -250,9 +250,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, Ifull, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, Rfull, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a fully connected ring lattice population {N}", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a fully connected ring lattice population {N}")
         plt.savefig(f"PythonPlotting/Small_K_Tests/Fully_Connected")
 
         network = ig.Graph.Watts_Strogatz(1,1000,40,0)
@@ -282,9 +282,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I4, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R4, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 40 neighbours", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 40 neighbours")
         plt.savefig(f"PythonPlotting/Small_K_Tests/40_Neighbours")
 
         network = ig.Graph.Watts_Strogatz(1,1000,20,0)
@@ -314,9 +314,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I2, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R2, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 20 neighbours", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 20 neighbours")
         plt.savefig(f"PythonPlotting/Small_K_Tests/20_Neighbours")
 
         network = ig.Graph.Watts_Strogatz(1,1000,10,0)
@@ -346,9 +346,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 10 neighbours", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 10 neighbours")
         plt.savefig(f"PythonPlotting/Small_K_Tests/10_Neighbours")
 
         network = ig.Graph.Watts_Strogatz(1,1000,5,0)
@@ -378,9 +378,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I05, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R05, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 5 neighbours", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 5 neighbours")
         plt.savefig(f"PythonPlotting/Small_K_Tests/5_Neighbours")
 
         network = ig.Graph.Watts_Strogatz(1,1000,2,0)
@@ -410,9 +410,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I02, color="red",label="Infected",lw = 2,figure=fig)
         plt.plot(t, R02, color="blue",label="Recovered",lw = 2,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
-        plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 2 neighbours", fontsize=20)
+        plt.xlabel("Time")
+        plt.ylabel("Number of Individuals in State")
+        plt.title(f"SIR model with a ring lattice population {N}, \n each node connected to nearest 2 neighbours")
         plt.savefig(f"PythonPlotting/Small_K_Tests/2_Neighbours")
 
         fig = plt.figure()
@@ -423,9 +423,9 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I05, color="black",label="Neighbourhood = 5",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I02, color="orange",label="Neighbourhood = 2",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
-        plt.xlabel("Time", fontsize=20)
+        plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals", fontsize=16)
-        plt.title(f"SIR model of ring lattice with varying neighbourhood sizes", fontsize=20)
+        plt.title(f"SIR model of ring lattice with varying neighbourhood sizes")
         plt.savefig(f"PythonPlotting/Small_K_Tests/K_Comparison")
 
 

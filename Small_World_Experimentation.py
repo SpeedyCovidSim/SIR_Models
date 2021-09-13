@@ -200,7 +200,7 @@ def main(er_small_test=True, ring_small_test=True):
         plt.legend()
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Individuals in State", fontsize=16)
-        plt.title(f"SIR model with a connectivity of 0.001, population size of {N}", fontsize=20)
+        plt.title(f"SIR model with an arc prob. of 0.001, population size of {N}", fontsize=20)
         plt.savefig(f"PythonPlotting/Small_ER_Tests/001_Connected")
 
         fig = plt.figure()
@@ -253,7 +253,7 @@ def main(er_small_test=True, ring_small_test=True):
         plt.xlabel("Time", fontsize=20)
         plt.ylabel("Number of Individuals in State", fontsize=16)
         plt.title(f"SIR model with a fully connected ring lattice population {N}", fontsize=20)
-        plt.savefig(f"PythonPlotting/Erdos_Renyi_Tests/Fully_Connected")
+        plt.savefig(f"PythonPlotting/Small_K_Tests/Fully_Connected")
 
         network = ig.Graph.Watts_Strogatz(1,1000,40,0)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network,0.001)

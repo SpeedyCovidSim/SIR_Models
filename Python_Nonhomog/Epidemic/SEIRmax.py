@@ -78,8 +78,6 @@ def gillespieMax(tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, susce
             else: # (I->R)
                 # change individual state
                 susceptible[trueIndex] = -1
-                # get neighbouring vertices
-                neighbors = network.neighbors(trueIndex)
                 # update numSusNei
                 numSusNei[trueIndex] = 0
                 # update network totals

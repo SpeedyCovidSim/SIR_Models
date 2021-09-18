@@ -1,10 +1,10 @@
 import numpy as np
 from numpy import random
-import time
 import igraph as ig
 import copy
 from matplotlib import pyplot as plt
 from pythonCompartment.sirNetworksFrequency import gillespieDirectNetwork
+from PythonSimulation.simulate import general_SIR_simulation, random_SIR_simulation
 
 def create_linked_neighbourhood(N, n):
     '''
@@ -117,6 +117,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxgamma = 0.1
         maxbeta = 4
         t = np.linspace(0,10,1000)
+        j=30
 
         N = 8
         n = 4
@@ -129,29 +130,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t2i, S2i, I2i, R2i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t2i, S2i, right=S2i[-1])
-            I[i] = np.interp(t, t2i, I2i, right=I2i[-1])
-            R[i] = np.interp(t, t2i, R2i, right=R2i[-1])
-            plt.plot(t2i, S2i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, I2i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, R2i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S2 = np.median(np.array(list(S.values())),0)
-        I2 = np.median(np.array(list(I.values())),0)
-        R2 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S2, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I2, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R2, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Single_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n 1 link between adjacent households"
+        fname=f"PythonPlotting/Single_Household/{N}_Households"
+        S2, I2, R2 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 16
         num = N*n
@@ -163,29 +145,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t4i, S4i, I4i, R4i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t4i, S4i, right=S4i[-1])
-            I[i] = np.interp(t, t4i, I4i, right=I4i[-1])
-            R[i] = np.interp(t, t4i, R4i, right=R4i[-1])
-            plt.plot(t4i, S4i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t4i, I4i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t4i, R4i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S4 = np.median(np.array(list(S.values())),0)
-        I4 = np.median(np.array(list(I.values())),0)
-        R4 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S4, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I4, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R4, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Single_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n 1 link between adjacent households"
+        fname=f"PythonPlotting/Single_Household/{N}_Households"
+        S4, I4, R4 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 32
         num = N*n
@@ -197,29 +160,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t8i, S8i, I8i, R8i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t8i, S8i, right=S4i[-1])
-            I[i] = np.interp(t, t8i, I8i, right=I4i[-1])
-            R[i] = np.interp(t, t8i, R8i, right=R4i[-1])
-            plt.plot(t8i, S8i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t8i, I8i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t8i, R8i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S8 = np.median(np.array(list(S.values())),0)
-        I8 = np.median(np.array(list(I.values())),0)
-        R8 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S8, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I8, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R8, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Single_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n 1 link between adjacent households"
+        fname=f"PythonPlotting/Single_Household/{N}_Households"
+        S8, I8, R8 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 64
         num = N*n
@@ -231,39 +175,20 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t16i, S16i, I16i, R16i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t16i, S16i, right=S16i[-1])
-            I[i] = np.interp(t, t16i, I16i, right=I16i[-1])
-            R[i] = np.interp(t, t16i, R16i, right=R16i[-1])
-            plt.plot(t16i, S16i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t16i, I16i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t16i, R16i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S16 = np.median(np.array(list(S.values())),0)
-        I16 = np.median(np.array(list(I.values())),0)
-        R16 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S16, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I16, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R16, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Single_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n 1 link between adjacent households"
+        fname=f"PythonPlotting/Single_Household/{N}_Households"
+        S16, I16, R16 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
-        plt.plot(t, I2, color="blue",label="Neighbourhoods = 8",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4, color="green",label="Neighbourhoods = 16",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I8, color="red",label="Neighbourhoods = 32",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I16, color="black",label="Neighbourhoods = 64",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I2, color="blue",label="Household Size = 8",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4, color="green",label="Household Size = 16",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8, color="red",label="Household Size = 32",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I16, color="black",label="Household Size = 64",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
-        plt.title(f"SIR model of ring lattice with varying neighbourhood sizes")
+        plt.title(f"SIR model of a varying number of single seeded households")
         plt.savefig(f"PythonPlotting/Single_Household/N_Comparison")
 
     if(multi_lattices):
@@ -286,29 +211,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t2i, S2i, I2i, R2i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t2i, S2i, right=S2i[-1])
-            I[i] = np.interp(t, t2i, I2i, right=I2i[-1])
-            R[i] = np.interp(t, t2i, R2i, right=R2i[-1])
-            plt.plot(t2i, S2i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, I2i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, R2i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S2 = np.median(np.array(list(S.values())),0)
-        I2 = np.median(np.array(list(I.values())),0)
-        R2 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S2, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I2, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R2, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Multi_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n Multi-seeding households"
+        fname=f"PythonPlotting/Multi_Household/{N}_Households"
+        S8, I8, R8 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 16
         num = N*n
@@ -320,29 +226,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t4i, S4i, I4i, R4i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t4i, S4i, right=S4i[-1])
-            I[i] = np.interp(t, t4i, I4i, right=I4i[-1])
-            R[i] = np.interp(t, t4i, R4i, right=R4i[-1])
-            plt.plot(t4i, S4i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t4i, I4i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t4i, R4i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S4 = np.median(np.array(list(S.values())),0)
-        I4 = np.median(np.array(list(I.values())),0)
-        R4 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S4, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I4, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R4, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Multi_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n Multi-seeding households"
+        fname=f"PythonPlotting/Multi_Household/{N}_Households"
+        S16, I16, R16 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 32
         num = N*n
@@ -354,29 +241,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t8i, S8i, I8i, R8i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t8i, S8i, right=S8i[-1])
-            I[i] = np.interp(t, t8i, I8i, right=I8i[-1])
-            R[i] = np.interp(t, t8i, R8i, right=R8i[-1])
-            plt.plot(t8i, S8i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t8i, I8i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t8i, R8i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S8 = np.median(np.array(list(S.values())),0)
-        I8 = np.median(np.array(list(I.values())),0)
-        R8 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S8, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I8, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R8, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Multi_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n Multi-seeding households"
+        fname=f"PythonPlotting/Multi_Household/{N}_Households"
+        S32, I32, R32 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         N = 64
         num = N*n
@@ -388,39 +256,20 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            t16i, S16i, I16i, R16i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t16i, S16i, right=S16i[-1])
-            I[i] = np.interp(t, t16i, I16i, right=I16i[-1])
-            R[i] = np.interp(t, t16i, R16i, right=R16i[-1])
-            plt.plot(t16i, S16i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t16i, I16i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t16i, R16i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S16 = np.median(np.array(list(S.values())),0)
-        I16 = np.median(np.array(list(I.values())),0)
-        R16 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S16, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I16, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R16, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n 1 link between adjacent households")
-        plt.savefig(f"PythonPlotting/Multi_Household/{N}_Households")
+        title=f"SIR model with {N} households of {n} people, \n Multi-seeding households"
+        fname=f"PythonPlotting/Multi_Household/{N}_Households"
+        S64, I64, R64 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
-        plt.plot(t, I2, color="blue",label="Neighbourhoods = 8",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4, color="green",label="Neighbourhoods = 16",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I8, color="red",label="Neighbourhoods = 32",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I16, color="black",label="Neighbourhoods = 64",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8, color="blue",label="Neighbourhoods = 8",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I16, color="green",label="Neighbourhoods = 16",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I32, color="red",label="Neighbourhoods = 32",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I64, color="black",label="Neighbourhoods = 64",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
-        plt.title(f"SIR model of ring lattice with varying neighbourhood sizes")
+        plt.title(f"SIR model of a varying number of multi-seeded households")
         plt.savefig(f"PythonPlotting/Multi_Household/N_Comparison")
 
     if(k_random):
@@ -431,146 +280,34 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxgamma = 0.1
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j=30
 
         N = 7
         n = 4
         num = N*n
         k = 1
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            network = create_random_neighbourhood(N,n,k)
-            iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n)
-            rates = np.zeros(2*num)
-            for inf in infecteds:
-                # set recovery hazard
-                rates[num+inf] = maxalpha
-                # set infection hazard
-                rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-            t1i, S1i, I1i, R1i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t1i, S1i, right=S1i[-1])
-            I[i] = np.interp(t, t1i, I1i, right=I1i[-1])
-            R[i] = np.interp(t, t1i, R1i, right=R1i[-1])
-            plt.plot(t1i, S1i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t1i, I1i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t1i, R1i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S1 = np.median(np.array(list(S.values())),0)
-        I1 = np.median(np.array(list(I.values())),0)
-        R1 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S1, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} random links between households")
-        plt.savefig(f"PythonPlotting/K_Random/{k}_Random")
-        plt.close()
-
+        title=f"SIR model with {N} households of {n} people, \n {k} random links between households"
+        fname=f"PythonPlotting/K_Random/{k}_Random"
+        S1, I1, R1 = random_SIR_simulation(j,N,n,k, create_random_neighbourhood, setNetwork_neighbourhoods, 
+        gillespieDirectNetwork, tMax, maxalpha, maxbeta, title, fname)
 
         k = 2
-        S = {}
-        I = {}
-        R = {}
-        fig = plt.figure()
-        for i in range(30):
-            network = create_random_neighbourhood(N,n,k)
-            iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n)
-            rates = np.zeros(2*num)
-            for inf in infecteds:
-                # set recovery hazard
-                rates[num+inf] = maxalpha
-                # set infection hazard
-                rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-            t2i, S2i, I2i, R2i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t2i, S2i, right=S2i[-1])
-            I[i] = np.interp(t, t2i, I2i, right=I2i[-1])
-            R[i] = np.interp(t, t2i, R2i, right=R2i[-1])
-            plt.plot(t2i, S2i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, I2i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, R2i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S2 = np.median(np.array(list(S.values())),0)
-        I2 = np.median(np.array(list(I.values())),0)
-        R2 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S2, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I2, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R2, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} random links between households")
-        plt.savefig(f"PythonPlotting/K_Random/{k}_Random")
-        plt.close()
+        title=f"SIR model with {N} households of {n} people, \n {k} random links between households"
+        fname=f"PythonPlotting/K_Random/{k}_Random"
+        S2, I2, R2 = random_SIR_simulation(j,N,n,k, create_random_neighbourhood, setNetwork_neighbourhoods, 
+        gillespieDirectNetwork, tMax, maxalpha, maxbeta, title, fname)
 
         k = 5
-        fig = plt.figure()
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            network = create_random_neighbourhood(N,n,k)
-            iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n)
-            rates = np.zeros(2*num)
-            for inf in infecteds:
-                # set recovery hazard
-                rates[num+inf] = maxalpha
-                # set infection hazard
-                rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-            t5i, S5i, I5i, R5i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t5i, S5i, right=S5i[-1])
-            I[i] = np.interp(t, t5i, I5i, right=I5i[-1])
-            R[i] = np.interp(t, t5i, R5i, right=R5i[-1])
-            plt.plot(t5i, S5i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t5i, I5i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t5i, R5i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S5 = np.median(np.array(list(S.values())),0)
-        I5 = np.median(np.array(list(I.values())),0)
-        R5 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S5, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I5, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R5, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} random links between households")
-        plt.savefig(f"PythonPlotting/K_Random/{k}_Random")
-        plt.close()
+        title=f"SIR model with {N} households of {n} people, \n {k} random links between households"
+        fname=f"PythonPlotting/K_Random/{k}_Random"
+        S5, I5, R5 = random_SIR_simulation(j,N,n,k, create_random_neighbourhood, setNetwork_neighbourhoods, 
+        gillespieDirectNetwork, tMax, maxalpha, maxbeta, title, fname)
 
         k = 7
-        fig = plt.figure()
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            network = create_random_neighbourhood(N,n,k)
-            iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n)
-            rates = np.zeros(2*num)
-            for inf in infecteds:
-                # set recovery hazard
-                rates[num+inf] = maxalpha
-                # set infection hazard
-                rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-            t7i, S7i, I7i, R7i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t7i, S7i, right=S7i[-1])
-            I[i] = np.interp(t, t7i, I7i, right=I7i[-1])
-            R[i] = np.interp(t, t7i, R7i, right=R7i[-1])
-            plt.plot(t7i, S7i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t7i, I7i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t7i, R7i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S7 = np.median(np.array(list(S.values())),0)
-        I7 = np.median(np.array(list(I.values())),0)
-        R7 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S1, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} random links between households")
-        plt.savefig(f"PythonPlotting/K_Random/{k}_Random")
-        plt.close()
+        title=f"SIR model with {N} households of {n} people, \n {k} random links between households"
+        fname=f"PythonPlotting/K_Random/{k}_Random"
+        S7, I7, R7 = random_SIR_simulation(j,N,n,k, create_random_neighbourhood, setNetwork_neighbourhoods, 
+        gillespieDirectNetwork, tMax, maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
         plt.plot(t, I1, color="blue",label="k = 1",lw = 2, alpha=0.5,figure=fig)
@@ -606,30 +343,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         fig = plt.figure()
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            t1i, S1i, I1i, R1i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t1i, S1i, right=S1i[-1])
-            I[i] = np.interp(t, t1i, I1i, right=I1i[-1])
-            R[i] = np.interp(t, t1i, R1i, right=R1i[-1])
-            plt.plot(t1i, S1i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t1i, I1i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t1i, R1i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S1 = np.median(np.array(list(S.values())),0)
-        I1 = np.median(np.array(list(I.values())),0)
-        R1 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S1, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} workplace links between households")
-        plt.savefig(f"PythonPlotting/K_Workplace/{k}_Workplace")
-        plt.close()
-
+        title=f"SIR model with {N} households of {n} people, \n {k} workplace links between households"
+        fname=f"PythonPlotting/K_Workplace/{k}_Workplace"
+        S1, I1, R1 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         k = 2
         fig = plt.figure()
@@ -641,29 +358,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            t2i, S2i, I2i, R2i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t2i, S2i, right=S2i[-1])
-            I[i] = np.interp(t, t2i, I2i, right=I2i[-1])
-            R[i] = np.interp(t, t2i, R2i, right=R2i[-1])
-            plt.plot(t2i, S2i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, I2i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t2i, R2i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S2 = np.median(np.array(list(S.values())),0)
-        I2 = np.median(np.array(list(I.values())),0)
-        R2 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S2, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I2, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R2, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} workplace links between households")
-        plt.savefig(f"PythonPlotting/K_Workplace/{k}_Workplace")
-        plt.close()
+        title=f"SIR model with {N} households of {n} people, \n {k} workplace links between households"
+        fname=f"PythonPlotting/K_Workplace/{k}_Workplace"
+        S2, I2, R2 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         k = 5
         network = create_working_neighbourhood(N,n,k)
@@ -675,29 +373,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            t5i, S5i, I5i, R5i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t5i, S5i, right=S5i[-1])
-            I[i] = np.interp(t, t5i, I5i, right=I5i[-1])
-            R[i] = np.interp(t, t5i, R5i, right=R5i[-1])
-            plt.plot(t5i, S5i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t5i, I5i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t5i, R5i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S5 = np.median(np.array(list(S.values())),0)
-        I5 = np.median(np.array(list(I.values())),0)
-        R5 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S5, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I5, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R5, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} workplace links between households")
-        plt.savefig(f"PythonPlotting/K_Workplace/{k}_Workplace")
-        plt.close()
+        title=f"SIR model with {N} households of {n} people, \n {k} workplace links between households"
+        fname=f"PythonPlotting/K_Workplace/{k}_Workplace"
+        S5, I5, R5 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
 
         k = 7
         network = create_working_neighbourhood(N,n,k)
@@ -709,30 +388,11 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         fig = plt.figure()
-        S = {}
-        I = {}
-        R = {}
-        for i in range(30):
-            t7i, S7i, I7i, R7i = gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
-            S[i] = np.interp(t, t7i, S7i, right=S7i[-1])
-            I[i] = np.interp(t, t7i, I7i, right=I7i[-1])
-            R[i] = np.interp(t, t7i, R7i, right=R7i[-1])
-            plt.plot(t7i, S7i, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t7i, I7i, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
-            plt.plot(t7i, R7i, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
-        S7 = np.median(np.array(list(S.values())),0)
-        I7 = np.median(np.array(list(I.values())),0)
-        R7 = np.median(np.array(list(R.values())),0)
-        plt.plot(t, S1, color="green",label="Susceptible",lw = 2,figure=fig)
-        plt.plot(t, I1, color="red",label="Infected",lw = 2,figure=fig)
-        plt.plot(t, R1, color="blue",label="Recovered",lw = 2,figure=fig)
-        plt.legend()
-        plt.xlabel("Time")
-        plt.ylabel("Number of Individuals in State")
-        plt.title(f"SIR model with {N} households of {n} people, \n {k} workplace links between households")
-        plt.savefig(f"PythonPlotting/K_Workplace/{k}_Workplace")
-        plt.close()
-
+        title=f"SIR model with {N} households of {n} people, \n {k} workplace links between households"
+        fname=f"PythonPlotting/K_Workplace/{k}_Workplace"
+        S7, I7, R7 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
+        
         fig = plt.figure()
         plt.plot(t, I1, color="blue",label="k = 1",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I2, color="green",label="k = 2",lw = 2, alpha=0.5,figure=fig)

@@ -1,29 +1,9 @@
 import numpy as np
 import igraph as ig
 from numpy import random
-from plots import plotSIR, plotSIRK
+from random import random as unif
 
-def selectEventIndex(rates, probs, rng, N):
-    '''
-    finds time and index of next event
-    Inputs
-    rates       : array of hazard rates
-    probs       : array of hazard probabilities
-    rng         : rng object
-    N           : total number of vertices
-    Outputs
-    deltaT      : time till next event
-    eventIndex  : index of next event
-    '''
-    # get hazard sum and next event time
-    h = np.sum(rates)
-    deltaT = rng.exponential(1/h)
-    # choose the index of the individual to transition
-    eventIndex = random.choice(a=N,p=probs)
-    return deltaT, eventIndex
-
-
-def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rates, susceptible, alpha, beta, gamma, tInit = 0.0):
+def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, alpha, beta, gamma, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -62,47 +42,47 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numInfNei, rate
 
     while t[-1] < tMax and iTotal != 0:
         # get next event time and next event index
-        deltaT, eventIndex = selectEventIndex(rates, probs, rng, N)
+        deltaT = -np.log(1-unif())/sum(rates)
+        eventIndex = random.choice(a=len(rates),p=rates/sum(rates))
+        eventType = "E" if eventIndex < N else "R" if eventIndex < 2*N else "I"
+        trueIndex = eventIndex if eventIndex<N else (eventIndex-N) if eventIndex <(2*N) else (eventIndex-2*N)
         # update local neighbourhood attributes
-        if susceptible[eventIndex]:  # (S->E)
-            # change state and individual rate
-            susceptible[eventIndex] = -1
-            rates[eventIndex] = gamma
-            # update network totals
-            sTotal -= 1
-            eTotal += 1
-
-        elif susceptible[eventIndex] == -1: # (E->I)
-            # change state and individual rate
-            susceptible[eventIndex] = 0
-            rates[eventIndex] = alpha
+        if eventType == "E":  # (S->E)
+            # choose infected person
+            infectedIndex = random.choice(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(trueIndex)))
+            # change state
+            susceptible[infectedIndex] = 2
+            # update infected vertex's number of susceptible neighbours
+            numSusNei[infectedIndex] = len(np.intersect1d(np.nonzero(susceptible==1),network.neighbors(infectedIndex)))
             # get neighbouring vertices
-            neighbors = network.neighbors(eventIndex)
-            # update hazards of neighbouring susceptible vertices
+            neighbors = network.neighbors(infectedIndex)
+            # update infection hazards of neighbouring infected vertices
             for n in neighbors:
-                if susceptible[n] == 1:
-                    numInfNei[n] += 1
-                    rates[n] = numInfNei[n]*beta
+                # if neighbour is infected decrease their NumSuNei and update hazard
+                if susceptible[n]==0:
+                    numSusNei[n] -= 1
+                    rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
             # update network totals
+            sTotal-= 1
+            iTotal += 1
+
+        elif eventType == "I": # (E->I)
+            # change state and update rates (infection and recovery)
+            susceptible[trueIndex] = 0
+            rates[eventIndex] = 0
+            rates[trueIndex+N] = alpha
+            rates[trueIndex] = beta*numSusNei[trueIndex]/network.degree(trueIndex) if network.degree(trueIndex)>0 else 0
             eTotal -= 1
             iTotal += 1
 
         else: # (I->R)
             # change individual rate
             rates[eventIndex] = 0
-            # get neighbouring vertices
-            neighbors = network.neighbors(eventIndex)
-            # update hazards of neighbouring susceptible vertices
-            for n in neighbors:
-                if susceptible[n] == 1:
-                    numInfNei[n] -= 1
-                    rates[n] = numInfNei[n]*beta
+            rates[trueIndex] = 0
+            susceptible[trueIndex] = -1
             # update network totals
             iTotal -= 1
             rTotal += 1
-
-        # update probabilities
-        probs = rates/np.sum(rates)
 
         # add totals
         if i < maxI:

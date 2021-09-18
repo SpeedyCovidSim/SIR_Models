@@ -15,7 +15,7 @@ def freq_dens_simulation(k, freq_func, dens_func, tMax, network, iTotal, sTotal,
     Idens = {}
     Rdens = {}
     fig, (ax1,ax2) = plt.subplots(nrows=1, ncols=2, sharex=True)
-    for i in range(10):
+    for i in range(k):
         ti, Si, Ii, Ri = freq_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
         Sfreq[i] = np.interp(t, ti, Si, right=Si[-1])
         Ifreq[i] = np.interp(t, ti, Ii, right=Ii[-1])
@@ -50,3 +50,74 @@ def freq_dens_simulation(k, freq_func, dens_func, tMax, network, iTotal, sTotal,
     fig.suptitle(title)
     plt.savefig(fname)
     return Sfreq,Ifreq,Rfreq,Sdens,Idens,Rdens
+
+def general_SIR_simulation(k, direct_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
+    '''
+    Method to run and plot general SIR experimentation
+    Returns the median SIR values for parsed direct method
+    '''
+    S = {}
+    I = {}
+    R = {}
+    fig = plt.figure()
+    t = np.linspace(0,tMax,1000)
+    for i in range(k):
+        ti, Si, Ii, Ri = direct_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
+        S[i] = np.interp(t, ti, Si, right=Si[-1])
+        I[i] = np.interp(t, ti, Ii, right=Ii[-1])
+        R[i] = np.interp(t, ti, Ri, right=Ri[-1])
+        plt.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
+    S = np.median(np.array(list(S.values())),0)
+    I = np.median(np.array(list(I.values())),0)
+    R = np.median(np.array(list(R.values())),0)
+    plt.plot(t, S, color="green",label="Susceptible",lw = 2,figure=fig)
+    plt.plot(t, I, color="red",label="Infected",lw = 2,figure=fig)
+    plt.plot(t, R, color="blue",label="Recovered",lw = 2,figure=fig)
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Number of Individuals in State")
+    plt.title(title)
+    plt.savefig(fname)
+    return S, I, R
+
+def random_SIR_simulation(j,N,n,k, network_create_func, network_set_func, direct_func, tMax, maxalpha, maxbeta, title, fname):
+    '''
+    Method to run and plot random network SIR experimentation
+    Returns the median SIR values for parsed direct method
+    '''
+    S = {}
+    I = {}
+    R = {}
+    fig = plt.figure()
+    t = np.linspace(0,tMax,1000)
+    num = N*n
+    for i in range(j):
+        network = network_create_func(N,n,k)
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = network_set_func(network,N,n)
+        rates = np.zeros(2*num)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[num+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+        ti, Si, Ii, Ri = direct_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
+        S[i] = np.interp(t, ti, Si, right=Si[-1])
+        I[i] = np.interp(t, ti, Ii, right=Ii[-1])
+        R[i] = np.interp(t, ti, Ri, right=Ri[-1])
+        plt.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
+    S = np.median(np.array(list(S.values())),0)
+    I = np.median(np.array(list(I.values())),0)
+    R = np.median(np.array(list(R.values())),0)
+    plt.plot(t, S, color="green",label="Susceptible",lw = 2,figure=fig)
+    plt.plot(t, I, color="red",label="Infected",lw = 2,figure=fig)
+    plt.plot(t, R, color="blue",label="Recovered",lw = 2,figure=fig)
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Number of Individuals in State")
+    plt.title(title)
+    plt.savefig(fname)
+    return S, I, R

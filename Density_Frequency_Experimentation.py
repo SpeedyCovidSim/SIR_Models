@@ -307,7 +307,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
 
-        N = 8
+        N = 15
         n = 4
         network, house_sizes = create_random_neighbourhood(N,n)
         num = np.sum(house_sizes)
@@ -318,7 +318,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        title = f"Freq. vs Dens. for {N} households of {n} people"
+        title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
         S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
@@ -333,7 +333,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        title = f"Freq. vs Dens. for {N} households of {n} people"
+        title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
         S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
@@ -349,7 +349,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        title = f"Freq. vs Dens. for {N} households of {n} people"
+        title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
         S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
@@ -365,25 +365,25 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[num+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-        title = f"Freq. vs Dens. for {N} households of {n} people"
+        title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
         S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
         fig = plt.figure()
-        plt.plot(t, I4dens, color="red",label="4 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4freq, color="red",linestyle="dashed",label="4 - Dens.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I6freq, color="blue",label="6 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I6dens, color="blue",linestyle="dashed",label="6  - Dens.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I8freq, color="green",label="8 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I8dens, color="green",linestyle="dashed",label="8 - Dens.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I10freq, color="orange",label="10 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I10dens, color="orange",linestyle="dashed",label="10 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4dens, color="red",label="Poi(4) - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4freq, color="red",linestyle="dashed",label="Poi(4) - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I6freq, color="blue",label="Poi(6) - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I6dens, color="blue",linestyle="dashed",label="Poi(6)  - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8freq, color="green",label="Poi(8) - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8dens, color="green",linestyle="dashed",label="Poi(8) - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I10freq, color="orange",label="Poi(10) - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I10dens, color="orange",linestyle="dashed",label="Poi(10) - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
-        plt.title(f"Freq. vs. Dens. with varying household sizes")
+        plt.title(f"Freq. vs. Dens. with varying Poi sizes")
         plt.savefig(f"PythonPlotting/Freq_Dens_Poisson_Test/Comp")
 
 if __name__=="__main__":

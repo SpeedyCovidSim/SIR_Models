@@ -3,7 +3,7 @@ import igraph as ig
 from numpy import random
 from random import random as unif
 
-def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, maxalpha, maxbeta, rateFunction, tInit = 0.0):
+def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, rateParams, rateFunction, rateMax, tInit = 0.0):
     '''
     Direct Gillespie Method, on network
     Uses numpy's random module for r.v. and sampling
@@ -35,16 +35,21 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
     sim_time = 0
     entry_times = np.zeros(N)
     num_neighbours = np.array(network.degree())
+    maxalpha = rateMax[0]
+    maxbeta = rateMax[1]
+    kinf, laminf, krec, lamrec = rateParams
+    
     while t[-1] < tMax and iTotal != 0:
         # get sum of maximum bounds
         rateMax = np.concatenate((maxbeta*numSusNei/num_neighbours,maxalpha*(1-np.abs(susceptible))))
+        rateMax[np.isnan(rateMax)] = 0
         H = np.sum(rateMax)
-        deltaT = -np.log(1-random())/H
+        deltaT = -np.log(1-unif())/H
         eventIndex = random.choice(a=len(rateMax),p=rateMax/H)
         eventType = "I" if eventIndex < N else "R"
         trueIndex = eventIndex if eventIndex < N else (eventIndex-N)
-        r = random.uniform()
-        if r <= rateFunction(eventType, numSusNei[trueIndex], num_neighbours[trueIndex], entry_times[trueIndex],  maxbeta, maxalpha, sim_time)/rateMax[eventIndex]:
+        r = unif()
+        if r <= rateFunction(eventType, numSusNei[trueIndex], num_neighbours[trueIndex], entry_times[trueIndex], kinf, laminf, krec, lamrec, sim_time)/rateMax[eventIndex]:
             # update local neighbourhood attributes
             if eventType == "I":  # (S->I)
                 # choose infected person

@@ -5,7 +5,7 @@ import igraph as ig
 from matplotlib import pyplot as plt
 from pythonCompartment.sirNetworksFrequency import gillespieDirectNetwork as gillespieSIR
 from pythonCompartment.seirNetworksFrequency import gillespieSEIR
-from PythonSimulation.simulate import nM_SIR_simulation
+from PythonSimulation.simulate import nM_SIR_simulation, nM_SEIR_simulation
 
 def setNetwork(network, prop_i=0.05):
     '''
@@ -236,9 +236,10 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
         tMax = 20
         maxalpha = 0.4
         maxbeta = 4
+        maxgamma = 1
         haz_params = [1.1, 0.2591, 1.1, 2.5909]
         haz_max = [1, 10]
-        j = 30
+        j = 2
         def h_func(eventType, numSusNei, num_neighbours, entryTime, kinf, laminf, krec, lamrec, simTime):
             if eventType=="I":
                 rate = kinf/laminf*(((simTime-entryTime)/laminf)**(kinf-1)) * (numSusNei/num_neighbours) if num_neighbours > 0 else 0
@@ -250,16 +251,16 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
         # initialise variables
         network = ig.Graph.Full(N)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
-        rates = np.zeros(2*N)
+        rates = np.zeros(3*N)
         for inf in infecteds:
             # set recovery hazard
             rates[N+inf] = maxalpha
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = "Markov. vs Non-Markov. for Fully Connected"
-        fname = "PythonPlotting/nM_ER_Tests/Full"
-        Sfullm, Ifullm, Rfullm, Sfullnm, Ifullnm, Rfullnm = nM_SIR_simulation(j, gillespieSIR, gillespieMax, h_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
-        maxalpha, maxbeta, haz_params, haz_max, title, fname)
+        fname = "PythonPlotting/nM_SEIR_Tests/Full"
+        Sfullm, Efullm, Ifullm, Inffullm, Rfullm, Sfullnm, Ifullnm, Rfullnm = nM_SEIR_simulation(j, gillespieSEIR, gillespieMax, h_func, tMax, network, 0, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, maxgamma, haz_params, haz_max, title, fname)
 
         network = ig.Graph.Erdos_Renyi(N,0.005)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -313,7 +314,7 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"Markov. vs Non-Markov. with varying probabilities of arcs existing")
-        plt.savefig(f"PythonPlotting/nM_ER_Tests/Comp")
+        plt.savefig(f"PythonPlotting/nM_SEIR_Tests/Comp")
 
         haz_params = [1.4, 0.2743, 1.1, 2.5909]
         haz_max = [60, 10]
@@ -329,7 +330,7 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = "Markov. vs Non-Markov. for Fully Connected"
-        fname = "PythonPlotting/nM_ER_Tests/Full_Strong"
+        fname = "PythonPlotting/nM_SEIR_Tests/Full_Strong"
         Sfullm, Ifullm, Rfullm, Sfullnms, Ifullnms, Rfullnms = nM_SIR_simulation(j, gillespieSIR, gillespieMax, h_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, haz_params, haz_max, title, fname)
 
@@ -342,7 +343,7 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Markov. vs Non-Markov. for arc prob. of 0.005, population size 1000"
-        fname = "PythonPlotting/nM_ER_Tests/05_Strong"
+        fname = "PythonPlotting/nM_SEIR_Tests/05_Strong"
         S5m, I5m, R5m, S5nms, I5nms, R5nms = nM_SIR_simulation(j, gillespieSIR, gillespieMax, h_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, haz_params, haz_max, title, fname)
 
@@ -355,7 +356,7 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Markov. vs Non-Markov. for arc prob. of 0.003, population size 1000"
-        fname = "PythonPlotting/nM_ER_Tests/03_Strong"
+        fname = "PythonPlotting/nM_SEIR_Tests/03_Strong"
         S3m, I3m, R3m, S3nms, I3nms, R3nms = nM_SIR_simulation(j, gillespieSIR, gillespieMax, h_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, haz_params, haz_max, title, fname)
 
@@ -368,7 +369,7 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Markov. vs Non-Markov. for arc prob. of 0.001, population size 1000"
-        fname = "PythonPlotting/nM_ER_Tests/01_Strong"
+        fname = "PythonPlotting/nM_SEIR_Tests/01_Strong"
         S1m, I1m, R1m, S1nms, I1nms, R1nms = nM_SIR_simulation(j, gillespieSIR, gillespieMax, h_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, haz_params, haz_max, title, fname)
 
@@ -391,84 +392,5 @@ def main(non_SIR=True, non_SEIR=True, non_SEPIR=True):
         plt.title(f"Markov. vs Non-Markov. with varying probabilities of arcs existing")
         plt.savefig(f"PythonPlotting/nM_ER_Tests/Comp_Full")
 
-    #     N = 15
-    #     n = 4
-    #     network, house_sizes = create_random_neighbourhood(N,n)
-    #     num = np.sum(house_sizes)
-    #     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
-    #     rates = np.zeros(2*num)
-    #     for inf in infecteds:
-    #         # set recovery hazard
-    #         rates[num+inf] = maxalpha
-    #         # set infection hazard
-    #         rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-    #     title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
-    #     fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-    #     S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
-    #     maxalpha, maxbeta, title, fname)
-
-    #     n = 6
-    #     network, house_sizes = create_random_neighbourhood(N,n)
-    #     num = np.sum(house_sizes)
-    #     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
-    #     rates = np.zeros(2*num)
-    #     for inf in infecteds:
-    #         # set recovery hazard
-    #         rates[num+inf] = maxalpha
-    #         # set infection hazard
-    #         rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-    #     title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
-    #     fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-    #     S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
-    #     maxalpha, maxbeta, title, fname)
-
-
-    #     n = 8
-    #     network, house_sizes = create_random_neighbourhood(N,n)
-    #     num = np.sum(house_sizes)
-    #     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
-    #     rates = np.zeros(2*num)
-    #     for inf in infecteds:
-    #         # set recovery hazard
-    #         rates[num+inf] = maxalpha
-    #         # set infection hazard
-    #         rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-    #     title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
-    #     fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-    #     S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
-    #     maxalpha, maxbeta, title, fname)
-
-
-    #     n = 10
-    #     network, house_sizes = create_random_neighbourhood(N,n)
-    #     num = np.sum(house_sizes)
-    #     iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
-    #     rates = np.zeros(2*num)
-    #     for inf in infecteds:
-    #         # set recovery hazard
-    #         rates[num+inf] = maxalpha
-    #         # set infection hazard
-    #         rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
-    #     title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
-    #     fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-    #     S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
-    #     maxalpha, maxbeta, title, fname)
-
-
-    #     fig = plt.figure()
-    #     plt.plot(t, I4dens, color="red",label="Poi(4) - Freq.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I4freq, color="red",linestyle="dashed",label="Poi(4) - Dens.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I6freq, color="blue",label="Poi(6) - Freq.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I6dens, color="blue",linestyle="dashed",label="Poi(6)  - Dens.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I8freq, color="green",label="Poi(8) - Freq.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I8dens, color="green",linestyle="dashed",label="Poi(8) - Dens.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I10freq, color="orange",label="Poi(10) - Freq.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.plot(t, I10dens, color="orange",linestyle="dashed",label="Poi(10) - Dens.",lw = 2, alpha=0.5,figure=fig)
-    #     plt.legend()
-    #     plt.xlabel("Time")
-    #     plt.ylabel("Number of Infected Individuals")
-    #     plt.title(f"Freq. vs. Dens. with varying Poi sizes")
-    #     plt.savefig(f"PythonPlotting/Freq_Dens_Poisson_Test/Comp")
-
 if __name__=="__main__":
-    main(True, False, False)
+    main(False, True, False)

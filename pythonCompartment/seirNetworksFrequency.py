@@ -59,12 +59,15 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, rate
             # update infection hazards of neighbouring infected vertices
             for n in neighbors:
                 # if neighbour is infected decrease their NumSuNei and update hazard
-                if susceptible[n]==0:
+                if (susceptible[n]==0 or susceptible[n]==2):
                     numSusNei[n] -= 1
-                    rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
+                    if susceptible[n]==0:
+                        rates[n] = beta*numSusNei[n]/network.degree(n) if network.degree(n)>0 else 0
+            # update exposed person's disease progression hazard
+            rates[infectedIndex+2*N] = gamma
             # update network totals
-            sTotal-= 1
-            iTotal += 1
+            sTotal -= 1
+            eTotal += 1
 
         elif eventType == "I": # (E->I)
             # change state and update rates (infection and recovery)

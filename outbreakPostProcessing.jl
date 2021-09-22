@@ -12,7 +12,64 @@ module outbreakPostProcessing
     using branchingProcesses: branchModel
 
     export createNewDir, quantile2D, probOfLessThanXGivenYDays, outputCSVDailyCases,
-        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff
+        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff, Df_transpose, convertCSVtoConditioning
+
+    function Df_transpose(df)
+        #=
+        Given a DataFrame, return it's transpose
+        =#
+        return DataFrame([[names(df)]; collect.(eachrow(df))], [:column; Symbol.(axes(df, 1))])
+    end
+
+    function convertCSVtoConditioning(origPath, newPath, alreadyTransposed=false)
+
+        case_df = DataFrame()
+
+        if !alreadyTransposed
+            case_df = DataFrame(CSV.File(origPath))
+            # case_df.time = convert.(Int64, case_df.time)
+            CSV.write(newPath, case_df)
+
+            transposeCSV(newPath, newPath)
+        else
+            case_df = DataFrame(CSV.File(origPath,header=2))
+            # case_df = select(case_df, 2:ncol(case_df))
+            CSV.write(newPath, case_df)
+        end
+
+        case_df = DataFrame(CSV.File(newPath))
+
+        rename!(case_df,"time" => "metric")
+
+        runColumn = ["" for i in 1:nrow(case_df)]
+
+        cumulative = true
+        type = ""
+        if cumulative
+            type = "Cumulative"
+        else
+            type = "Daily"
+        end
+
+        j = 1
+        for i in 1:length(runColumn)
+            if rem(i,2) == 1
+                runColumn[i] = "$j Known"
+                case_df[i, :metric] = "Known Cases"
+            else
+                runColumn[i] = "$j $type"
+                case_df[i, :metric] = "$type Cases"
+                j+=1
+            end
+        end
+
+        case_df = insertcols!(case_df, 1, :run=>runColumn)
+
+        # println(case_df.run)
+        CSV.write(newPath, case_df)
+
+        return nothing
+    end
 
     function modelReff(model::branchModel)::AbstractFloat
         #=
@@ -171,7 +228,7 @@ module outbreakPostProcessing
         return nothing
     end
 
-    function outputCSVmodels(models, outputFileName, meanOffspring=[], alertIncrease=[])
+    function outputCSVmodels(models, outputFileName, meanOffspring=[], alertIncrease=[], usingContactTrace=false)
 
         infection_dist = Weibull(models[1].t_generation_shape, models[1].t_generation_scale)
 
@@ -223,8 +280,15 @@ module outbreakPostProcessing
             models_df.R_eff_after_al_estimate = meanOffspring
         end
 
-
         models_df.R_eff_before_al = models_df.reproduction_number .* ((1.0 .- models_df.sub_clin_prop) .+ models_df.sub_clin_scaling .* models_df.sub_clin_prop)
+
+        models_df.num_seed_cases = [models[i].state_totals[2]*1 for i in 1:length(models)]
+        models_df.alert_scaling_speed = [models[i].alert_pars.alert_level_scaling_speed*1 for i in 1:length(models)]
+
+        if usingContactTrace
+            models_df.p_contact = [models[i].alert_pars.p_contact*1 for i in 1:length(models)]
+            models_df.p_contact_time = [models[i].alert_pars.p_contact_time*1 for i in 1:length(models)]
+        end
 
         CSV.write(outputFileName, models_df)
 

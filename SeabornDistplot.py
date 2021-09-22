@@ -32,19 +32,21 @@ def seabornDist(x_vector, hue_vector, hue_order_vector, title, outputFileName="p
     plt.ylabel("Probability")
 
     plt.title(title)
+    plt.tight_layout(h_pad=0.01)
     # plt.legend(loc = 'upper right')
 
-    if Display:
-        # required to display graph on plots.
-        plt.show()
+    # if Display:
+    #     # required to display graph on plots.
+    #     plt.show()
 
     if save:
         # Save graph as pngW
         plt.savefig(outputFileName)
+    plt.close()
 
 # pastel_colors = ['#A1C9F4', '#FFB482', '#8DE5A1', '#FF9F9B', '#D0BBFF', '#DEBB9B', '#FAB0E4', '#CFCFCF', '#FFFEA3', '#B9F2F0']
 
-def plotReffHist(x_vector, title, outputFileName="plot", Display=True, save=True):
+def plotReffHist(x_vector, title, xlab, outputFileName="plot", Display=True, save=True):
 
     # set up figure # histogram of Reff in AL4
     sns.set()
@@ -62,19 +64,22 @@ def plotReffHist(x_vector, title, outputFileName="plot", Display=True, save=True
 
     # else
     # end
-    plt.xlabel("Reff")
+    plt.xlabel(xlab)
     plt.ylabel("Probability")
 
     plt.title(title)
+    plt.tight_layout(h_pad=0.01)
     # plt.legend(loc = 'upper right')
 
-    if Display:
-        # required to display graph on plots.
-        plt.show()
+    # if Display:
+    #     # required to display graph on plots.
+    #     plt.show()
 
     if save:
         # Save graph as pngW
         plt.savefig(outputFileName)
+
+    plt.close()
 
 # seabornDist([1,2,2,2,3,3,4], [1,1,1,1,1,2,2], 'hi', 'nope', True, False)
 

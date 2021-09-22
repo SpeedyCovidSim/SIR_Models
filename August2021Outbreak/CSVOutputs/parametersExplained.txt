@@ -16,3 +16,13 @@ config 7 is the contact tracing ensemble from Sep 7 (actually Sep 8)
 config 8 is the ensemble created on the 5th but with a limit on Reff (1.3) within the outbreak sim
 
 config 9 is identical to 8 but with Alert level 3 hitting 30 days after detection with increases on Reff of 1.5, 2.0 and 3.0
+
+config 10 is identical to 7 but now has proper estimate of Reff in the models CSV
+
+config 11 is a slightly wider contact tracing ensemble with 100,000 realisations (actually 86,700 or so after acceptance).
+Has transposed CSVs as a result.
+
+config 12 is a slightly wider contact tracing ensemble than config 11 with 100,000 realisations (actually 86,700 or so after acceptance).
+Has transposed CSVs as a result.
+
+config 13 is config 12 but for daily cases not cumulative.

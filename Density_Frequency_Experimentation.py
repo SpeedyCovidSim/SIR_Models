@@ -142,6 +142,8 @@ def main(er_small_test=True, household_test=True, random_test=True):
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j = 30
+
         # initialise variables
         network = ig.Graph.Full(N)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
@@ -153,7 +155,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = "Freq. vs Dens. for Fully Connected"
         fname = "PythonPlotting/Freq_Dens_Tests/Full"
-        Sfullfreq, Ifullfreq, Rfullfreq, Sfulldens, Ifulldens, Rfulldens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        Sfullfreq, Ifullfreq, Rfullfreq, Sfulldens, Ifulldens, Rfulldens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         network = ig.Graph.Erdos_Renyi(N,0.005)
@@ -166,7 +168,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Freq. vs Dens. for arc prob. of 0.005, population size 1000"
         fname = "PythonPlotting/Freq_Dens_Tests/05"
-        S5freq, I5freq, R5freq, S5dens, I5dens, R5dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S5freq, I5freq, R5freq, S5dens, I5dens, R5dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         network = ig.Graph.Erdos_Renyi(N,0.003)
@@ -179,7 +181,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Freq. vs Dens. for arc prob. of 0.003, population size 1000"
         fname = "PythonPlotting/Freq_Dens_Tests/03"
-        S3freq, I3freq, R3freq, S3dens, I3dens, R3dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S3freq, I3freq, R3freq, S3dens, I3dens, R3dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         network = ig.Graph.Erdos_Renyi(N,0.001)
@@ -192,12 +194,12 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf) if network.degree(inf)>0 else 0
         title = "Freq. vs Dens. for arc prob. of 0.001, population size 1000"
         fname = "PythonPlotting/Freq_Dens_Tests/01"
-        S1freq, I1freq, R1freq, S1dens, I1dens, R1dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S1freq, I1freq, R1freq, S1dens, I1dens, R1dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
-        plt.plot(t, Ifulldens, color="red",label="Full - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, Ifullfreq, color="red",linestyle="dashed",label="Full - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, Ifullfreq, color="red",label="Full - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, Ifulldens, color="red",linestyle="dashed",label="Full - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I5freq, color="blue",label="P = 0.005 - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I5dens, color="blue",linestyle="dashed",label="P = 0.005  - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I3freq, color="green",label="P = 0.003 - Freq.",lw = 2, alpha=0.5,figure=fig)
@@ -209,6 +211,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"Freq. vs. Dens. with varying probabilities of arcs existing")
         plt.savefig(f"PythonPlotting/Freq_Dens_Tests/Comp")
+        plt.savefig(f"PythonPlotting/Comparisons/FD_ER_Comp")
 
     if(household_test):
         print("Beginning density vs frequency household size simulations")
@@ -217,6 +220,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j=30
 
         N = 8
         n = 4
@@ -231,7 +235,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of {n} people"
         fname = f"PythonPlotting/Freq_Dens_Household_Test/{n}"
-        S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         n = 6
@@ -246,7 +250,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of {n} people"
         fname = f"PythonPlotting/Freq_Dens_Household_Test/{n}"
-        S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
@@ -254,7 +258,6 @@ def main(er_small_test=True, household_test=True, random_test=True):
         num = N*n
         network = create_fixed_neighbourhood(N,n)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n,N)
-        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
         rates = np.zeros(2*num)
         for inf in infecteds:
             # set recovery hazard
@@ -263,7 +266,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of {n} people"
         fname = f"PythonPlotting/Freq_Dens_Household_Test/{n}"
-        S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
@@ -271,7 +274,6 @@ def main(er_small_test=True, household_test=True, random_test=True):
         num = N*n
         network = create_fixed_neighbourhood(N,n)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_neighbourhoods(network,N,n,N)
-        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network)
         rates = np.zeros(2*num)
         for inf in infecteds:
             # set recovery hazard
@@ -280,13 +282,13 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of {n} people"
         fname = f"PythonPlotting/Freq_Dens_Household_Test/{n}"
-        S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
         fig = plt.figure()
-        plt.plot(t, I4dens, color="red",label="4 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4freq, color="red",linestyle="dashed",label="4 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4freq, color="red",label="4 - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4dens, color="red",linestyle="dashed",label="4 - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I6freq, color="blue",label="6 - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I6dens, color="blue",linestyle="dashed",label="6  - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I8freq, color="green",label="8 - Freq.",lw = 2, alpha=0.5,figure=fig)
@@ -298,6 +300,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"Freq. vs. Dens. with varying household sizes")
         plt.savefig(f"PythonPlotting/Freq_Dens_Household_Test/Comp")
+        plt.savefig(f"PythonPlotting/Comparisons/FD_Fixed_Household_Comp")
 
     if(random_test):
         print("Beginning density vs frequency household Poisson simulations")
@@ -306,6 +309,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j = 30
 
         N = 15
         n = 4
@@ -320,7 +324,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-        S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
         n = 6
@@ -335,7 +339,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-        S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
@@ -351,7 +355,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-        S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
@@ -367,13 +371,13 @@ def main(er_small_test=True, household_test=True, random_test=True):
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of Poi({n}) people"
         fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{n}"
-        S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(10, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 
 
         fig = plt.figure()
-        plt.plot(t, I4dens, color="red",label="Poi(4) - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4freq, color="red",linestyle="dashed",label="Poi(4) - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4freq, color="red",label="Poi(4) - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4dens, color="red",linestyle="dashed",label="Poi(4) - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I6freq, color="blue",label="Poi(6) - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I6dens, color="blue",linestyle="dashed",label="Poi(6)  - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I8freq, color="green",label="Poi(8) - Freq.",lw = 2, alpha=0.5,figure=fig)
@@ -385,6 +389,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"Freq. vs. Dens. with varying Poi sizes")
         plt.savefig(f"PythonPlotting/Freq_Dens_Poisson_Test/Comp")
+        plt.savefig(f"PythonPlotting/Comparisons/FD_Poisson_Household_Comp")
 
 if __name__=="__main__":
-    main(False, False, True)
+    main(False, True, False)

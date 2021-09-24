@@ -190,6 +190,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model of a varying number of single seeded households")
         plt.savefig(f"PythonPlotting/Single_Household/N_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/Single_N_Comparison")
 
     if(multi_lattices):
         print("Beginning Multi Seed Increasing Households tests")
@@ -199,6 +200,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxgamma = 0.1
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j=30
 
         N = 8
         n = 4
@@ -271,6 +273,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model of a varying number of multi-seeded households")
         plt.savefig(f"PythonPlotting/Multi_Household/N_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/Multi_N_Comparison")
 
     if(k_random):
         print("Beginning k Random Inter-Household Links Testing")
@@ -319,6 +322,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model of neighbourhoods with varying random links")
         plt.savefig(f"PythonPlotting/K_Random/K_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/K_Random_Comparison")
         plt.close()
 
     if(k_workplace):
@@ -329,6 +333,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxgamma = 0.1
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
+        j=30
 
         N = 7
         n = 4
@@ -403,6 +408,7 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model of neighbourhoods with varying workplace links")
         plt.savefig(f"PythonPlotting/K_Workplace/K_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/K_Workplace_Comparison")
         plt.close()
 
 

@@ -138,6 +138,7 @@ def main(er_small_test=True, ring_small_test=True):
         plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model with varying probabilities of arcs existing")
         plt.savefig(f"PythonPlotting/Small_ER_Tests/P_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/Markov_ER_P_Comparison")
 
     if(ring_small_test):
         print("Beginning Small Ring k tests")
@@ -178,6 +179,11 @@ def main(er_small_test=True, ring_small_test=True):
         network = ig.Graph.Watts_Strogatz(1,1000,20,0)
         iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork(network,0.001)
         rates = np.zeros(2*N)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[N+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title=f"SIR model with a ring lattice population {N}, \n each node connected to nearest 20 neighbours"
         fname=f"PythonPlotting/Small_K_Tests/20_Neighbours"
         S2, I2, R2 = general_SIR_simulation(j, gillespieDirectNetwork, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
@@ -234,6 +240,7 @@ def main(er_small_test=True, ring_small_test=True):
         plt.ylabel("Number of Infected Individuals", fontsize=16)
         plt.title(f"SIR model of ring lattice with varying neighbourhood sizes")
         plt.savefig(f"PythonPlotting/Small_K_Tests/K_Comparison")
+        plt.savefig(f"PythonPlotting/Comparisons/Markov_WS_K_Comparison")
 
 
 if __name__=="__main__":

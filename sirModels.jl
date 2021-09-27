@@ -381,7 +381,7 @@ module sirModels
         # the individual's network index in the array. If multiple, then they are
         # stored in individual's network index * 0, ... * 1,... etc. in the array
         h_i::Array{Float64,1} = calcHazardFirstReact!(network, networkVertex_df, network_dict, isState)
-        maxEvents::Int64 = maximum(network_dict["eventsPerState"]::Array{Int64,1})
+        multipleEventsPerState::Bool = maximum(network_dict["eventsPerState"]::Array{Int64,1}) > 1
 
         iteration = 0
         reaction_j = Int64[0,0]
@@ -404,7 +404,7 @@ module sirModels
             # reaction_j[1] stores the index of the event that occurred for
             # a given state. If only one event per state, then it is one
             # reaction_j[2] stores the individual the event occurs to (vertexIndex)
-            if maxEvents > 1
+            if multipleEventsPerState
                 reaction_j[1] = div(reaction_index-1, network_dict["population"]::Int64)+1
                 reaction_j[2] = rem(reaction_index-1, network_dict["population"]::Int64)+1
             else

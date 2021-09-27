@@ -46,15 +46,15 @@ function gillespieDirect_pyVsJl()
     pythonGillespieDirect = py"gillespieDirect2Processes"
 
     # Setup the inputs for the test
-    N = [5, 25, 50,100,1000,10000,100000]
+    N = [50,100,1000,10000,100000]
 
     S_total = N - ceil.(0.05 .* N)
     I_total = ceil.(0.05 .* N)
     R_total = zeros(length(N))
 
-    t_max = 200
-    alpha = 0.4
-    beta = 10 ./ N
+    t_max = 40
+    alpha = 0.15
+    beta = 1.5 ./ N
 
     # @profiler juliaGillespieDirect(t_max, S_total[end], I_total[end], R_total[end], alpha, beta[end], N[end])
 
@@ -72,7 +72,11 @@ function gillespieDirect_pyVsJl()
         jlGillespieTimes = []
         pyGillespieTimes = []
 
-        @showprogress 0.5 for j in 1:(20000/log10(N[i]))
+        # call as init
+        juliaGillespieDirect(t_max, copy(S_total[i]), copy(I_total[i]), copy(R_total[i]), copy(alpha), copy(beta[i]), copy(N[i]))
+        pythonGillespieDirect(t_max, copy(S_total[i]), copy(I_total[i]), copy(R_total[i]), copy(alpha), copy(beta[i]), copy(N[i]))
+
+        for j in 1:(20000/log10(N[i]))
             time_jl = @elapsed juliaGillespieDirect(t_max, copy(S_total[i]), copy(I_total[i]), copy(R_total[i]), copy(alpha), copy(beta[i]), copy(N[i]))
             push!(jlGillespieTimes, time_jl)
             push!(time_df, [log10(time_jl), "Julia", N[i]])
@@ -82,22 +86,22 @@ function gillespieDirect_pyVsJl()
             push!(time_df, [log10(time_py), "Python", N[i]])
         end
 
-        println(S_total[i])
+        # println(S_total[i])
 
         println("Completed iteration #$i")
 
-        # tMean[i,:] = [mean(jlGillespieTimes), mean(pyGillespieTimes)]
-        # tMedian[i,:] = [median(jlGillespieTimes), median(pyGillespieTimes)]
+        tMean[i,:] = [mean(jlGillespieTimes), mean(pyGillespieTimes)]
+        tMedian[i,:] = [median(jlGillespieTimes), median(pyGillespieTimes)]
 
     end
 
     # println(tMean)
-    #
-    # meanSpeedup = tMean[:,2]./tMean[:,1]
-    # medianSpeedup = tMedian[:,2]./tMedian[:,1]
-    #
-    # println("Mean Speedup of: $meanSpeedup")
-    # println("Median Speedup of: $medianSpeedup")
+
+    meanSpeedup = tMean[:,2]./tMean[:,1]
+    medianSpeedup = tMedian[:,2]./tMedian[:,1]
+
+    println("Mean Speedup of: $meanSpeedup")
+    println("Median Speedup of: $medianSpeedup")
     #
     # # graph the benchmark of time as N increases. Recommend two graphs next to
     # # each other with median on one and mean on other.

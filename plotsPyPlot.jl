@@ -27,14 +27,15 @@ module plotsPyPlot
 
         Seaborn.set()
         set_style("ticks")
-        Seaborn.set_style("white")
+        Seaborn.set_color_codes("pastel")
+        # Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)
-        plt.plot(t, SIR[1], label="Susceptible", lw = 2, figure=fig)
-        plt.plot(t, SIR[2], label="Infected", lw = 2, figure=fig)
-        plt.plot(t, SIR[3], label="Recovered", lw=2, figure=fig)
+        plt.plot(t, SIR[1], label="Susceptible", "k", lw=2, figure=fig)
+        plt.plot(t, SIR[2], label="Infected", "b", lw=2, figure=fig)
+        plt.plot(t, SIR[3], label="Recovered", "r", lw=2, figure=fig)
         try
-            plt.plot(t, SIR[4], label="Deceased", lw=2, figure=fig)
+            plt.plot(t, SIR[4], label="Deceased", color="tab:gray", linestyle="-", lw=2, figure=fig)
         catch
         end
         plt.xlabel("Time")
@@ -183,7 +184,8 @@ module plotsPyPlot
 
         Seaborn.set()
         set_style("ticks")
-        Seaborn.set_style("white")
+        set_color_codes("pastel")
+        # Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)
         plt.plot(t, SIR[:,1], label="Susceptible", lw=2, figure=fig)
@@ -225,7 +227,7 @@ module plotsPyPlot
 
         Seaborn.set()
         set_style("ticks")
-        Seaborn.set_style("white")
+        # Seaborn.set_style("white")
 
         fig = plt.figure(dpi=300)
         plt.plot(t, SIR[:,1], "x", label="Susceptible", lw=2, figure=fig)
@@ -254,10 +256,11 @@ module plotsPyPlot
 
         Seaborn.set()
         Seaborn.set_style("ticks")
+        Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
 
         Seaborn.violinplot(x=x_vector, y=y_vector, hue=hue_vector, bw=1.5,
-            cut=0, scale="count",palette = "Set2" )
+            cut=0, scale="count", palette = "Set2", aspect=.7, gridsize=40)
 
         plt.xlabel(xlabel)
         plt.ylabel("Log10 Simulation time (log10(s))")
@@ -278,4 +281,74 @@ module plotsPyPlot
         end
         close()
     end
+
+    function plotBenchmarks_network(tMean,tMedian, N, legendLabel=["Discrete" "First React" "Next React"],
+        outputFileName="Benchmarks/SimulationTimesNetwork",Display=true, save=true)
+        #=
+        Inputs
+        tMean   : 2D array. Col 1 contains mean times for Discrete, Col 2 for
+                  First, Col 3 contains mean times for Next React, to complete simulation.
+        tMedian : 2D array. Col 1 contains median times for Discrete, Col 2 for
+                  First, Col 3 for Next React, to complete simulation.
+        N       : Array of Population size used.
+
+        Outputs
+        png     : plot of SIR model over time [by default]
+        =#
+
+        Seaborn.set()
+        Seaborn.set_style("ticks")
+        # Seaborn.set_color_codes("Set2")
+        # Seaborn.set
+        # fig,ax = Seaborn.subplots(1,2, figsize=(10,5), dpi=300)
+        fig = plt.figure(dpi=300)
+
+        # MAY NEED TO USE EXP or log time if order of magnitude between times taken
+        # need to use log N
+
+        plt.plot(log10.(N), log10.(tMean[:,1]), color=[120,187,164]./255, label=legendLabel[1], lw=2, alpha = 1)
+        plt.plot(log10.(N), log10.(tMean[:,2]), color=[235,150,111]./255, label=legendLabel[2], lw=2, alpha = 1)
+        plt.plot(log10.(N), log10.(tMean[:,3]), color=[146,160,198]./255, label=legendLabel[3], lw=2, alpha = 1)
+
+        plt.legend(loc = "upper left")
+        plt.ylabel("Log10 Simulation time (log10(s))")
+        plt.xlabel("Log10 Population size used")
+
+
+        if Display
+            # required to display graph on plots.
+            display(fig)
+        end
+        if save
+            # Save graph as pngW
+            fig.savefig(outputFileName*"_Mean")
+
+        end
+        close()
+
+        fig = plt.figure(dpi=300)
+
+        # MAY NEED TO USE EXP or log time if order of magnitude between times taken
+        # need to use log N
+
+        plt.plot(log10.(N), log10.(tMedian[:,1]), color=[120,187,164]./255, label=legendLabel[1], lw=2, alpha = 1)
+        plt.plot(log10.(N), log10.(tMedian[:,2]), color=[235,150,111]./255, label=legendLabel[2], lw=2, alpha = 1)
+        plt.plot(log10.(N), log10.(tMedian[:,3]), color=[146,160,198]./255, label=legendLabel[3], lw=2, alpha = 1)
+        plt.legend(loc = "upper left")
+        plt.ylabel("Log10 Simulation time (log10(s))")
+        plt.xlabel("Log10 Population size used")
+
+
+        if Display
+            # required to display graph on plots.
+            display(fig)
+        end
+        if save
+            # Save graph as pngW
+            fig.savefig(outputFileName*"_Median")
+
+        end
+        close()
+    end
+
 end  # module plots

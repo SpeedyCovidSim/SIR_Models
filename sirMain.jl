@@ -8,8 +8,10 @@ using Random, Conda, PyCall
 
 
 # import required modules
-push!( LOAD_PATH, "./" )    #Set path to current
-using sirModels: gillespieDirect2Processes_rand, gillespieDirect2Processes_dist,
+push!(LOAD_PATH, "./")    #Set path to current
+using sirModels:
+    gillespieDirect2Processes_rand,
+    gillespieDirect2Processes_dist,
     gillespieFirstReact2Processes
 using plotsPyPlot: plotSIRPyPlot
 
@@ -22,7 +24,7 @@ function main(Display = true, save = true)
     Random.seed!(1)
 
     # initialise variables
-    N = [5, 10, 50, 100,1000,10000]
+    N = [5, 10, 50, 100, 1000, 10000]
 
     # functions are not allowed to edit these arrays. Copy values in when passing
     # to the functions
@@ -31,15 +33,22 @@ function main(Display = true, save = true)
     R_total = zeros(length(N))
 
     t_max = 200
-    alpha = 0.4
-    beta = 0 ./ N .+ 10
+    alpha = 0.15
+    beta = 0 ./ N .+ 1.5
 
     # Could reduce redundancy here too:
 
     # iterate through populations (Regular/rand)
-    for i in 1:length(N)
-        t, S, I, R = gillespieDirect2Processes_rand(t_max, copy(S_total[i]), copy(I_total[i]),
-            copy(R_total[i]), alpha, beta[i], N[i])
+    for i = 1:length(N)
+        t, S, I, R = gillespieDirect2Processes_rand(
+            t_max,
+            copy(S_total[i]),
+            copy(I_total[i]),
+            copy(R_total[i]),
+            alpha,
+            beta[i],
+            N[i],
+        )
 
         if Display | save
             population = N[i]
@@ -49,9 +58,16 @@ function main(Display = true, save = true)
     end
 
     # iterate through populations (Dist)
-    for i in 1:length(N)
-        t, S, I, R = gillespieDirect2Processes_dist(t_max, copy(S_total[i]), copy(I_total[i]),
-            copy(R_total[i]), alpha, beta[i], N[i])
+    for i = 1:length(N)
+        t, S, I, R = gillespieDirect2Processes_dist(
+            t_max,
+            copy(S_total[i]),
+            copy(I_total[i]),
+            copy(R_total[i]),
+            alpha,
+            beta[i],
+            N[i],
+        )
 
         if Display | save
             population = N[i]
@@ -61,9 +77,16 @@ function main(Display = true, save = true)
     end
 
     # iterate through populations (First Reaction/Sep)
-    for i in 1:length(N)
-        t, S, I, R = gillespieFirstReact2Processes(t_max, copy(S_total[i]), copy(I_total[i]),
-            copy(R_total[i]), alpha, beta[i], N[i])
+    for i = 1:length(N)
+        t, S, I, R = gillespieFirstReact2Processes(
+            t_max,
+            copy(S_total[i]),
+            copy(I_total[i]),
+            copy(R_total[i]),
+            alpha,
+            beta[i],
+            N[i],
+        )
 
         if Display | save
             population = N[i]
@@ -75,4 +98,4 @@ function main(Display = true, save = true)
 end
 
 # main(Display, save)
-main(true, false)
+main(true, true)

@@ -181,10 +181,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
-        plt.plot(t, I2, color="blue",label="Household Size = 8",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I4, color="green",label="Household Size = 16",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I8, color="red",label="Household Size = 32",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I16, color="black",label="Household Size = 64",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I2, color="blue",label="Number of Households = 8",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4, color="green",label="Number of Households = 16",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8, color="red",label="Number of Households = 32",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I16, color="black",label="Number of Households = 64",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
@@ -264,10 +264,10 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
         maxalpha, maxbeta, title, fname)
 
         fig = plt.figure()
-        plt.plot(t, I8, color="blue",label="Neighbourhoods = 8",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I16, color="green",label="Neighbourhoods = 16",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I32, color="red",label="Neighbourhoods = 32",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I64, color="black",label="Neighbourhoods = 64",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8, color="blue",label="Number of Households = 8",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I16, color="green",label="Number of Households = 16",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I32, color="red",label="Number of Households = 32",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I64, color="black",label="Number of Households = 64",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
@@ -413,4 +413,4 @@ def main(single_lattices=True, multi_lattices=True,k_random=True,k_workplace=Tru
 
 
 if __name__=="__main__":
-    main(True, True, True, True)
+    main(True, True, False, False)

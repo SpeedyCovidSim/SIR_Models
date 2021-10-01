@@ -253,6 +253,8 @@ def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz
     ax1.plot(t, Invm, color="green",lw = 2)
     ax2.plot(t, Thinm, color="green",lw = 2)
     ax1.set_xlabel('Time')
+    ax1.set_xlim([0,50])
+    ax2.set_xlim([0,50])
     ax2.set_xlabel('Time')
     ax1.set_ylabel('Cumulative Number of Events')
     fig.suptitle(title)

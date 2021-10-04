@@ -106,7 +106,7 @@ end
 function ODEnetwork!(du,u,p,t)
     # let S = u[1], I = u[2], R = u[3]
     alpha = 0.15
-    beta = 1.5 / 1000
+    beta = 1.5 / (1000-1)
     du[1] = -beta*u[1]*u[2]
     du[2] = beta*u[1]*u[2]-alpha*u[2]
     du[3] = alpha*u[2]
@@ -115,7 +115,7 @@ end
 function ODEnetworkSIRD!(du,u,p,t)
     # let S = u[1], I = u[2], R = u[3], D = u[4]
     alpha = 0.15
-    beta = 1.5 / 1000
+    beta = 1.5 / (1000-1)
     mu = alpha * 0.25 # mortality constant
     du[1] = -beta*u[1]*u[2]
     du[2] = beta*u[1]*u[2] - (alpha+mu)*u[2]
@@ -774,4 +774,4 @@ function main(SIR, SIRD)
     end
 end
 
-main(false, true)
+main(true, true)

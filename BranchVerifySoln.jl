@@ -37,7 +37,7 @@ module BranchVerifySoln
         if Discrete
             typeSim2 = "Discrete"
         else
-            typeSim2 = "Simple BP"
+            typeSim2 = "Thinned BP"
         end
 
         Seaborn.set()
@@ -357,7 +357,7 @@ module BranchVerifySoln
         Seaborn.set_color_codes("pastel")
         fig = plt.figure(dpi=300)
 
-        plt.plot(times, x1, "b$x1PlotType", label="I - SimpleBranch", lw=2.5, figure=fig)
+        plt.plot(times, x1, "b$x1PlotType", label="I - Basic BP", lw=2.5, figure=fig)
         plt.plot(times, x2, "r$x2PlotType", label="I - Geometric Series", lw=1.5, figure=fig, alpha = 1)
 
         plt.xlabel("Time")

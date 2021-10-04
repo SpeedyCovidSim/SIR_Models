@@ -108,7 +108,7 @@ function gillespieDirect_pyVsJl()
     # plotBenchmarks(tMean,tMedian,N,true,true)
 
     outputFileName = "Benchmarks/SimulationTimes"
-    xlabel = "Population Size"
+    xlabel = "Population Size (N)"
     plotBenchmarksViolin(time_df.population, time_df.time, time_df.language, outputFileName,
         xlabel, true, true)
 

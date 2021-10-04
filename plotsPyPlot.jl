@@ -260,7 +260,7 @@ module plotsPyPlot
         fig = plt.figure(dpi=300)
 
         Seaborn.violinplot(x=x_vector, y=y_vector, hue=hue_vector, bw=1.5,
-            cut=0, scale="count", palette = "Set2", aspect=.7, gridsize=40)
+            cut=0, width = 0.9, scale="width", palette = "Set2", aspect=.7, gridsize=40, saturation=0.9)
 
         plt.xlabel(xlabel)
         plt.ylabel("Log10 Simulation time (log10(s))")
@@ -283,7 +283,7 @@ module plotsPyPlot
     end
 
     function plotBenchmarks_network(tMean,tMedian, N, legendLabel=["Discrete" "First React" "Next React"],
-        outputFileName="Benchmarks/SimulationTimesNetwork",Display=true, save=true)
+        outputFileName="Benchmarks/SimulationTimesNetwork",Display=true, save=true, populationMetric=true)
         #=
         Inputs
         tMean   : 2D array. Col 1 contains mean times for Discrete, Col 2 for
@@ -312,8 +312,11 @@ module plotsPyPlot
 
         plt.legend(loc = "upper left")
         plt.ylabel("Log10 Simulation time (log10(s))")
-        plt.xlabel("Log10 Population size used")
-
+        if populationMetric
+            plt.xlabel("Log10 Population Size (log10(N))")
+        else
+            plt.xlabel("Log10 Local Connectivity Proportion (log10(k / N))")
+        end
 
         if Display
             # required to display graph on plots.
@@ -336,7 +339,11 @@ module plotsPyPlot
         plt.plot(log10.(N), log10.(tMedian[:,3]), color=[146,160,198]./255, label=legendLabel[3], lw=2, alpha = 1)
         plt.legend(loc = "upper left")
         plt.ylabel("Log10 Simulation time (log10(s))")
-        plt.xlabel("Log10 Population size used")
+        if populationMetric
+            plt.xlabel("Log10 Population Size (log10(N))")
+        else
+            plt.xlabel("Log10 Local Connectivity Proportion (log10(k / N))")
+        end
 
 
         if Display

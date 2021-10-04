@@ -86,7 +86,8 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
     if 1 in benchmarkRange
 
         # initialise variables
-        maxCases = [1,2,5,10,25,50,75]*10^2#,500,1000]*10^2
+        # maxCases = [1,2,5,10,25,50,75]*10^2#,500,1000]*10^2
+        maxCases = [1,10,100]*10^2
         tspan = (0.0,100.0)
 
         it_count = 10000*10^2 ./ maxCases
@@ -115,7 +116,7 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
                 population_dfs = [deepcopy(population_df) for i in 1:4]
 
                 k = 1
-                if rem(j, 6) == 0
+                if rem(j, 5) == 0
                     time_dir = @elapsed discrete_branch!(population_dfs[k], models[k], timesteps[1])
                     push!(time_df, [log10(time_dir), "Discrete, Timestep=$(timesteps[1])", maxCases[i]])
                 end
@@ -140,6 +141,15 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
 
         end
 
+        for typeSim in unique(time_df.type)
+            for pop in maxCases
+                filter_df = filter(row -> row.type == typeSim && row.population == pop, time_df, view=true)
+                println("For sim type: $typeSim, Maximum cases: $pop")
+                println("Mean time is $(mean(10 .^filter_df.time)), Median time is $(median(10 .^filter_df.time))")
+
+            end
+        end
+
         outputFileName = "Benchmarks/SimulationTimesMikeBranch"
         xlabel = "Maximum Case Size"
         plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
@@ -150,7 +160,9 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
     if 2 in benchmarkRange
 
         # initialise variables
-        maxCases = [25,50,75,500,1000]*10^2
+        # maxCases = [25,50,75,500,1000]*10^2
+        maxCases = [10,100,1000]*10^2
+
         tspan = (0.0,100.0)
 
         it_count = 20000*10^2 ./ maxCases
@@ -204,7 +216,104 @@ function BPbenchmarking(numSimsScaling::Int64, benchmarkRange)
 
         end
 
+        for typeSim in unique(time_df.type)
+            for pop in maxCases
+                filter_df = filter(row -> row.type == typeSim && row.population == pop, time_df, view=true)
+                println("For sim type: $typeSim, Maximum cases: $pop")
+                println("Mean time is $(mean(10 .^filter_df.time)), Median time is $(median(10 .^filter_df.time))")
+
+            end
+        end
+
         outputFileName = "Benchmarks/SimulationTimesMikeBranch_noFirst"
+        xlabel = "Maximum Case Size"
+        plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
+        xlabel, true, true)
+
+        # Seaborn.set()
+        # Seaborn.set_style("ticks")
+        # fig = plt.figure(dpi=300)
+        # # plt.violinplot(data)
+        # Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.type,
+        #     bw=1.5, cut=0,scale="count",palette = "Set2" )
+        #
+        # plt.xlabel("Maximum Case Size")
+        # plt.ylabel("Log10 Simulation time (log10(s))")
+        # plt.title("Time To Complete Simulation")
+        # # plt.title("For alpha = $alpha and beta $beta")
+        # plt.legend(loc = "upper left")
+        # display(fig)
+        # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
+        # close()
+    end
+
+    println("Benchmark #3: Next React Style vs Thinned Basic BPs, Speed, Varied Max Case Size")
+    if 3 in benchmarkRange
+
+        # initialise variables
+        # maxCases = [25,50,75,500,1000]*10^2
+        # maxCases = [10,100,1000]*10^2
+        maxCases = [1,10,100,1000]*10^2
+
+        tspan = (0.0,100.0)
+
+        it_count = 20000*10^2 ./ maxCases
+        # [2000,1000,200,100,40,20,5]
+        it_count = convert.(Int, round.(it_count ./ numSimsScaling))
+        # it_count_first = [2000, 1000, 800, 200, 50, 20, 4, 2]
+
+        time_df = DataFrame(time=Float64[], type=String[], population=Int64[])
+
+        # setup a loop that benchmarks each function for different N values
+        for i::Int64 in 1:length(maxCases)
+
+            @showprogress PROGRESS__METER__DT for j in 1:(it_count[i])
+
+                model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases[i], [5*10^6-10,10,0]);
+                model.stochasticRi = true
+                model.reproduction_number = 3
+                model.p_test = 0.4
+
+                # model = init_model_pars(tspan[1], tspan[end], 5*10^3, maxCases, [5*10^3-10,10,0])
+                models = [deepcopy(model) for i in 1:4]
+
+                k=1
+                time_dir_init = @elapsed population_df = initDataframe(models[1]);
+                time_dir = @elapsed nextReact_branch!(population_df, models[k])
+                push!(time_df, [log10(time_dir+time_dir_init), "Next React Style", maxCases[i]])
+
+                k+=1
+                time_dir_init = @elapsed population_df_thin_tree = initDataframe_thin(models[k]);
+                time_dir = @elapsed bpMain!(population_df_thin_tree, models[k], false, ThinFunction(ThinTree()), false, true, true)
+                push!(time_df, [log10(time_dir+time_dir_init), "Thinned Tree", maxCases[i]])
+
+                k+=1
+                models[k].max_cases = models[k].max_cases
+                time_dir_init = @elapsed population_df_thin_tree = initDataframe_thin(models[k]);
+                time_dir = @elapsed bpMain!(population_df_thin_tree, models[k], false, ThinFunction(ThinSingle()), false, true, true)
+                push!(time_df, [log10(time_dir+time_dir_init), "Single Thin (Approx)", maxCases[i]])
+
+                k+=1
+                models[k].max_cases = models[k].max_cases*2
+                time_dir_init = @elapsed population_df_thin_tree = initDataframe_thin(models[k]);
+                time_dir = @elapsed bpMain!(population_df_thin_tree, models[k], false, ThinFunction(ThinSingle()), false, true, true)
+                push!(time_df, [log10(time_dir+time_dir_init), "Single Thin (Less Approx, 2x Max Cases) ", maxCases[i]])
+            end
+
+            println("Completed iteration #$i")
+
+        end
+
+        for typeSim in unique(time_df.type)
+            for pop in maxCases
+                filter_df = filter(row -> row.type == typeSim && row.population == pop, time_df, view=true)
+                println("For sim type: $typeSim, Maximum cases: $pop")
+                println("Mean time is $(mean(10 .^filter_df.time)), Median time is $(median(10 .^filter_df.time))")
+
+            end
+        end
+
+        outputFileName = "Benchmarks/SimulationTimesMikeBranch_ThinTree"
         xlabel = "Maximum Case Size"
         plotBenchmarksViolin(time_df.population, time_df.time, time_df.type, outputFileName,
         xlabel, true, true)
@@ -5378,11 +5487,12 @@ function main()
     # ALERT__REFF__MAX__VAL = 1.3
 
     compilationInit()
-    # verifySolutions(1, [4])
+    verifySolutions(1, [collect(11:14)])
+    # verifySolutions(1,[15,17])
     # verifySolutions(1, collect(5:18))
     # verifySolutions(1, collect(22:23))
 
-    # BPbenchmarking(1, [1,2])
+    # BPbenchmarking(1, [3])
 
     # augustOutbreakSim(0.5, collect(4:11))
     # augustOutbreakSim(2, [4])
@@ -5391,7 +5501,7 @@ function main()
 
     # augustOutbreakSim(1, [13.5])
 
-    augustOutbreakPostProcess([2.73, 2.74],true,true)
+    # augustOutbreakPostProcess([2.73, 2.74],true,true)
 
     # augustOutbreakSim(1, [5.5], false, false,[5.5])
 

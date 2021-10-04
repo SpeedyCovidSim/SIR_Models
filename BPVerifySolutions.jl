@@ -809,7 +809,6 @@ module BPVerifySolutions
             println()
         end
 
-
         println("Test #11: Epidemic curves (Next vs Simple BP, S Saturation Thinning)")
         if 11 in testRange
             println("Beginning simulation of Simple BP Case")
@@ -1149,7 +1148,7 @@ module BPVerifySolutions
             i = 1
             time = @elapsed Threads.@threads for i = 1:numSims
 
-                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+                models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
                 models[Threads.threadid()].stochasticRi = false
                 # models[Threads.threadid()].sub_clin_prop = 0.0
                 # models[Threads.threadid()].reproduction_number = 1.0
@@ -1183,7 +1182,7 @@ module BPVerifySolutions
             # discreteSIR_mean = hcat(Smean, Imean, Rmean)
 
             println("Solving Exponential equation")
-            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-10,10,0]);
+            model = init_model_pars(tspan[1], tspan[end], 5*10^4, 5*10^4, [5*10^4-20,20,0]);
             # model.stochasticRi = false
             # model.sub_clin_prop = 0.0
             # model.reproduction_number = 1.0
@@ -1221,7 +1220,7 @@ module BPVerifySolutions
             misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
             println("Mean Abs Error I = $misfitI")
 
-            title = "Geometric Series vs Simple Branch Mean"
+            title = "Geometric Series vs Basic Branch Mean"
             outputFileName = "./verifiedBranch/ExponentialvsSimpleBP"
             branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Dots(), true, true)
             # branch2wayVerifyPlot(Itmean, Iovertime, times, title, outputFileName, true, true)
@@ -1419,7 +1418,7 @@ module BPVerifySolutions
             misfitI = sum(abs.(meanCumI - Iovertime))/length(meanCumI)
             println("Mean Abs Error I = $misfitI")
 
-            title = "Geometric Series vs Simple Branch Mean, Distributed Times"
+            title = "Geometric Series vs Basic Branch Mean, Distributed Times"
             outputFileName = "./verifiedBranch/ExponentialvsSimpleBPTimes.png"
             branch2wayVerifyPlot(meanCumI, Iovertime, times, title, outputFileName, Lines(), true, true)
             # branch2wayVerifyPlot(Inormtime, Iovertime, times, title, outputFileName, Lines(), true, false)
@@ -1437,7 +1436,7 @@ module BPVerifySolutions
             # times to sim on
             times = [i for i=tspan[1]:time_step:tspan[end]]
 
-            numSims = convert(Int, round(300 / numSimsScaling))
+            numSims = convert(Int, round(2000 / numSimsScaling))
 
             StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -1495,12 +1494,15 @@ module BPVerifySolutions
             x2 = x2[1:end-endminus, :]
             times = times[1:end-endminus]
 
+            println("Mean and sd of homogeneous sim at t=45: $(mean_and_std(x1[end,:]))")
+            println("Mean and sd of heterogeneous sim at t=45: $(mean_and_std(x2[end,:]))")
+
             title = "Time Distributed Branching Process Simulation"
             outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimes"
-            branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true)
+            branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, true, true, true, 0.5)
 
             outputFileName = "./verifiedBranch/SimpleBPHeterogeneousVsNonTimesSD"
-            branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true)
+            branchSideBySideVerifyPlot(x1, x2, times, title, outputFileName, false, true, true, 0.5)
             println()
         end
 
@@ -1684,7 +1686,7 @@ module BPVerifySolutions
             # times to sim on
             times = [i for i=tspan[1]:time_step:tspan[end]]
 
-            numSims = convert(Int, round(400 / numSimsScaling))
+            numSims = convert(Int, round(1000 / numSimsScaling))
 
             StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
 
@@ -1826,6 +1828,16 @@ module BPVerifySolutions
             x21 = x21[1:end-endminus, :]
             x22 = x22[1:end-endminus, :]
             times = times[1:end-endminus]
+
+            index40 = findfirst(times .== 40)
+            index50 = findfirst(times .== 50)
+
+            println("Mean and sd of homogeneous sim at t=40: $(mean_and_std(x11[index40,:]))")
+            println("Mean and sd of heterogeneous sim at t=40: $(mean_and_std(x21[index40,:]))")
+
+
+            println("Mean and sd of homogeneous sim at t=50 (isol): $(mean_and_std(x12[index50,:]))")
+            println("Mean and sd of heterogeneous sim at t=50 (isol): $(mean_and_std(x22[index50,:]))")
 
             title = "Next Reaction Branching Process Simulation With Isolation"
             outputFileName = "./verifiedBranch/NextHeterogeneousVsNonIsol"
@@ -1983,8 +1995,8 @@ module BPVerifySolutions
 
             println("Model Reff for next = $modelReff_next, for discrete (same param) = $modelReff_disc, for discrete (match) = $modelReff_disc_match")
 
-            misfitDetect = sum(abs.(meanDetect - meanDetect_disc))/length(meanDetect)
-            misfitDetect_match = sum(abs.(meanDetect - meanDetect_disc_match))/length(meanDetect)
+            misfitDetect = sum(abs.(diff(vcat([0],[meanDetect...])) - diff(vcat([0],[meanDetect_disc...]))))/length(meanDetect)
+            misfitDetect_match = sum(abs.(diff(vcat([0],[meanDetect...])) - diff(vcat([0],[meanDetect_disc_match...]))))/length(meanDetect)
 
             # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
 
@@ -2052,6 +2064,10 @@ module BPVerifySolutions
             modelReff_disc = round(modelReff(models[1]), sigdigits=4)
 
             # matching next, lower initCases ###########################################
+
+
+            IDetect_daily_disc, IDetect_daily_disc_match, IDetect_daily = initSIRArrays(tspanNew, 1, numSims)
+
             i = 1
             p = Progress(numSims,PROGRESS__METER__DT)
             time = @elapsed Threads.@threads for i = 1:numSims
@@ -2104,8 +2120,7 @@ module BPVerifySolutions
             println("Beginning simulation of Next Case")
             numSims = convert(Int, round(800 / numSimsScaling))
 
-
-            # IDetect_daily, ItStep, RtStep = initSIRArrays(tspanNew, 1, numSims)
+            IDetect_daily_disc, IDetect_daily_disc_match, IDetect_daily = initSIRArrays(tspanNew, 1, numSims)
 
             i = 1
             p = Progress(numSims,PROGRESS__METER__DT)
@@ -2155,8 +2170,8 @@ module BPVerifySolutions
 
             println("Model Reff for next = $modelReff_next, for discrete (same param) = $modelReff_disc, for next (match) = $modelReff_match")
 
-            misfitDetect = sum(abs.(meanDetect - meanDetect_disc))/length(meanDetect)
-            misfitDetect_match = sum(abs.(meanDetect_match - meanDetect_disc))/length(meanDetect)
+            misfitDetect = sum(abs.(diff(vcat([0],[meanDetect...])) - diff(vcat([0],[meanDetect_disc...]))))/length(meanDetect)
+            misfitDetect_match = sum(abs.(diff(vcat([0],[meanDetect_match...])) - diff(vcat([0],[meanDetect_disc...]))))/length(meanDetect)
 
             # Smean, Imean, Rmean = multipleSIRMeans(StStep, ItStep, RtStep)
 

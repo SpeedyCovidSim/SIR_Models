@@ -50,6 +50,7 @@ def freq_dens_simulation(k, freq_func, dens_func, tMax, network, iTotal, sTotal,
     fig.legend(handles=[S, I, R],labels=line_labels,loc="center right")
     fig.suptitle(title)
     plt.savefig(fname)
+    plt.close()
     return Sfreq,Ifreq,Rfreq,Sdens,Idens,Rdens
 
 def general_SIR_simulation(k, direct_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
@@ -81,6 +82,7 @@ def general_SIR_simulation(k, direct_func, tMax, network, iTotal, sTotal, rTotal
     plt.ylabel("Number of Individuals in State")
     plt.title(title)
     plt.savefig(fname)
+    plt.close()
     return S, I, R
 
 def random_SIR_simulation(j,N,n,k, network_create_func, network_set_func, direct_func, tMax, maxalpha, maxbeta, title, fname):
@@ -121,9 +123,10 @@ def random_SIR_simulation(j,N,n,k, network_create_func, network_set_func, direct
     plt.ylabel("Number of Individuals in State")
     plt.title(title)
     plt.savefig(fname)
+    plt.close()
     return S, I, R
 
-def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, haz_params, haz_max, title, fname):
+def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, haz_params, haz_max, haz_params_strong, haz_max_strong, title, fname, fname2):
     '''
     Method to run and plot Markov. vs. NonMarkov. experimentation
     Returns the median SIR values for the Markov. and NonMarkov. experiments
@@ -135,7 +138,11 @@ def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTota
     Snm = {}
     Inm = {}
     Rnm = {}
+    Snms = {}
+    Inms = {}
+    Rnms = {}
     fig, (ax1,ax2) = plt.subplots(nrows=1, ncols=2, sharex=True)
+    fig2, (ax3,ax4) = plt.subplots(nrows=1, ncols=2, sharex=True)
     for i in range(k):
         ti, Si, Ii, Ri = m_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
         Sm[i] = np.interp(t, ti, Si, right=Si[-1])
@@ -144,6 +151,9 @@ def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTota
         ax1.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
         ax1.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
         ax1.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+        ax3.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
+        ax3.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
+        ax3.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
         ti, Si, Ii, Ri = nm_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(susceptible), haz_params, haz_func, haz_max)
         Snm[i] = np.interp(t, ti, Si, right=Si[-1])
         Inm[i] = np.interp(t, ti, Ii, right=Ii[-1])
@@ -151,12 +161,23 @@ def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTota
         ax2.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
         ax2.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
         ax2.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+        ti, Si, Ii, Ri = nm_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(susceptible), haz_params_strong, haz_func, haz_max_strong)
+        Snms[i] = np.interp(t, ti, Si, right=Si[-1])
+        Inms[i] = np.interp(t, ti, Ii, right=Ii[-1])
+        Rnms[i] = np.interp(t, ti, Ri, right=Ri[-1])
+        ax4.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
+        ax4.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
+        ax4.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+
     Sm = np.median(np.array(list(Sm.values())),0)
     Im = np.median(np.array(list(Im.values())),0)
     Rm = np.median(np.array(list(Rm.values())),0)
     Snm = np.median(np.array(list(Snm.values())),0)
     Inm = np.median(np.array(list(Inm.values())),0)
     Rnm = np.median(np.array(list(Rnm.values())),0)
+    Snms = np.median(np.array(list(Snms.values())),0)
+    Inms = np.median(np.array(list(Inms.values())),0)
+    Rnms = np.median(np.array(list(Rnms.values())),0)
     line_labels = ["Susceptible", "Infected", "Recovered"]
     S = ax1.plot(t, Sm, color="green",lw = 2)[0]
     I = ax1.plot(t, Im, color="red",lw = 2)[0]
@@ -169,10 +190,25 @@ def nM_SIR_simulation(k, m_func, nm_func, haz_func, tMax, network, iTotal, sTota
     ax1.set_ylabel('Number of Individuals in State')
     fig.legend(handles=[S, I, R],labels=line_labels,loc="center right")
     fig.suptitle(title)
-    plt.savefig(fname)
-    return Sm,Im,Rm,Snm,Inm,Rnm
+    fig.savefig(fname)
+    plt.close(fig)
+    S = ax3.plot(t, Sm, color="green",lw = 2)[0]
+    I = ax3.plot(t, Im, color="red",lw = 2)[0]
+    R = ax3.plot(t, Rm, color="blue",lw = 2)[0]
+    ax4.plot(t, Snms, color="green",lw = 2)
+    ax4.plot(t, Inms, color="red",lw = 2)
+    ax4.plot(t, Rnms, color="blue",lw = 2)
+    ax3.set_xlabel('Time')
+    ax4.set_xlabel('Time')
+    ax3.set_ylabel('Number of Individuals in State')
+    fig2.legend(handles=[S, I, R],labels=line_labels,loc="center right")
+    fig2.suptitle(title)
+    fig2.savefig(fname2)
+    plt.close(fig2)
 
-def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, maxgamma, haz_params, haz_max, title, fname):
+    return Sm,Im,Rm,Snm,Inm,Rnm,Snms,Inms,Rnms
+
+def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, maxgamma, haz_params, haz_max, haz_params_strong, haz_max_strong, title, fname, fname2):
     '''
     Method to run and plot Markov. vs. NonMarkov. experimentation
     Returns the median SIR values for the Markov. and NonMarkov. experiments
@@ -186,7 +222,11 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
     Snm = {}
     Inm = {}
     Rnm = {}
+    Snms = {}
+    Inms = {}
+    Rnms = {}
     fig, (ax1,ax2) = plt.subplots(nrows=1, ncols=2, sharex=True)
+    fig2, (ax3,ax4) = plt.subplots(nrows=1, ncols=2, sharex=True)
     for i in range(k):
         ti, Si, Ei, Ii, Ri = m_func(tMax, network, eTotal, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta, maxgamma)
         Sm[i] = np.interp(t, ti, Si, right=Si[-1])
@@ -200,6 +240,11 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
         ax1.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
         ax1.plot(ti, Ei, color="orange",lw = 2, alpha=0.3)
         ax1.plot(ti, Inmi, color="purple",lw=2, alpha=0.3)
+        ax3.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
+        ax3.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
+        ax3.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+        ax3.plot(ti, Ei, color="orange",lw = 2, alpha=0.3)
+        ax3.plot(ti, Inmi, color="purple",lw=2, alpha=0.3)
         ti, Si, Ii, Ri = nm_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(susceptible), haz_params, haz_func, haz_max)
         Snm[i] = np.interp(t, ti, Si, right=Si[-1])
         Inm[i] = np.interp(t, ti, Ii, right=Ii[-1])
@@ -207,6 +252,14 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
         ax2.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
         ax2.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
         ax2.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+        ti, Si, Ii, Ri = nm_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(susceptible), haz_params_strong, haz_func, haz_max_strong)
+        Snms[i] = np.interp(t, ti, Si, right=Si[-1])
+        Inms[i] = np.interp(t, ti, Ii, right=Ii[-1])
+        Rnms[i] = np.interp(t, ti, Ri, right=Ri[-1])
+        ax4.plot(ti, Si, color="#82c7a5",lw = 2, alpha=0.3)
+        ax4.plot(ti, Ii, color="#f15e22",lw = 2, alpha=0.3)
+        ax4.plot(ti, Ri, color="#7890cd",lw = 2, alpha=0.3)
+    
     Sm = np.median(np.array(list(Sm.values())),0)
     Em = np.median(np.array(list(Em.values())),0)
     Im = np.median(np.array(list(Im.values())),0)
@@ -215,6 +268,11 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
     Snm = np.median(np.array(list(Snm.values())),0)
     Inm = np.median(np.array(list(Inm.values())),0)
     Rnm = np.median(np.array(list(Rnm.values())),0)
+    Snms = np.median(np.array(list(Snms.values())),0)
+    Inms = np.median(np.array(list(Inms.values())),0)
+    Rnms = np.median(np.array(list(Rnms.values())),0)
+    maes = np.mean(np.abs(Infm-Inms))
+    maew = np.mean(np.abs(Infm-Inm))
     line_labels = ["Susceptible", "Exposed", "Infectious", "Infected", "Recovered"]
     S = ax1.plot(t, Sm, color="green",lw = 2)[0]
     E = ax1.plot(t, Em, color="orange",lw = 2)[0]
@@ -229,8 +287,26 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
     ax1.set_ylabel('Number of Individuals in State')
     fig.legend(handles=[S, E, I, Infi, R],labels=line_labels,loc="center right")
     fig.suptitle(title)
-    plt.savefig(fname)
-    return Sm,Em,Im,Inm,Rm,Snm,Inm,Rnm
+    fig.savefig(fname)
+    plt.close(fig)
+    S = ax3.plot(t, Sm, color="green",lw = 2)[0]
+    E = ax3.plot(t, Em, color="orange",lw = 2)[0]
+    I = ax3.plot(t, Im, color="red",lw = 2)[0]
+    Infi = ax3.plot(t, Infm, color="purple",lw = 2)[0]
+    R = ax3.plot(t, Rm, color="blue",lw = 2)[0]
+    ax4.plot(t, Snms, color="green",lw = 2)
+    ax4.plot(t, Inms, color="red",lw = 2)
+    ax4.plot(t, Rnms, color="blue",lw = 2)
+    ax3.set_xlabel('Time')
+    ax4.set_xlabel('Time')
+    ax3.set_ylabel('Number of Individuals in State')
+    fig2.legend(handles=[S, E, I, Infi, R],labels=line_labels,loc="center right")
+    fig2.suptitle(title)
+    fig2.savefig(fname2)
+    plt.close(fig2)
+    print(f"mae Weak nMarkov: {maew:.4f}")
+    print(f"mae Strong nMarkov: {maes:.4f}")
+    return Sm,Em,Im,Infm,Rm,Snm,Inm,Rnm,Snms,Inms,Rnms
 
 def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz_max, tMax, title, fname):
     '''
@@ -260,6 +336,7 @@ def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz
     ax1.set_ylabel('Cumulative Number of Events')
     fig.suptitle(title)
     plt.savefig(fname)
+    plt.close()
 
 def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_method, nMGA, first_method, gMax, haz_max, haz_min, num_processes, tMax, title, fname):
     '''
@@ -382,6 +459,7 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
     fig.legend(handles=[p1, p2, p3, p4],labels=line_labels,loc="center right")
     fig.suptitle(title)
     plt.savefig(fname)
+    plt.close()
 
 def nH_timing_simulation(k, update_funcs, rate_func_sings, rate_func_vecs, inv_method, nMGA, first_method, gMax, haz_maxs, haz_mins, num_processes, tMax):
     times = {}

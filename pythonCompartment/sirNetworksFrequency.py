@@ -33,10 +33,6 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
     R[0] = rTotal
     i = 1
 
-    # initialise random variate generation with set seed
-    rng = random.default_rng(123)
-    probs = rates/np.sum(rates)
-
     while t[-1] < tMax and iTotal != 0:
         # get next event time and next event index
         deltaT = -np.log(1-unif())/sum(rates)

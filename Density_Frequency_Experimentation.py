@@ -392,4 +392,4 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.savefig(f"PythonPlotting/Comparisons/FD_Poisson_Household_Comp")
 
 if __name__=="__main__":
-    main(False, True, False)
+    main(True, False, False)

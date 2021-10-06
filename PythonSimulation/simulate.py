@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+import time
 import copy
 
 def freq_dens_simulation(k, freq_func, dens_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
@@ -381,3 +382,41 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
     fig.legend(handles=[p1, p2, p3, p4],labels=line_labels,loc="center right")
     fig.suptitle(title)
     plt.savefig(fname)
+
+def nH_timing_simulation(k, update_funcs, rate_func_sings, rate_func_vecs, inv_method, nMGA, first_method, gMax, haz_maxs, haz_mins, num_processes, tMax):
+    times = {}
+    times["Inverse"] = np.zeros(len(update_funcs))
+    times["First"] = np.zeros(len(rate_func_sings))
+    times["GMax"] = np.zeros(len(rate_func_sings))
+    times["nMGA"] = np.zeros(len(rate_func_vecs))
+
+    for i in range(len(update_funcs)):
+        s_time = time.time()
+        for j in range(k):
+            inv_method(update_funcs[i], num_processes[i], tMax)
+        e_time = time.time()
+        times["Inverse"][i] = (e_time-s_time)
+    
+    for i in range(len(rate_func_sings)):
+        s_time = time.time()
+        for j in range(k):
+            first_method(rate_func_sings[i], haz_maxs[i], tMax)
+        e_time = time.time()
+        times["First"][i] = (e_time-s_time)
+
+    for i in range(len(rate_func_sings)):
+        s_time = time.time()
+        for j in range(k):
+            gMax(rate_func_sings[i], haz_maxs[i], tMax)
+        e_time = time.time()
+        times["GMax"][i] = (e_time-s_time)
+
+    for i in range(len(rate_func_vecs)):
+        s_time = time.time()
+        for j in range(k):
+            nMGA(rate_func_vecs[i], haz_mins[i], tMax)
+        e_time = time.time()
+        times["nMGA"][i] = (e_time-s_time)
+    
+    for ke, v in times.items():
+        print(ke, v)

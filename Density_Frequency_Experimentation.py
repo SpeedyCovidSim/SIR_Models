@@ -308,7 +308,7 @@ def main(er_small_test=True, household_test=True, random_test=True, random_sd_te
         plt.plot(t, I8freq, color="green",label="8 - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I8dens, color="green",linestyle="dashed",label="8 - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I10freq, color="orange",label="10 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I10dens, color="orange",label="10 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I10dens, color="orange",linestyle="dashed",label="10 - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
@@ -503,4 +503,4 @@ def main(er_small_test=True, household_test=True, random_test=True, random_sd_te
         plt.savefig(f"PythonPlotting/Comparisons/FD_nBinom_Household_Comp")
 
 if __name__=="__main__":
-    main(False, False, False, True)
+    main(False, True, False, False)

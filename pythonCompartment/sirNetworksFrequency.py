@@ -76,10 +76,10 @@ def gillespieDirectNetwork(tMax, network, iTotal, sTotal, rTotal, numSusNei, rat
             I[i] = iTotal
             R[i] = rTotal
         else:
-            t.append(t[-1] + deltaT)
-            S.append(sTotal)
-            I.append(iTotal)
-            R.append(rTotal)
+            t = np.append(t,t[-1] + deltaT)
+            S = np.append(S,sTotal)
+            I = np.append(I,iTotal)
+            R = np.append(R,rTotal)
 
         i += 1
     

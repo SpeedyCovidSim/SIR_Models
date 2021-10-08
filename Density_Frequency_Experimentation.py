@@ -2,6 +2,7 @@ import numpy as np
 from numpy import random
 import time
 import igraph as ig
+from scipy.stats import nbinom
 import copy
 from matplotlib import pyplot as plt
 from pythonCompartment.sirNetworksFrequency import gillespieDirectNetwork as gillespieFrequency
@@ -23,6 +24,19 @@ def create_random_neighbourhood(N, n):
     Creates N full subgraphs of a left-truncated Poiss(n) people with at least 2 people in a household (to get spread)
     '''
     house_sizes = random.poisson(n, N)
+    house_sizes = [a if a>1 else 2 for a in house_sizes]
+    network = ig.Graph.Full(house_sizes[0])
+
+    for i in range(1,N):
+        networki = ig.Graph.Full(house_sizes[i])
+        network = ig.operators.disjoint_union([network,networki])
+    return network, house_sizes
+
+def create_nbinom_neighbourhood(N, n, p):
+    '''
+    Creates N full subgraphs of a left-truncated nBinom(n,p) people with at least 2 people in a household (to get spread)
+    '''
+    house_sizes = nbinom.rvs(n, p, size=N)
     house_sizes = [a if a>1 else 2 for a in house_sizes]
     network = ig.Graph.Full(house_sizes[0])
 
@@ -130,7 +144,7 @@ def initHazards(network, infecteds, N):
     numInfNei[infecteds] = 0
     return numInfNei, numSusNei
 
-def main(er_small_test=True, household_test=True, random_test=True):
+def main(er_small_test=True, household_test=True, random_test=True, random_sd_test=True):
     '''
     Main loop for testing within this Python file
     '''
@@ -205,7 +219,7 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.plot(t, I3freq, color="green",label="P = 0.003 - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I3dens, color="green",linestyle="dashed",label="P = 0.003 - Freq.",lw = 2, alpha=0.5,figure=fig)
         plt.plot(t, I1freq, color="orange",label="P = 0.001 - Freq.",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I1dens, color="orange",label="P = 0.001 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I1dens, color="orange",linestyle="dashed",label="P = 0.001 - Dens.",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
         plt.ylabel("Number of Infected Individuals")
@@ -391,5 +405,102 @@ def main(er_small_test=True, household_test=True, random_test=True):
         plt.savefig(f"PythonPlotting/Freq_Dens_Poisson_Test/Comp")
         plt.savefig(f"PythonPlotting/Comparisons/FD_Poisson_Household_Comp")
 
+    if(random_sd_test):
+        print("Beginning density vs frequency household nBinom simulations, mean = 6, sd in [3,5,7,9]")
+        # initialise variables
+        tMax = 20
+        maxalpha = 0.4
+        maxbeta = 4
+        t = np.linspace(0,tMax,1000)
+        j = 30
+        mu = 6
+        sd = np.array([3,5,7,9])
+        ps = mu/sd**2
+        ns = mu**2/(sd**2-mu)
+
+        N = 15
+        n = ns[0]
+        p = ps[0]
+        network, house_sizes = create_nbinom_neighbourhood(N,n,p)
+        num = np.sum(house_sizes)
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
+        rates = np.zeros(2*num)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[num+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+        title = f"Freq. vs Dens. for {N} households of nBinom({n:.3f},{p:.3f}) people"
+        fname = f"PythonPlotting/Freq_Dens_nbinom_Test/{sd[0]}"
+        S4freq, I4freq, R4freq, S4dens, I4dens, R4dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
+
+        n = ns[1]
+        p = ps[1]
+        network, house_sizes = create_nbinom_neighbourhood(N,n,p)
+        num = np.sum(house_sizes)
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
+        rates = np.zeros(2*num)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[num+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+        title = f"Freq. vs Dens. for {N} households of nBinom({n:.3f},{p:.3f}) people"
+        fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{sd[1]}"
+        S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
+
+
+        n = ns[2]
+        p = ps[2]
+        network, house_sizes = create_nbinom_neighbourhood(N,n,p)
+        num = np.sum(house_sizes)
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
+        rates = np.zeros(2*num)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[num+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+        title = f"Freq. vs Dens. for {N} households of nBinom({n:.3f},{p:.3f}) people"
+        fname = f"PythonPlotting/Freq_Dens_nbinom_Test/{sd[2]}"
+        S8freq, I8freq, R8freq, S8dens, I8dens, R8dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
+
+
+        n = ns[3]
+        p = ps[3]
+        network, house_sizes = create_nbinom_neighbourhood(N,n,p)
+        num = np.sum(house_sizes)
+        iTotal, sTotal, rTotal, numInfNei, numSusNei, susceptible, infecteds = setNetwork_random(network,N,n,house_sizes,N)
+        rates = np.zeros(2*num)
+        for inf in infecteds:
+            # set recovery hazard
+            rates[num+inf] = maxalpha
+            # set infection hazard
+            rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
+        title = f"Freq. vs Dens. for {N} households of nBinom({n:.3f},{p:.3f}) people"
+        fname = f"PythonPlotting/Freq_Dens_nbinom_Test/{sd[3]}"
+        S10freq, I10freq, R10freq, S10dens, I10dens, R10dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
+        maxalpha, maxbeta, title, fname)
+
+
+        fig = plt.figure()
+        plt.plot(t, I4freq, color="red",label="SD = 3 - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I4dens, color="red",linestyle="dashed",label="SD = 3 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I6freq, color="blue",label="SD = 5 - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I6dens, color="blue",linestyle="dashed",label="SD = 5  - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8freq, color="green",label="SD = 7 - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I8dens, color="green",linestyle="dashed",label="SD = 7 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I10freq, color="orange",label="SD = 9 - Freq.",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, I10dens, color="orange",linestyle="dashed",label="SD = 9 - Dens.",lw = 2, alpha=0.5,figure=fig)
+        plt.legend()
+        plt.xlabel("Time")
+        plt.ylabel("Number of Infected Individuals")
+        plt.title(f"Freq. vs. Dens. with varying nBinom standard deviations")
+        plt.savefig(f"PythonPlotting/Freq_Dens_nbinom_Test/Comp")
+        plt.savefig(f"PythonPlotting/Comparisons/FD_nBinom_Household_Comp")
+
 if __name__=="__main__":
-    main(True, False, False)
+    main(False, False, False, True)

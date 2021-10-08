@@ -91,11 +91,11 @@ def gillespieSEIR(tMax, network, eTotal, iTotal, sTotal, rTotal, numSusNei, rate
             I[i] = iTotal
             R[i] = rTotal
         else:
-            t.append(t[-1] + deltaT)
-            S.append(sTotal)
-            E.append(eTotal)
-            I.append(iTotal)
-            R.append(rTotal)
+            t = np.append(t,t[-1] + deltaT)
+            S = np.append(S,sTotal)
+            E = np.append(E,eTotal)
+            I = np.append(I,iTotal)
+            R = np.append(R,rTotal)
 
         i += 1
     

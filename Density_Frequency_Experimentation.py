@@ -406,14 +406,14 @@ def main(er_small_test=True, household_test=True, random_test=True, random_sd_te
         plt.savefig(f"PythonPlotting/Comparisons/FD_Poisson_Household_Comp")
 
     if(random_sd_test):
-        print("Beginning density vs frequency household nBinom simulations, mean = 6, sd in [3,5,7,9]")
+        print("Beginning density vs frequency household nBinom simulations, mean = 8, sd in [3,5,7,9]")
         # initialise variables
         tMax = 20
         maxalpha = 0.4
         maxbeta = 4
         t = np.linspace(0,tMax,1000)
         j = 30
-        mu = 6
+        mu = 8
         sd = np.array([3,5,7,9])
         ps = mu/sd**2
         ns = mu**2/(sd**2-mu)
@@ -447,7 +447,7 @@ def main(er_small_test=True, household_test=True, random_test=True, random_sd_te
             # set infection hazard
             rates[inf] = maxbeta*numSusNei[inf]/network.degree(inf)
         title = f"Freq. vs Dens. for {N} households of nBinom({n:.3f},{p:.3f}) people"
-        fname = f"PythonPlotting/Freq_Dens_Poisson_Test/{sd[1]}"
+        fname = f"PythonPlotting/Freq_Dens_nbinom_Test/{sd[1]}"
         S6freq, I6freq, R6freq, S6dens, I6dens, R6dens = freq_dens_simulation(j, gillespieFrequency, gillespieDensity, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, 
         maxalpha, maxbeta, title, fname)
 

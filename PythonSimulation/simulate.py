@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 import copy
+import igraph as ig
 
 def freq_dens_simulation(k, freq_func, dens_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
     '''
@@ -498,3 +499,46 @@ def nH_timing_simulation(k, update_funcs, rate_func_sings, rate_func_vecs, inv_m
     
     for ke, v in times.items():
         print(ke, v)
+
+def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
+    '''
+    Method to run and plot freq. vs. dens. experimentation
+    Returns the median SIR values for freq. and dens. scalings 
+    '''
+    t = np.linspace(0,tMax,1000)
+
+
+    network = networks[0]
+    network1 = networks[1]
+    rates1 = rates[1]
+    rates = rates[0]
+
+    fig, axs = plt.subplots(nrows=2, ncols=2)
+    ax1 = axs[0,0]
+    ax2 = axs[0,1]
+    ax3 = axs[1,0]
+    ax4 = axs[1,1]
+
+    t, Si, Ii, Ri = g_func(tMax, network, iTotal[0], sTotal[0], rTotal[0], copy.copy(numSusNei[0]), copy.copy(rates), copy.copy(susceptible[0]), maxalpha, maxbeta)
+    S=ax1.plot(t, Si, color="green",lw = 2)[0]
+    I=ax1.plot(t, Ii, color="red",lw = 2)[0]
+    R=ax1.plot(t, Ri, color="blue",lw = 2)[0]
+    t, Si, Ii, Ri = g_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
+    ax2.plot(t, Si, color="green",lw = 2)
+    ax2.plot(t, Ii, color="red",lw = 2)
+    ax2.plot(t, Ri, color="blue",lw = 2)
+    t, Si, Ii, Ri = f_func(tMax, network, iTotal[0], sTotal[0], rTotal[0], copy.copy(numSusNei[0]), copy.copy(rates), copy.copy(susceptible[0]), maxalpha, maxbeta)
+    ax3.plot(t, Si, color="green",lw = 2)
+    ax3.plot(t, Ii, color="red",lw = 2)
+    ax3.plot(t, Ri, color="blue",lw = 2)
+    t, Si, Ii, Ri = f_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
+    ax4.plot(t, Si, color="green",lw = 2)
+    ax4.plot(t, Ii, color="red",lw = 2) 
+    ax4.plot(t, Ri, color="blue",lw = 2)
+    
+    line_labels = ["Susceptible", "Infected", "Recovered"]
+    ax1.set_ylabel('Number of Individuals in State')
+    fig.legend(handles=[S, I, R],labels=line_labels,loc="center right")
+    fig.suptitle(title)
+    plt.savefig(fname)
+    plt.close()

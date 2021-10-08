@@ -237,11 +237,11 @@ def main(er_small_test=True, ring_small_test=True):
         plt.plot(t, I02, color="orange",label="Neighbourhood = 2",lw = 2, alpha=0.5,figure=fig)
         plt.legend()
         plt.xlabel("Time")
-        plt.ylabel("Number of Infected Individuals", fontsize=16)
+        plt.ylabel("Number of Infected Individuals")
         plt.title(f"SIR model of ring lattice with varying neighbourhood sizes")
         plt.savefig(f"PythonPlotting/Small_K_Tests/K_Comparison")
         plt.savefig(f"PythonPlotting/Comparisons/Markov_WS_K_Comparison")
 
 
 if __name__=="__main__":
-    main(True, True)
+    main(False, True)

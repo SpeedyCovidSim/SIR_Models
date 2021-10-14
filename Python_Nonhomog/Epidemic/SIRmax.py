@@ -35,8 +35,8 @@ def gillespieMax(tMax, network, iTotal, sTotal, rTotal, numSusNei, susceptible, 
     sim_time = 0
     entry_times = np.zeros(N)
     num_neighbours = np.array(network.degree())
-    maxalpha = rateMax[0]
-    maxbeta = rateMax[1]
+    maxbeta = rateMax[0]
+    maxalpha = rateMax[1]
     kinf, laminf, krec, lamrec = rateParams
     
     while t[-1] < tMax and iTotal != 0:

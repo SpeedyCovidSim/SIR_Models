@@ -54,7 +54,7 @@ def main(single=True, competing=True, timing=True):
         minBounds = np.array([0.4,0.2,0.1,0.1])
         tMax = 40
 
-        title = f"Inv., First Max., Gillespie Max., and nMGA Methods \n for competing inhomogeneous Poissons"
+        title = f"Inv., First Max., Gillespie Max., and nMGA Methods for competing \n inhomogeneous Poissons"
         fname= f"PythonPlotting/nh_Poisson_Tests/Competing"
         nH_competing_simulation(j, updateFunction, rateFunctionSing, rateFunctionVect, competing_inverse, nMGA, competing_thin, 
         gMax, rateMax, minBounds, numProcesses, tMax, title, fname)
@@ -122,4 +122,4 @@ def main(single=True, competing=True, timing=True):
         [minBoundsOne, minBoundsTwo, minBoundsFour], numProcesses, tMax)
 
 if __name__=="__main__":
-    main(False, False, True)
+    main(False, True, False)

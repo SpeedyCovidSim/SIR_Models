@@ -86,6 +86,39 @@ def general_SIR_simulation(k, direct_func, tMax, network, iTotal, sTotal, rTotal
     plt.close()
     return S, I, R
 
+def general_proportional_SIR_simulation(k, direct_func, tMax, network, iTotal, sTotal, rTotal, numSusNei, rates, susceptible, maxalpha, maxbeta, title, fname):
+    '''
+    Method to run and plot general SIR experimentation
+    Returns the median SIR values for parsed direct method
+    '''
+    S = {}
+    I = {}
+    R = {}
+    fig = plt.figure()
+    t = np.linspace(0,tMax,1000)
+    N = network.vcount()
+    for i in range(k):
+        ti, Si, Ii, Ri = direct_func(tMax, network, iTotal, sTotal, rTotal, copy.copy(numSusNei), copy.copy(rates), copy.copy(susceptible), maxalpha, maxbeta)
+        S[i] = np.interp(t, ti, Si, right=Si[-1])/N
+        I[i] = np.interp(t, ti, Ii, right=Ii[-1])/N
+        R[i] = np.interp(t, ti, Ri, right=Ri[-1])/N
+        plt.plot(ti, Si/N, color="#82c7a5",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ii/N, color="#f15e22",lw = 2, alpha=0.3,figure=fig)
+        plt.plot(ti, Ri/N, color="#7890cd",lw = 2, alpha=0.3,figure=fig)
+    S = np.median(np.array(list(S.values())),0)
+    I = np.median(np.array(list(I.values())),0)
+    R = np.median(np.array(list(R.values())),0)
+    plt.plot(t, S, color="green",label="Susceptible/N",lw = 2,figure=fig)
+    plt.plot(t, I, color="red",label="Infected/N",lw = 2,figure=fig)
+    plt.plot(t, R, color="blue",label="Recovered/N",lw = 2,figure=fig)
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Proportion of Individuals in State")
+    plt.title(title)
+    plt.savefig(fname)
+    plt.close()
+    return S, I, R
+
 def random_SIR_simulation(j,N,n,k, network_create_func, network_set_func, direct_func, tMax, maxalpha, maxbeta, title, fname):
     '''
     Method to run and plot random network SIR experimentation
@@ -320,11 +353,13 @@ def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz
     for i in range(k):
         ti, ei = inv_method(update_func, tMax)
         ei = np.cumsum(ei)
-        invn[i] = np.interp(t, ti, ei)
+        invn[i] = np.interp(t, ti, ei,right=ei[-1])
         ax1.plot(ti, ei, color="#82c7a5",lw = 2, alpha=0.3)
         ti, ei = thin_method(rate_func, haz_max, tMax)
         ei = np.cumsum(ei)
-        thinn[i] = np.interp(t, ti, ei)
+        thinn[i] = np.interp(t, ti, ei,right=ei[-1])
+        ti = np.append(ti,50)
+        ei = np.append(ei,ei[-1])
         ax2.plot(ti, ei, color="#82c7a5",lw = 2, alpha=0.3)
     Invm = np.median(np.array(list(invn.values())),0)
     Thinm = np.median(np.array(list(thinn.values())),0)
@@ -379,6 +414,7 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
         ax1.plot(ti, inv1, label="Event Type 1",color="#f15e22",lw = 2, alpha=0.15)
         ax1.plot(ti, inv2, label="Event Type 2",color="#7890cd",lw = 2, alpha=0.15)
         ax1.plot(ti, inv3, label="Event Type 3",color="purple",lw = 2, alpha=0.15)
+        ax1.set_title("Inverse")
         ti, firstMaxReactTypes = first_method(rate_func_sing, haz_max, tMax)
         first0 = np.cumsum(firstMaxReactTypes==0)
         first1 = np.cumsum(firstMaxReactTypes==1)
@@ -392,6 +428,7 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
         ax2.plot(ti, first1, label="Event Type 1",color="#f15e22",lw = 2, alpha=0.15)
         ax2.plot(ti, first2, label="Event Type 2",color="#7890cd",lw = 2, alpha=0.15)
         ax2.plot(ti, first3, label="Event Type 3",color="purple",lw = 2, alpha=0.15)
+        ax2.set_title("First Max")
         ti, MaxReactTypes = gMax(rate_func_sing, haz_max, tMax)
         max0 = np.cumsum(MaxReactTypes==0)
         max1 = np.cumsum(MaxReactTypes==1)
@@ -405,6 +442,7 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
         ax3.plot(ti, max1, label="Event Type 1",color="#f15e22",lw = 2, alpha=0.15)
         ax3.plot(ti, max2, label="Event Type 2",color="#7890cd",lw = 2, alpha=0.15)
         ax3.plot(ti, max3, label="Event Type 3",color="purple",lw = 2, alpha=0.15)
+        ax3.set_title("GMax")
         ti, nMGAReactTypes = nMGA(rate_func_vec, haz_min, tMax)
         nMGA0 = np.cumsum(nMGAReactTypes==0)
         nMGA1 = np.cumsum(nMGAReactTypes==1)
@@ -418,6 +456,7 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
         ax4.plot(ti, nMGA1, label="Event Type 1",color="#f15e22",lw = 2, alpha=0.15)
         ax4.plot(ti, nMGA2, label="Event Type 2",color="#7890cd",lw = 2, alpha=0.15)
         ax4.plot(ti, nMGA3, label="Event Type 3",color="purple",lw = 2, alpha=0.15)
+        ax4.set_title("nMGA")
     inv0m = np.median(np.array(list(inv0m.values())),0)
     inv1m = np.median(np.array(list(inv1m.values())),0)
     inv2m = np.median(np.array(list(inv2m.values())),0)
@@ -451,15 +490,14 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
     ax4.plot(t, nMGA1m, color="red",lw = 2)
     ax4.plot(t, nMGA2m, color="blue",lw = 2)
     ax4.plot(t, nMGA3m, color="purple",lw = 2)
-    ax1.set_xlabel('Time')
-    ax2.set_xlabel('Time')
     ax3.set_xlabel('Time')
     ax4.set_xlabel('Time')
     fig.text(0.04, 0.5, 'Cumulative Number of Events Occurred', va='center', rotation='vertical')
     line_labels = ["Event Type 0", "Event Type 1", "Event Type 2", "Event Type 3"]
-    fig.legend(handles=[p1, p2, p3, p4],labels=line_labels,loc="center right")
+    plt.legend(handles=[p1, p2, p3, p4],labels=line_labels,bbox_to_anchor=(1.04,1.5), loc="upper left")
+
     fig.suptitle(title)
-    plt.savefig(fname)
+    plt.savefig(fname,bbox_inches="tight")
     plt.close()
 
 def nH_timing_simulation(k, update_funcs, rate_func_sings, rate_func_vecs, inv_method, nMGA, first_method, gMax, haz_maxs, haz_mins, num_processes, tMax):
@@ -523,6 +561,8 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     S=ax1.plot(t, Si, color="green",lw = 2)[0]
     I=ax1.plot(t, Ii, color="red",lw = 2)[0]
     R=ax1.plot(t, Ri, color="blue",lw = 2)[0]
+    line_labels = ["Susceptible", "Infected", "Recovered"]
+    plt.legend(handles=[S, I, R],labels=line_labels,bbox_to_anchor=(1.04,1.5), loc="upper left")
     t, Si, Ii, Ri = g_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
     ax2.plot(t, Si, color="green",lw = 2)
     ax2.plot(t, Ii, color="red",lw = 2)
@@ -536,9 +576,8 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     ax4.plot(t, Ii, color="red",lw = 2) 
     ax4.plot(t, Ri, color="blue",lw = 2)
     
-    line_labels = ["Susceptible", "Infected", "Recovered"]
-    ax1.set_ylabel('Number of Individuals in State')
-    fig.legend(handles=[S, I, R],labels=line_labels,loc="center right")
+
+    fig.text(0.04, 0.5, 'Number of Individuals in State', va='center', rotation='vertical')
     fig.suptitle(title)
-    plt.savefig(fname)
+    plt.savefig(fname,bbox_inches="tight")
     plt.close()

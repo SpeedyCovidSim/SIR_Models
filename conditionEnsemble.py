@@ -27,7 +27,7 @@ def get_cases(dir, net=True):
         detected = [0]
     conf_cases = df.xs("Known Cases", level='metric').fillna(method='ffill', axis='columns').values
     cumul_cases = df.xs("Cumulative Cases", level='metric').fillna(method='ffill', axis='columns').values
-    
+
     return conf_cases, cumul_cases, detected, df
 
 def condition(dir):
@@ -103,11 +103,11 @@ def getGPBands(conf_cases, data):
 
 def conditionABC(conf_cases, data):
 
-    filtered_ABC = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))), 
+    filtered_ABC = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))),
         data=data, q_tol=0.01, return_indices=False)
 
-    indexes = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))), 
-        data=data, q_tol=0.01, return_indices=True)      
+    indexes = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))),
+        data=data, q_tol=0.01, return_indices=True)
 
     t = list(range(0, len(data[0])))
 

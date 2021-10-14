@@ -640,7 +640,7 @@ module BPVerifySolutions
             println("Mean Abs Error S = $misfitS, Mean Abs Error I = $misfitI, Mean Abs Error R = $misfitR, ")
 
             title = "Next React vs Discrete with isolation. Discrete timestep = $time_step"
-            outputFileName = "./verifiedBranch/NextvsDiscreteIsolationg"
+            outputFileName = "./verifiedBranch/NextvsDiscreteIsolation"
             branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true)
             println()
         end
@@ -1037,7 +1037,7 @@ module BPVerifySolutions
 
             title = "Next React vs Simple Branch with Saturation (Single) Thinning"
             outputFileName = "./verifiedBranch/NextvsSimpleBP_SingleThin"
-            branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+            branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false, false)
             println()
         end
 
@@ -1122,7 +1122,7 @@ module BPVerifySolutions
 
             title = "Next React vs Simple BP with Isolation and S Saturation (Single) Thinning"
             outputFileName = "./verifiedBranch/NextvsSimpleBPIsolation_SingleThin"
-            branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false)
+            branchVerifyPlot(Smean, Imean, Rmean, discreteSIR_mean, times, title, outputFileName, false, true, true, false, false)
             println()
         end
 

@@ -807,11 +807,21 @@ module branchingProcesses
 
         numSeedCases = length(gen_range_dict[1])
         time_infected = zeros(nrow(population_df))
+        maxKey = maximum(keys(gen_range_dict))
+        zeroInFinalGen = population_df[gen_range_dict[maxKey][1], :parentID] == 0
 
-        for gen in 2:maximum(keys(gen_range_dict))
-            infect_range = gen_range_dict[gen]
+        if zeroInFinalGen
+            for gen in 2:(maxKey-1)
+                infect_range = gen_range_dict[gen]
 
-            time_infected[infect_range] .= population_df[infect_range, :time_infected_rel] .+ time_infected[population_df[infect_range, :parentID]]
+                time_infected[infect_range] .= population_df[infect_range, :time_infected_rel] .+ time_infected[population_df[infect_range, :parentID]]
+            end
+        else
+            for gen in 2:maxKey
+                infect_range = gen_range_dict[gen]
+
+                time_infected[infect_range] .= population_df[infect_range, :time_infected_rel] .+ time_infected[population_df[infect_range, :parentID]]
+            end
         end
 
         population_df.time_infected = time_infected
@@ -2115,7 +2125,7 @@ module branchingProcesses
                     sSaturation = (model.state_totals[1]/model.population_size)
                     # rejection step for population saturation
                     if rand() < sSaturation/reaction.sSaturation
-                        
+
                         # rejection step for detection and subsequent isolation
                         if detectionRejection(population_df, model, reaction, infection_time)
 

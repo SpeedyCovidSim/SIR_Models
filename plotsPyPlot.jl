@@ -43,6 +43,7 @@ module plotsPyPlot
         plt.suptitle("SIR model over time with a population size of $N")
         plt.title("For alpha = $alpha and beta $beta")
         plt.legend()
+        plt.xlim(-1,31)
 
         if Display
             # required to display graph on plots.
@@ -266,7 +267,7 @@ module plotsPyPlot
         plt.ylabel("Log10 Simulation time (log10(s))")
         plt.title("Time To Complete Simulation")
         # plt.title("For alpha = $alpha and beta $beta")
-        plt.legend(loc = "upper left")
+        plt.legend(loc = "upper left", prop=plt.matplotlib.font_manager.FontProperties(family="DejaVu Sans Mono", size=9))
 
         # fig.savefig("Benchmarks/SimulationTimesMikeBranch_noFirst")
 

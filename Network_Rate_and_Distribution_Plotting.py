@@ -1,6 +1,79 @@
 import numpy as np
+from numpy import random
 import igraph as ig
 from matplotlib import pyplot as plt
+
+def create_linked_neighbourhood(N, n):
+    '''
+    Creates N full subgraphs of n people with 1 link between adjacent subgraphs
+    '''
+    network = ig.Graph.Full(n)
+    for i in range(1,N):
+        networki = ig.Graph.Full(n)
+        network = ig.operators.disjoint_union([network,networki])
+        if(i < N-1):
+            network.add_edge(n*i-1,n*i)
+        else:
+            network.add_edge(0,n*(i+1)-1)
+            network.add_edge(n*i-1,n*i)
+    return network
+        
+def create_random_neighbourhood(N, n, k):
+    '''
+    Creates N full subgraphs of n people with k random links also in the network
+    (e.g. testing for multiple random links ala AL3/AL4 spread)
+    note k < (n-1)N else this results in a fully-connected network
+    '''
+    network = create_linked_neighbourhood(N, n)
+    pops = np.arange(N*n)
+    for i in range(k):
+        inserted = False
+        while not(inserted):
+            N_i = random.choice(N)
+            out_nodes = np.arange(N_i*n,(N_i+1)*n-1)
+            in_nodes = np.setdiff1d(pops,out_nodes)
+            out_node = random.choice(out_nodes)
+            in_node = random.choice(in_nodes)
+            if not(network.are_connected(out_node,in_node)):
+                network.add_edge(out_node,in_node)
+                inserted = True
+    return network
+
+def create_working_neighbourhood(N, n, k):
+    '''
+    Creates N full subgraphs of n people with each household connected
+    to k others
+    '''
+    network = create_linked_neighbourhood(N, n)
+    for i in range(1,k+1):
+        if i < N:
+            network.add_edge(0,i*n)
+        else:
+            network.add_edge(0,(i-N+2)*n-1)
+    return network
+
+def create_random_household_links(N, n, k):
+    '''
+    Creates N full subgraphs of n people with k random links 
+    between households
+    '''
+    network = ig.Graph.Full(n)
+    for i in range(1,N):
+        networki = ig.Graph.Full(n)
+        network = ig.operators.disjoint_union([network,networki])
+    
+
+    selections = np.arange(N)
+    choices = []
+    i = 0
+    while i < k:
+        houses = random.choice(selections,size=2,replace=False)
+        if not(list(houses) in choices):
+            network.add_edge(houses[0]*n,houses[1]*n+n-1)
+            choices.append(list(houses))
+            i += 1
+    
+    return network
 
 
 
@@ -20,6 +93,30 @@ def main(networks=True,rates=True,distributions=True):
         network = ig.Graph.Watts_Strogatz(1,20,4,0)
         fig, ax = plt.subplots()
         fname = f"PythonPlotting/Misc/ws_4"
+        ig.plot(network,target=ax)
+        plt.axis('off')
+        plt.savefig(fname)
+        plt.close()
+
+        network = create_linked_neighbourhood(10,4)
+        fig, ax = plt.subplots()
+        fname = f"PythonPlotting/Misc/household_lattice"
+        ig.plot(network,target=ax)
+        plt.axis('off')
+        plt.savefig(fname)
+        plt.close()
+
+        network = create_random_neighbourhood(10,4,3)
+        fig, ax = plt.subplots()
+        fname = f"PythonPlotting/Misc/ws_households"
+        ig.plot(network,target=ax)
+        plt.axis('off')
+        plt.savefig(fname)
+        plt.close()
+
+        network = create_random_household_links(10,4,3)
+        fig, ax = plt.subplots()
+        fname = f"PythonPlotting/Misc/er_households"
         ig.plot(network,target=ax)
         plt.axis('off')
         plt.savefig(fname)

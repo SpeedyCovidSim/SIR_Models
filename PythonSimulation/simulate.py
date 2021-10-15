@@ -562,6 +562,7 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     I=ax1.plot(t, Ii, color="red",lw = 2)[0]
     R=ax1.plot(t, Ri, color="blue",lw = 2)[0]
     line_labels = ["Susceptible", "Infected", "Recovered"]
+    ax1.text(6,60,"N=100\nDirect Method")
     plt.legend(handles=[S, I, R],labels=line_labels,bbox_to_anchor=(1.04,1.5), loc="upper left")
     t, Si, Ii, Ri = g_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
     ax2.plot(t, Si, color="green",lw = 2)
@@ -575,6 +576,9 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     ax4.plot(t, Si, color="green",lw = 2)
     ax4.plot(t, Ii, color="red",lw = 2) 
     ax4.plot(t, Ri, color="blue",lw = 2)
+    ax4.text(8,6000,"N=10000\nDirect Method")
+    ax3.set_xlabel('Time')
+    ax4.set_xlabel('Time')
     
 
     fig.text(0.04, 0.5, 'Number of Individuals in State', va='center', rotation='vertical')

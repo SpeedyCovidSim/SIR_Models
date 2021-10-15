@@ -62,7 +62,7 @@ def initHazards(network, infecteds, N):
 
 def main():
     # initialise variables
-    Ns = [100,100]
+    Ns = [100,10000]
     maxbeta = 4
     maxalpha = 0.4
     tMax = 40

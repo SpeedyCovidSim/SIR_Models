@@ -879,7 +879,7 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
         # graph the benchmark of time as N increases. Recommend two graphs next to
         # each other with median on one and mean on other.
         outputFileName = "Benchmarks/SimulationTimesNetwork_DiscVNext"
-        plotBenchmarks_network(tMean,tMedian,N,["Discrete" "First React" "Next React"], outputFileName, true,true)
+        plotBenchmarks_network(tMean,tMedian,N,["Direct" "First React" "Next React"], outputFileName, true,true)
 
         Seaborn.set()
         Seaborn.set_style("ticks")
@@ -989,7 +989,7 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
         # graph the benchmark of time as N increases. Recommend two graphs next to
         # each other with median on one and mean on other.
         outputFileName = "Benchmarks/SimulationTimesNetwork_changing_N_loglog"
-        plotBenchmarks_network(tMean,tMedian,N,["Discrete" "First React" "Next React"], outputFileName, true,true)
+        plotBenchmarks_network(tMean,tMedian,N,["Direct" "First React" "Next React"], outputFileName, true,true)
 
         Seaborn.set()
         Seaborn.set_style("ticks")
@@ -1098,7 +1098,7 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
         # graph the benchmark of time as N increases. Recommend two graphs next to
         # each other with median on one and mean on other.
         outputFileName = "Benchmarks/SimulationTimesNetwork_changing_k_loglog"
-        plotBenchmarks_network(tMean,tMedian,k./N[1],["Discrete" "First React" "Next React"], outputFileName, true,true, false)
+        plotBenchmarks_network(tMean,tMedian,k./N[1],["Direct" "First React" "Next React"], outputFileName, true,true, false)
 
         Seaborn.set()
         Seaborn.set_style("ticks")
@@ -1230,4 +1230,4 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
     end
 end
 
-benchmarkNetwork(false, false, false, false, false, true)
+benchmarkNetwork(false, false, false, true, true, false)

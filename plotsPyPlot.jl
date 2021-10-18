@@ -283,7 +283,7 @@ module plotsPyPlot
         close()
     end
 
-    function plotBenchmarks_network(tMean,tMedian, N, legendLabel=["Discrete" "First React" "Next React"],
+    function plotBenchmarks_network(tMean,tMedian, N, legendLabel=["Direct" "First React" "Next React"],
         outputFileName="Benchmarks/SimulationTimesNetwork",Display=true, save=true, populationMetric=true)
         #=
         Inputs

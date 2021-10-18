@@ -104,10 +104,10 @@ def getGPBands(conf_cases, data):
 def conditionABC(conf_cases, data):
 
     filtered_ABC = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))),
-        data=data, q_tol=0.01, return_indices=False)
+        data=data, q_tol=0.05, return_indices=False)
 
     indexes = cc.filter_ABC(realisations=conf_cases, obs_indices=list(range(0, len(data[0]))),
-        data=data, q_tol=0.01, return_indices=True)
+        data=data, q_tol=0.05, return_indices=True)
 
     t = list(range(0, len(data[0])))
 

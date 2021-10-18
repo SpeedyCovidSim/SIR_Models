@@ -1,0 +1,4 @@
+The median value of $R_\text{eff}$ is 0.52 with IQR between [0.32, 0.7]
+For 1.5x is 0.78 and IQR [0.48, 1.0499999999999998] 
+For 2.0x is 1.04 and IQR [0.64, 1.4] 
+For 3.0x is 1.56 and IQR [0.96, 2.0999999999999996] 

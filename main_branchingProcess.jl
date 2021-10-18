@@ -338,7 +338,7 @@ end
 
 function plotDailyCasesOutbreak(dailyConfirmedCases, dailyTimes, actualDailyCumCases,
     timesActual, title, outputFileName, two21::Bool=true, Display=true, save=false,
-    conditioned=false, useDates=false, forReport=false)
+    conditioned=false, useDates=false, forReport=0)
 
     actualDailyCases = diff(vcat([0],actualDailyCumCases))
     # dailyTimes=timesDaily
@@ -409,10 +409,17 @@ function plotDailyCasesOutbreak(dailyConfirmedCases, dailyTimes, actualDailyCumC
         plt.plot(tDetect, observedIDetect, color="tab:gray", linestyle="-", label="August 2020 Daily Detected Cases", lw=2.5, figure=fig)
     end
 
-    if forReport
+    if forReport == 1
         plt.plot(timesActual[1:8], actualDailyCases[1:8], "k-", label="Daily Detected Cases To 24 Aug", lw=2.5, figure=fig)
         plt.plot(timesActual[8:end], actualDailyCases[8:end], "k--", label="Daily Detected Cases After 24 Aug", lw=2.5, figure=fig)
         plt.plot([7,7], [0, 250],"k--", label=Dates.format(DAY__ZERO__DATE+Dates.Day(7), "U d Y"), lw=2, alpha = 1)
+    elseif forReport == 2
+        plt.plot(timesActual[1:10], actualDailyCases[1:10], "k-", label="Daily Detected Cases To 26 Aug", lw=2.5, figure=fig)
+        plt.plot(timesActual[10:end], actualDailyCases[10:end], "k--", label="Next Week of Daily Detected Cases", lw=2.5, figure=fig)
+        plt.plot([9,9], [0, 250],"k--", label=Dates.format(DAY__ZERO__DATE+Dates.Day(9), "U d Y"), lw=2, alpha = 1)
+    elseif forReport == 3
+        plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Detected Cases", lw=2.5, figure=fig)
+        plt.plot([35,35], [0, 250],"k--", label=Dates.format(DAY__ZERO__DATE+Dates.Day(35), "U d Y"), lw=2, alpha = 1)
     else
         plt.plot(timesActual, actualDailyCases, "k-", label="Actual Daily Detected Cases", lw=2.5, figure=fig)
     end
@@ -427,13 +434,19 @@ function plotDailyCasesOutbreak(dailyConfirmedCases, dailyTimes, actualDailyCumC
     end
     plt.ylabel("Daily Detected Cases")
     # plt.suptitle("Branching Process Simulation")
-    if !forReport
+    if forReport == 0
         plt.title(title)
     end
     plt.legend(loc = "upper right")
-    if forReport
+    if forReport == 1
         plt.xlim([0,30])
         plt.ylim([0,250])
+    elseif forReport == 2
+        # plt.xlim([0,40])
+        plt.ylim([0,150])
+    elseif forReport == 3
+        # plt.xlim([0,40])
+        plt.ylim([0,104])
 
     end
     # plt.ylim([0,150])
@@ -2007,8 +2020,10 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         newdir = createNewDir("./August2021Outbreak/EnsembleConditioned26Aug")
         # newdir = "./August2021Outbreak/2021_8_26_Aug/"
         io_output, io_model = newStatsTxt(newdir)
-        observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210]#, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807, 827, 848]
-        tDetect = collect(0:length(observedIDetect)-1)
+        # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210]#, 278, 348, 430, 513, 566, 615, 690, 739, 767, 787, 807, 827, 848]
+        # tDetect = collect(0:length(observedIDetect)-1)
+        observedIDetect = observedIDetect[1:36]
+        tDetect = tDetect[1:36]
 
         # observedIDetect = [1, 10, 20, 32, 51, 74, 107, 148, 210, 279]
         # tDetect = collect(0:length(observedIDetect)-1)
@@ -2031,7 +2046,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         cumulativeDetectedCases = cumulativeDetectedCases[:,filterVector]
         cumulativeTotalCases = cumulativeTotalCases[:,filterVector]
 
-        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true, 2)
 
         numCasesRange = 80:-10:0
         daysSinceRange = 10:5:40
@@ -3431,7 +3446,7 @@ function augustOutbreakPostProcess(processRange, Display=true, save=false)
         # timesDaily = [i for i=tspan[1]:1:tspan[end]]
         title = "Daily Case Numbers After Detection, Conditioned Model Ensemble"
         outputFileName = newdir*"/DailyCaseNumbersAfterDetection"
-        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true)
+        plotDailyCasesOutbreak(dailyDetectedCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, Display, save, true, true, 3) # for report
 
         title = "August 2021 Outbreak Conditioned Model Ensemble"
         outputFileName = newdir*"/EstimatedCaseNumbersAfterDetection"
@@ -4561,7 +4576,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit"
         # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true)
-        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true, true) # for report
+        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true, 1) # for report
         # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
 
         title = "August 2021 Outbreak using August 2020 Fit \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
@@ -4622,7 +4637,7 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         title = "August 2021 Outbreak using August 2020 Fit, Daily Case Numbers After Detection"
         outputFileName = "./August2021Outbreak/DailyCaseNumbersAfterDetection2020Fit_InstantAL"
         # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true)
-        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true, true) # for report
+        plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, true, true, false, true, 1) # for report
         # plotDailyCasesOutbreak(dailyDetectCases, timesDaily, observedIDetect, tDetect, title, outputFileName, true, false, true)
 
         title = "August 2021 Outbreak using August 2020 Fit \n Estimated Case Numbers After Detection of 3 Cases on Day Zero (Actual is 5)"
@@ -5591,7 +5606,7 @@ function main()
     compilationInit()
     # verifySolutions(1, collect(5:14))
     # verifySolutions(1, collect(22:23))
-    BPbenchmarking(1, [3])
+    # BPbenchmarking(1, [3])
     # verifySolutions(1, [8])
     # augustOutbreakPostProcess([2.73],true,true)
 
@@ -5611,7 +5626,7 @@ function main()
 
     # augustOutbreakSim(1, [1], true, false,[1])
 
-    # augustOutbreakPostProcess([2.1],true,true)
+    augustOutbreakPostProcess([2.73],true,true)
 
 
     # augustOutbreakSim(1, [5, 6, 7], true, true)

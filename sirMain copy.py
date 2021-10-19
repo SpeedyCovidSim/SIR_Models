@@ -27,19 +27,21 @@ def main():
     alpha = 0.4
     beta = 4 / N
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=[6,4],dpi=300)
+    fig.tight_layout()
     
     # iterate through populations
-    for i in range(100):
+    for i in range(50):
         t, S, I, R = gillespieDirect2Processes(t_max, S_total, I_total,
             R_total, alpha, beta, N)
-        plt.plot(t, S, color="#82c7a5",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, I, color="#f15e22",lw = 2, alpha=0.5,figure=fig)
-        plt.plot(t, R, color="#7890cd",lw = 2, alpha=0.5,figure=fig)
+        plt.plot(t, S, color="#777777",lw = 1,alpha=0.4, figure=fig)
+        plt.plot(t, I, color="#c0d7f4",lw = 1,alpha=0.4, figure=fig)
+        plt.plot(t, R, color="#f8b9b3",lw = 1,alpha=0.4, figure=fig)
 
-    plt.xlabel("Time", fontsize=20)
-    plt.ylabel("Number of Individuals in State", fontsize=16)
-    plt.title(f"Stochastic SIR models with a population size of {N}", fontsize=20)
+    plt.xlabel("Time")
+    plt.ylabel("Number of Individuals in State")
+    plt.title(f"Stochastic SIR models with a population size of {N}")
+    plt.savefig("presentation_plot")
     plt.show()
     
 
@@ -53,19 +55,21 @@ def main():
     alpha = 0.4
     beta = 4 / N
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=[6,4],dpi=300)
+    fig.tight_layout()
     t, S, I, R = gillespieDirect2Processes(t_max, S_total, I_total,
             R_total, alpha, beta, N)
     S = np.array(S)/100
     I = np.array(I)/100
     R = np.array(R)/100
-    plt.plot(t, S, label="Susceptible",color="#82c7a5",lw = 2, alpha=1,figure=fig)
-    plt.plot(t, I, label="Infected",color="#f15e22",lw = 2, alpha=1,figure=fig)
-    plt.plot(t, R, label="Recovered",color="#7890cd",lw = 2, alpha=1,figure=fig)
-    plt.legend(fontsize=20)
-    plt.xlabel("Time", fontsize=20)
-    plt.ylabel("Number of Individuals in State", fontsize=16)
-    plt.title(f"ODE SIR model with a population size of 100", fontsize=20)
+    plt.plot(t, S, color="#777777",label="Susceptible",lw = 3, figure=fig)
+    plt.plot(t, I, color="#c0d7f4",label="Infected",lw = 3, figure=fig)
+    plt.plot(t, R, color="#f8b9b3",label="Recovered",lw = 3, figure=fig)
+    plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Number of Individuals in State")
+    plt.title(f"ODE SIR model with a population size of 100")
+    plt.savefig("presentation_plot_ode")
     plt.show()
 
 

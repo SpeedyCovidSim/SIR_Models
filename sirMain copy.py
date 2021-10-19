@@ -34,10 +34,15 @@ def main():
     for i in range(50):
         t, S, I, R = gillespieDirect2Processes(t_max, S_total, I_total,
             R_total, alpha, beta, N)
-        plt.plot(t, S, color="#777777",lw = 1,alpha=0.4, figure=fig)
-        plt.plot(t, I, color="#c0d7f4",lw = 1,alpha=0.4, figure=fig)
-        plt.plot(t, R, color="#f8b9b3",lw = 1,alpha=0.4, figure=fig)
-
+        if(i==1):
+            plt.plot(t, S, color="#777777",label="Susceptible",lw = 1,alpha=0.4, figure=fig)
+            plt.plot(t, I, color="#c0d7f4",label="Infected",lw = 1,alpha=0.4, figure=fig)
+            plt.plot(t, R, color="#f8b9b3",label="Recovered",lw = 1,alpha=0.4, figure=fig)
+        else:
+            plt.plot(t, S, color="#777777",lw = 1,alpha=0.4, figure=fig)
+            plt.plot(t, I, color="#c0d7f4",lw = 1,alpha=0.4, figure=fig)
+            plt.plot(t, R, color="#f8b9b3",lw = 1,alpha=0.4, figure=fig)
+    plt.legend()
     plt.xlabel("Time")
     plt.ylabel("Number of Individuals in State")
     plt.title(f"Stochastic SIR models with a population size of {N}")

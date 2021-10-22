@@ -393,7 +393,7 @@ def nM_SEIR_simulation(k, m_func, nm_func, haz_func, tMax, network, eTotal, iTot
     print(f"mae Strong nMarkov: {maes:.4f}")
     return Sm,Em,Im,Infm,Rm,Snm,Inm,Rnm,Snms,Inms,Rnms
 
-def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz_max, tMax, title, fname):
+def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz_max, tMax, title, fname, fname2):
     '''
     Method to run and plot nonhomogeneous Poisson validation experiments
     '''
@@ -407,23 +407,37 @@ def nH_single_simulation(k, update_func, rate_func, inv_method, thin_method, haz
         invn[i] = np.interp(t, ti, ei,right=ei[-1])
         ax1.plot(ti, ei, color="#82c7a5",lw = 2, alpha=0.3)
         ti, ei = thin_method(rate_func, haz_max, tMax)
+        ti = np.append(ti, tMax)
+        ei = np.append(ei, ei[-1])
         ei = np.cumsum(ei)
         thinn[i] = np.interp(t, ti, ei,right=ei[-1])
-        ti = np.append(ti,50)
-        ei = np.append(ei,ei[-1])
-        ax2.plot(ti, ei, color="#82c7a5",lw = 2, alpha=0.3)
+        ax2.plot(ti, ei, color="#7890cd",lw = 2, alpha=0.3)
     Invm = np.median(np.array(list(invn.values())),0)
     Thinm = np.median(np.array(list(thinn.values())),0)
-    ax1.plot(t, Invm, color="green",lw = 2)
-    ax2.plot(t, Thinm, color="green",lw = 2)
+    inv = ax1.plot(t, Invm, color="green",lw = 2)[0]
+    thin = ax2.plot(t, Thinm, color="blue",lw = 2)[0]
+    ax1.plot(t, Thinm, color="blue",linestyle="dashed", lw=2,alpha=0.7)
+    ax2.plot(t, Invm, color="green",lw=2,linestyle="dashed",alpha=0.7)
     ax1.set_xlabel('Time')
     ax1.set_xlim([0,50])
     ax2.set_xlim([0,50])
     ax2.set_xlabel('Time')
     ax1.set_ylabel('Cumulative Number of Events')
+    line_labels = ["Inverse Method", "Thinning Method"]
+    fig.legend(handles=[inv, thin],labels=line_labels,loc="center right")
     fig.suptitle(title)
     plt.savefig(fname)
     plt.close()
+
+    fig, (ax1,ax2) = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
+    ax1.hist(np.array(list(invn.values()))[:,600])
+    ax1.set_xlabel('Cumulative Number of Events')
+    ax2.set_xlabel('Cumulative Number of Events')
+    ax1.set_ylabel('Frequency')
+    ax2.hist(np.array(list(thinn.values()))[:,600])
+    plt.savefig(fname2)
+    plt.close()
+
 
 def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_method, nMGA, first_method, gMax, haz_max, haz_min, num_processes, tMax, title, fname):
     '''
@@ -547,7 +561,6 @@ def nH_competing_simulation(k, update_func, rate_func_sing, rate_func_vec, inv_m
     line_labels = ["Event Type 0", "Event Type 1", "Event Type 2", "Event Type 3"]
     plt.legend(handles=[p1, p2, p3, p4],labels=line_labels,bbox_to_anchor=(1.04,1.5), loc="upper left")
 
-    fig.suptitle(title)
     plt.savefig(fname,bbox_inches="tight")
     plt.close()
 
@@ -609,6 +622,10 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     ax4 = axs[1,1]
 
     t, Si, Ii, Ri = g_func(tMax, network, iTotal[0], sTotal[0], rTotal[0], copy.copy(numSusNei[0]), copy.copy(rates), copy.copy(susceptible[0]), maxalpha, maxbeta)
+    Si = np.append(Si,Si[-1])
+    t = np.append(t,tMax)
+    Ii = np.append(Ii,Ii[-1])
+    Ri = np.append(Ri,Ri[-1])
     S=ax1.plot(t, Si, color="green",lw = 2)[0]
     I=ax1.plot(t, Ii, color="red",lw = 2)[0]
     R=ax1.plot(t, Ri, color="blue",lw = 2)[0]
@@ -616,14 +633,26 @@ def ode_N_simulation(g_func, f_func, tMax, networks, iTotal, sTotal, rTotal, num
     ax1.text(6,60,"N=100\nDirect Method")
     plt.legend(handles=[S, I, R],labels=line_labels,bbox_to_anchor=(1.04,1.5), loc="upper left")
     t, Si, Ii, Ri = g_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
+    Si = np.append(Si,Si[-1])
+    t = np.append(t,tMax)
+    Ii = np.append(Ii,Ii[-1])
+    Ri = np.append(Ri,Ri[-1])
     ax2.plot(t, Si, color="green",lw = 2)
     ax2.plot(t, Ii, color="red",lw = 2)
     ax2.plot(t, Ri, color="blue",lw = 2)
     t, Si, Ii, Ri = f_func(tMax, network, iTotal[0], sTotal[0], rTotal[0], copy.copy(numSusNei[0]), copy.copy(rates), copy.copy(susceptible[0]), maxalpha, maxbeta)
+    Si = np.append(Si,Si[-1])
+    t = np.append(t,tMax)
+    Ii = np.append(Ii,Ii[-1])
+    Ri = np.append(Ri,Ri[-1])
     ax3.plot(t, Si, color="green",lw = 2)
     ax3.plot(t, Ii, color="red",lw = 2)
     ax3.plot(t, Ri, color="blue",lw = 2)
     t, Si, Ii, Ri = f_func(tMax, network1, iTotal[1], sTotal[1], rTotal[1], copy.copy(numSusNei[1]), copy.copy(rates1), copy.copy(susceptible[1]), maxalpha, maxbeta)
+    Si = np.append(Si,Si[-1])
+    t = np.append(t,tMax)
+    Ii = np.append(Ii,Ii[-1])
+    Ri = np.append(Ri,Ri[-1])
     ax4.plot(t, Si, color="green",lw = 2)
     ax4.plot(t, Ii, color="red",lw = 2) 
     ax4.plot(t, Ri, color="blue",lw = 2)

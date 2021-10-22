@@ -59,8 +59,6 @@ def thinningExactMethod(rateFunction, rateMax, timeLimit=50):
             numEvents[i] = numEvents[i-1] + 1
             # update index
             i += 1
-
-
     return eventTimes[:i], numEvents[:i]
 
 def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
@@ -92,5 +90,4 @@ def thinningApproxMethod(rateFunction, rateMax, timeLimit=100):
             i += 1
         # update time
         t += delT
-
     return eventTimes[:i], numEvents[:i]

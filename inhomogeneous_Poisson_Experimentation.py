@@ -15,13 +15,14 @@ def main(single=True, competing=True, timing=True):
             return np.sqrt((1+ti**2-r**(2/4))/(r**(2/4)))
         def rateFunction(t):
             return (4*t)/(1+t**2) 
-        j = 30
+        j = 200
         rateMax = 2
         tMax = 50
         # conducting experiment and plotting
         title = "Inversion and Thinning Methods for an inhomogeneous Poisson process"
         fname = "PythonPlotting/nh_Poisson_Tests/Single"
-        nH_single_simulation(j, updateFunction, rateFunction, single_inverse, single_thin, rateMax, tMax, title, fname)
+        fname2 = "PythonPlotting/nh_Poisson_Tests/Single_hist"
+        nH_single_simulation(j, updateFunction, rateFunction, single_inverse, single_thin, rateMax, tMax, title, fname, fname2)
 
 
     if (competing):
@@ -122,4 +123,4 @@ def main(single=True, competing=True, timing=True):
         [minBoundsOne, minBoundsTwo, minBoundsFour], numProcesses, tMax)
 
 if __name__=="__main__":
-    main(False, True, False)
+    main(True, False, False)

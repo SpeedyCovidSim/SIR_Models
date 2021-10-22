@@ -65,7 +65,7 @@ def main():
     Ns = [100,10000]
     maxbeta = 4
     maxalpha = 0.4
-    tMax = 40
+    tMax = 30
 
     network = ig.Graph.Full(Ns[0])
     network1 = ig.Graph.Full(Ns[1])

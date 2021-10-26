@@ -8,33 +8,27 @@
 -->
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
 
 
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/github_username/repo_name">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+  <a href="https://github.com/SpeedyCovidSim/SIR_Models">
+    <img src="images/logo.png" alt="Logo" width="260" height="200">
   </a>
 
-<h3 align="center">project_title</h3>
+<h3 align="center">Efficient Stochastic Simulation of Epidemics</h3>
 
   <p align="center">
-    project_description
+    This repository contains the code used to produce the results found in Honour's project reports by Joel Trent and Joshua Looker. Additionally, it contains outputs used in reports by Te Pūnaha Matatini for modelling New Zealand's August 2021 COVID-19 outbreak.
     <br />
-    <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/SpeedyCovidSim/SIR_Models"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
+    <a href="https://github.com/SpeedyCovidSim/SIR_Models/issues">Report Bug</a>
     ·
-    <a href="https://github.com/github_username/repo_name/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/github_username/repo_name/issues">Request Feature</a>
+    <a href="https://github.com/SpeedyCovidSim/SIR_Models/issues">Request Feature</a>
   </p>
 </div>
 
@@ -58,9 +52,6 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -73,7 +64,6 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
-Here's a blank template to get started: To avoid retyping too much info. Do a search and replace with your text editor for the following: `github_username`, `repo_name`, `twitter_handle`, `linkedin_username`, `email`, `email_client`, `project_title`, `project_description`
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -113,7 +103,7 @@ This is an example of how to list things you need to use the software and how to
 1. Get a free API Key at [https://example.com](https://example.com)
 2. Clone the repo
    ```sh
-   git clone https://github.com/github_username/repo_name.git
+   git clone https://github.com/SpeedyCovidSim/SIR_Models.git
    ```
 3. Install NPM packages
    ```sh
@@ -143,7 +133,7 @@ Joel Trent - jtre998@aucklanduni.ac.nz
 
 Joshua Looker - jloo188@aucklanduni.ac.nz
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/SpeedyCovidSim/SIR_Models)
+Project Link: [https://github.com/SpeedyCovidSim/SIR_Models](https://github.com/SpeedyCovidSim/SIR_Models)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -152,9 +142,9 @@ Project Link: [https://github.com/github_username/repo_name](https://github.com/
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-* []()
-* []()
-* []()
+* Produced for Te Pūnaha Matatini [https://www.tepunahamatatini.ac.nz/](https://www.tepunahamatatini.ac.nz/)
+* For the Honours project from the Department of Engineering Science, University of Auckland [https://www.auckland.ac.nz/en/engineering/about-the-faculty/engineering-science.html](https://www.auckland.ac.nz/en/engineering/about-the-faculty/engineering-science.html)
+* With supervision from Oliver Maclaren, David Wu, Dion O'Neale and Emily Harvey
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -162,17 +152,17 @@ Project Link: [https://github.com/github_username/repo_name](https://github.com/
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/github_username/repo_name.svg?style=for-the-badge
-[contributors-url]: https://github.com/github_username/repo_name/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/github_username/repo_name.svg?style=for-the-badge
-[forks-url]: https://github.com/github_username/repo_name/network/members
-[stars-shield]: https://img.shields.io/github/stars/github_username/repo_name.svg?style=for-the-badge
-[stars-url]: https://github.com/github_username/repo_name/stargazers
-[issues-shield]: https://img.shields.io/github/issues/github_username/repo_name.svg?style=for-the-badge
-[issues-url]: https://github.com/github_username/repo_name/issues
-[license-shield]: https://img.shields.io/github/license/github_username/repo_name.svg?style=for-the-badge
-[license-url]: https://github.com/github_username/repo_name/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/SpeedyCovidSim/SIR_Models.svg?style=for-the-badge
+[contributors-url]: https://github.com/SpeedyCovidSim/SIR_Models/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/SpeedyCovidSim/SIR_Models.svg?style=for-the-badge
+[forks-url]: https://github.com/SpeedyCovidSim/SIR_Models/network/members
+[stars-shield]: https://img.shields.io/github/stars/SpeedyCovidSim/SIR_Models.svg?style=for-the-badge
+[stars-url]: https://github.com/SpeedyCovidSim/SIR_Models/stargazers
+[issues-shield]: https://img.shields.io/github/issues/SpeedyCovidSim/SIR_Models.svg?style=for-the-badge
+[issues-url]: https://github.com/SpeedyCovidSim/SIR_Models/issues
+[license-shield]: https://img.shields.io/github/license/SpeedyCovidSim/SIR_Models.svg?style=for-the-badge
+[license-url]: https://github.com/SpeedyCovidSim/SIR_Models/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/linkedin_username
-[product-screenshot]: images/screenshot.png
+[product-screenshot]: images/exampleGraph.png
 

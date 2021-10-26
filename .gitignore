@@ -7,3 +7,11 @@
 # ignore huge csvs
 ./SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv
 # find **/ -size +100M | cat >> .gitignore
+August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_11Sep_contact_transpose.csv
+August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_15Sep_contact_transpose.csv
+August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv
+August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_15Sep_contact_transpose.csv
+August2021Outbreak/CSVOutputs/config_11_created11Sep.timeseries.csv
+August2021Outbreak/CSVOutputs/config_12_created15Sep.timeseries.csv
+August2021Outbreak/CSVOutputs/config_13_created15Sep.timeseries.csv
+August2021Outbreak/CSVOutputs/configTEST.csv

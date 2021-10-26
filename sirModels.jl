@@ -1,8 +1,9 @@
 #=
 This is a code base for a simple SIR simulation using the Gillespie Direct
-Method. Contains the simulation functions.
+Method. Contains the simulation functions, including the contagion network
+algorithms.
 
-Author: Joel Trent and Josh Looker
+Author: Joel Trent and Josh Looker (Josh only the 2 Processes algorithms)
 =#
 
 module sirModels

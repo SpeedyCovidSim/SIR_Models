@@ -1,3 +1,9 @@
+#=
+A module of functions for generating LightGraphs Bipartite Networks.
+For use with SIR models (Gillespie algorithms) 
+
+Author: Joel Trent
+=#
 module bipartiteInitFunctions
 
     using LightGraphs, DataFrames, StatsBase, SparseArrays

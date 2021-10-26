@@ -1,3 +1,15 @@
+'''
+A set of two plotting functions used for accessing the histplot plot type in Seaborn
+(this wasn't available via the Julia wrapper).
+
+Used for the August 2021 Outbreak - seabornDist() is the plot function for
+the overlaid Reff plot used in the AL->AL3 change reports.
+
+plotReffHist() is the plot function for the plotting a given parameters posterior
+after ABC conditioning.
+
+Author: Joel Trent
+'''
 from matplotlib.colors import Colormap
 import seaborn as sns
 from matplotlib import pyplot as plt

@@ -2,7 +2,7 @@
 This is a code base for benchmarking a Python and Julia instance of a
 for a simple SIR simulation using the Gillespie Direct Method
 
-Author: Joel Trent and Josh Looker
+Author: Joel Trent
 
 For info on Benchmark:
 https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/manual.md#handling-benchmark-results
@@ -16,10 +16,7 @@ https://github.com/JuliaCI/BenchmarkTools.jl/blob/master/doc/manual.md#handling-
 using Conda, BenchmarkTools, PyCall, DataFrames, Seaborn
 using ProgressMeter
 
-# It'd probably be better to tell Julia to use an already installed python ENV
-
 # ##############################################################################
-
 # Benchmarking Python vs Julia #################################################
 
 # Loading a Julia function (must be within a module). Set path to current
@@ -102,7 +99,7 @@ function gillespieDirect_pyVsJl()
 
     println("Mean Speedup of: $meanSpeedup")
     println("Median Speedup of: $medianSpeedup")
-    #
+
     # # graph the benchmark of time as N increases. Recommend two graphs next to
     # # each other with median on one and mean on other.
     # plotBenchmarks(tMean,tMedian,N,true,true)
@@ -112,21 +109,6 @@ function gillespieDirect_pyVsJl()
     plotBenchmarksViolin(time_df.population, time_df.time, time_df.language, outputFileName,
         xlabel, true, true)
 
-    # Seaborn.set()
-    # # Seaborn.set_style("ticks")
-    # fig = plt.figure(dpi=300)
-    # # plt.violinplot(data)
-    # Seaborn.violinplot(x=time_df.population, y=time_df.time, hue=time_df.language,
-    #     bw=0.5, cut=0,scale="count",palette = "Set2" )
-    #
-    # plt.xlabel("Population Size")
-    # plt.ylabel("Log10 Simulation time (log10(s))")
-    # plt.title("Time To Complete Simulation")
-    # # plt.title("For alpha = $alpha and beta $beta")
-    # plt.legend()
-    # display(fig)
-    # fig.savefig("Benchmarks/SimulationTimes")
-    # close()
 end
 
 gillespieDirect_pyVsJl()

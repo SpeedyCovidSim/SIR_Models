@@ -1,9 +1,16 @@
+#=
+The script used for generating a simple set of plots used in the project presentation. 
+
+Author: Joel Trent
+=#
+
 using PyPlot, Seaborn
 
 function simpleBarPlot(yVals, xVals, outputFileName, Display, save)
     Seaborn.set()
     set_style("ticks")
     Seaborn.set_color_codes("pastel")
+    # Seaborn.set_color_codes("Set2")
     # Seaborn.set_style("white")
 
     fig = plt.figure(figsize=[6,4],dpi=300)

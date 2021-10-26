@@ -1,10 +1,9 @@
 #=
-This is a code base for the plotting function of a simple SIR simulation
-using the Gillespie Direct Method. Using PyPlot
+A module of plotting functions used for SIR curves, infction curves and
+benchmark timing plots used for BPM and Contagion Network algorithms.
 
-Author: Joel Trent and Josh Looker
+Author: Joel Trent
 =#
-
 
 module plotsPyPlot
 

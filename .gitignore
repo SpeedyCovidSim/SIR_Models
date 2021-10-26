@@ -3,3 +3,7 @@
 
 #ignore .vscode (local stuff)
 /.vscode
+
+# ignore huge csvs
+./SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_dailycases_11Sep_contact_transpose.csv
+# find **/ -size +100M | cat >> .gitignore

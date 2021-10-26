@@ -1,3 +1,23 @@
+#=
+The main script for the branching process model. Note. it got a bit cluttered
+with functions after beginning work on the August 2021 Outbreak.
+
+Contains the function used for benchmarking the BP algorithms.
+
+Contains the vast majority of plotting functions, postprocessing functions and
+model simulation functions (including ensemble simulation) used for the COVID-19
+August 2021 Outbreak in NZ.
+
+See the main() function as an example of how the different parts are called.
+This function calls each of the different parts of the BPM code used for generating
+plots in the report.
+
+Author: Joel Trent
+=#
+
+# if Ccandu (by Oliver Maclaren and Frankie Patten-Elliot) is not on your local
+# machine, comment out these lines. Note, conditioning will no longer work within
+# the outbreakPostProcessing function.
 push!( LOAD_PATH, "./" )
 include("TestConditionEnsemble.jl"); using ConditionEnsemble # both required for conditionEnsemble to work properly.
 # also has to be the first package imported. Must be in this order
@@ -14,6 +34,7 @@ using PlotlyJS
 using PyCall
 
 # import required modules
+push!( LOAD_PATH, "./" )
 using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot, plotCumulativeInfections,
     plotBenchmarksViolin
 using BranchVerifySoln
@@ -33,7 +54,7 @@ global ALERT__CHANGE__DATE = Date("16-09-2021", dateformat"d-m-y")
 py"""
 import sys
 sys.path.append("/Users/joeltrent/Documents/GitHub/SIR_Models")
-from transpose import transposeCSV
+# from transpose import transposeCSV
 from SeabornDistplot import seabornDist, plotReffHist
 """
 #
@@ -43,7 +64,7 @@ from SeabornDistplot import seabornDist, plotReffHist
 # from conditionEnsemble import conditioningJulia
 # """
 # conditionEnsemble = py"condition"
-transposeCSV = py"transposeCSV"
+# transposeCSV = py"transposeCSV"
 plotReffAL3 = py"seabornDist"
 plotReffHist = py"plotReffHist"
 # conditionEnsemble = py"conditioningJulia"
@@ -5605,8 +5626,8 @@ function main()
 
     compilationInit()
     # verifySolutions(1, collect(5:14))
-    # verifySolutions(1, collect(22:23))
-    # BPbenchmarking(1, [3])
+    verifySolutions(1, collect(1:23))
+    BPbenchmarking(1, [1,2,3])
     # verifySolutions(1, [8])
     # augustOutbreakPostProcess([2.73],true,true)
 
@@ -5632,7 +5653,6 @@ function main()
     # augustOutbreakSim(1, [5, 6, 7], true, true)
     # augustOutbreakSim(2, [5, 6,7,10,11])
 
-    # times, dailyConfirmedCases, dailyTotalCases = reloadCSV("", true)
 end
 
 main()

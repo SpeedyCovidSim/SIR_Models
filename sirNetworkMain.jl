@@ -1,8 +1,12 @@
 #=
-This is a code base for the main function of a network SIR simulation using the
-Gillespie Direct Method
+The main script for the contagion network model.
 
-Author: Joel Trent and Josh Looker
+Contains the function used for benchmarking the CN algorithms (benchmarkNetwork()).
+
+Contains two main functions that call all CN algorithms for both SIR and SIRD cases.
+These output single realisations of each model over increasing population size.
+
+Author: Joel Trent
 =#
 using Random, Conda, PyCall, LightGraphs, GraphPlot#, MetaGraphs
 using BenchmarkTools, Seaborn, DataFrames

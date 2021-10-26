@@ -1,18 +1,26 @@
+#=
+A module of post-processing functions used for post processing the August2021Outbreak
+BPM simulations.
+
+Significantly, has the output and reload of CSV functions, that contain simulation
+realisations. Also has the modelReff function, that estimates the value of Reff
+after intervention, given model parameters. 
+
+Author: Joel Trent
+=#
+
 module outbreakPostProcessing
 
-    # using BenchmarkTools
     using DataFrames
     using Distributions, Random, StatsBase, Statistics
-    # using LightGraphs, GraphPlot, NetworkLayout
     using PyPlot, Seaborn
-    # using ProgressMeter
     using CSV
     using Dates
-    # using PlotlyJS
     using branchingProcesses: branchModel
 
     export createNewDir, quantile2D, probOfLessThanXGivenYDays, outputCSVDailyCases,
-        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff, Df_transpose, convertCSVtoConditioning
+        outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff, Df_transpose,
+        convertCSVtoConditioning
 
     function Df_transpose(df)
         #=

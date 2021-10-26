@@ -1,3 +1,15 @@
+#=
+A module of functions used for network and model initialisation, including
+seeding of cases.
+
+initialiseNetwork! is the only function that is exported. It returns the algorithm
+used for model simulation.
+
+For use with SIR models (Gillespie algorithms)
+
+Author: Joel Trent
+=#
+
 module networkInitFunctions
 
     using LightGraphs, StatsBase, DataFrames#, MetaGraphs
@@ -16,10 +28,16 @@ module networkInitFunctions
         simType       : type of sim to use. ["SIR", "SIRD"]
 
         Outputs
-        network       : works in place on the network. network is initialised
-        S_total       : Num people susceptible to infection
-        I_total       : Num people infected
-        R_total       : Num people recovered
+        network          : works in place on the network. network is initialised
+        networkVertex_df : dataframe containing the attributes of individuals in the network
+        network_dict     : dictionary of model attributes such as infection rate, number of states etc.
+        stateTotals      : Num people in states S, I, R (and D if relevant)
+        isState          : boolean 2d array containing the truth value of the state for each individual
+        model!           : the algorithm function (model - should be called method) used for simulation
+
+
+
+        networkVertex_df, network_dict, stateTotals, isState, model!
         =#
 
         states, stateEvents, eventHazards, hazardMultipliers, simpleHazards, model!,

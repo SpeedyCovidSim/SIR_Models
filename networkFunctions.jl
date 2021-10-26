@@ -1,3 +1,11 @@
+#=
+A module of functions used by the SIR model algorithms for interacting with the
+network structure. No other functions are called by these algorithms.
+
+For use with SIR models (Gillespie algorithms), sirModels.jl
+
+Author: Joel Trent
+=#
 
 module networkFunctions
     using LightGraphs, StatsBase, Distributions, Random, TrackingHeaps#, MetaGraphs
@@ -226,7 +234,6 @@ module networkFunctions
         return nothing
     end
 
-
     function updateHazardSir!(network, hazards, vertexIndex, prevState, newState,
         networkVertex_df, network_dict, isState) # also works for SIRD
 
@@ -275,7 +282,6 @@ module networkFunctions
 
             return nothing
         end
-
     end
 
     function calcHazardFirstReact!(network, networkVertex_df, network_dict, isState) # also for SIRD

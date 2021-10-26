@@ -1,3 +1,14 @@
+#=
+A module containing the primary function used to verify that all branching process
+algorithms have been written correctly, relative to each other; verifySolutions.
+Contains 23 different tests that demonstrate the functionality of the algorithms.
+
+It is called like this: verifySolutions(1, collect(1:23)), where the first variable
+is for scaling the number of simulations down so that it completes more quickly,
+and the second is an array of integers, containing the tests to run. 
+
+Author: Joel Trent
+=#
 module BPVerifySolutions
 
     using BenchmarkTools
@@ -6,6 +17,7 @@ module BPVerifySolutions
     using LightGraphs, GraphPlot, NetworkLayout
     using PyPlot, Seaborn
     using ProgressMeter
+
     using BranchVerifySoln
     using branchingProcesses
     using outbreakPostProcessing: modelReff

@@ -2,6 +2,8 @@
 This is a code base for comparing the ODE solution to a well-mixed SIR simulation
 to a randomly generated SIR solution, using the gillespie direct approach
 
+Note, not a module, this has it's own main function at the bottom.
+
 Author: Joel Trent
 
 Discrepancies would be due to random realisations and the fact that interpolation

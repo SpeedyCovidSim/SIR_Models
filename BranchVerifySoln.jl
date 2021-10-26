@@ -1,13 +1,15 @@
 #=
-This is a code base for comparing the discrete solution to a branching process
-SIR simulation with the first reaction and next reaction solutions.
-Much of this code has been copied over from ODEVerifySoln.jl
+A module for comparing and interpolating branching process algorithm solutions
+across many realisations.
+Much of this code has been copied over from ODEVerifySoln.jl - contains functions
+for interpolating our SIR arrays at given times, determining means across multiple
+interpolated simulations, quantifying the difference between means and initialising
+arrays to contain the interpolated SIR curves.
+
+Also many plotting functions that are used for comparing branching process solutions.
 
 Author: Joel Trent
-
-Values should be pretty close for all cases if the time_step is small enough
 =#
-
 
 module BranchVerifySoln
 

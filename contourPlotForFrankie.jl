@@ -1,3 +1,11 @@
+#=
+A script given to Frankie Patten-Elliot that contained the code used to create
+the heatmap/contour plot of model belief on seeing N number of cases again, after
+a given date. 
+
+Author: Joel Trent
+=#
+
 using Dates, PlotlyJS
 
 function indexWhereAllValuesLessThanX(array, x)

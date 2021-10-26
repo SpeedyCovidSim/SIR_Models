@@ -1,3 +1,24 @@
+#=
+A module containing functions for all of the branching process algorithms developed
+and the datastructures and variables that they act upon.
+
+Contains:
+
+discrete_branch! - Discrete-time Simulation of Branching Process Model
+nextReact_branch! - Next Reaction Simulation of Branching Process Model
+firstReact_branch! - First Reaction Simulation of Branching Process Model
+bpMain! - The main function for simulating the branching process model by generating
+    a full infection tree (our Single Thin and Thin Tree algorithms).
+
+Model initialisation functions:
+compilationInit - runs very simple cases of each algorithm. For use before running
+    any simulations, as will make sure that Julia compiles the code.
+init_model_pars - function for initialising a struct that represents our model parameters.
+initDataframe - function for initialising the 'cases' DataFrame that our algorithms
+    runs on.
+
+Author: Joel Trent
+=#
 module branchingProcesses
 
     using DataFrames
@@ -1895,6 +1916,7 @@ module branchingProcesses
     end
 
     function nextReact_branch_trackedHeap!(population_df::DataFrame, model::branchModel)
+        # now deprecated - slower than nextReact_branch!
 
         num_cases::Int64 = model.state_totals[2]*1
         num_events = 1

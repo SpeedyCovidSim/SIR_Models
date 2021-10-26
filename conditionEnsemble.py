@@ -1,3 +1,12 @@
+'''
+Functions used for conditioning model realisations to August 2021 Outbreak data.
+
+Uses an absolute reference to a separate GitHub repository that belongs to
+Oliver Maclaren and Frankie Patten-Elliot, containing the conditioning functions.
+
+Author: Joel Trent
+'''
+
 import sys
 from numpy.core.function_base import linspace
 import pandas as pd

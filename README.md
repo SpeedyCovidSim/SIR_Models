@@ -21,7 +21,7 @@
 <h3 align="center">Efficient Stochastic Simulation of Epidemics</h3>
 
   <p align="center">
-    This repository contains the code used to produce the results found in Honour's project reports by Joel Trent and Joshua Looker. Additionally, it contains outputs used in reports by Te Pūnaha Matatini for modelling New Zealand's August 2021 COVID-19 outbreak.
+    This repository contains code used to produce results found in Honour's project reports by Joel Trent and Joshua Looker. Additionally, it contains outputs used in reports by Te Pūnaha Matatini for modelling New Zealand's August 2021 COVID-19 outbreak.
     <br />
     <a href="https://github.com/SpeedyCovidSim/SIR_Models"><strong>Explore the docs »</strong></a>
     <br />
@@ -62,23 +62,34 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+Which code was written by whom...
+
+<div align="center">
+<img src="images/exampleGraph.png" width=50% height=50%>
+</div>
+
+ <p align="right">(<a href="#top">back to top</a>)</p>
 
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+
+### Built With (Julia)
+
+* [LightGraphs](https://github.com/sbromberger/LightGraphs.jl)
+* [TrackingHeaps](https://github.com/henriquebecker91/TrackingHeaps.jl)
+* [DataFrames and CSV](https://github.com/JuliaData)
+* [Distributions and StatsBase](https://github.com/JuliaStats)
+* [Dierckx](https://github.com/kbarbary/Dierckx.jl)
+* [PyCall, Pyplot and Seaborn](https://github.com/JuliaPy)
+* [PlotlyJS](https://github.com/JuliaPlots/PlotlyJS.jl)
+* [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
+* [BenchmarkTools](https://github.com/JuliaCI/BenchmarkTools.jl)
+* [ProgressMeter](https://github.com/timholy/ProgressMeter.jl)
+
+
+### Built With (Python)
 
 
 
-### Built With
-
-* [Next.js](https://nextjs.org/)
-* [React.js](https://reactjs.org/)
-* [Vue.js](https://vuejs.org/)
-* [Angular](https://angular.io/)
-* [Svelte](https://svelte.dev/)
-* [Laravel](https://laravel.com)
-* [Bootstrap](https://getbootstrap.com)
-* [JQuery](https://jquery.com)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -90,29 +101,26 @@
 This is an example of how you may give instructions on setting up your project locally.
 To get a local copy up and running follow these simple example steps.
 
-### Prerequisites
+### Prerequisites (Julia)
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+* Julia, visit [https://julialang.org/downloads/](https://julialang.org/downloads/) to download. 
+* Packages used within the project. Install them using the following in an open Julia environment.
+    ```sh
+   Pkg.add("InsertPackageNameHere")
+   ```
+
+### Prerequisites (Python)
+* 
+
+
 
 ### Installation
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
+1. Clone the repo
    ```sh
    git clone https://github.com/SpeedyCovidSim/SIR_Models.git
    ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
+2. Install needed packages
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

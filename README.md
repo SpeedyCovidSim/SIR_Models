@@ -145,6 +145,7 @@ To get a local copy up and running follow these simple example steps.
     ```sh
    Pkg.add("InsertPackageNameHere")
    ```
+* Branching process conditioning / model fitting was done using an external private GitHub repository belonging to Oliver Maclaren and Frankie Patten-Elliot. It is not necessary, but is required for the more recent simulation outputs. Additionally, due to GitHub file limits, the most recent simulation CSVs (contact tracing ensemble) is not available in this repository and so some CSV loading within `augustOutbreakPostProcess()` will not work. 
 
 ### Installation
 

@@ -62,13 +62,51 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Which code was written by whom...
+This project contains the code and algorithms used for the Joel Trent and Joshua Looker's Honours Project. Apart from the very initial set of scripts, all code was produced separately - Joshua worked exclusively in Python, while Joel worked in Julia, with a couple of scripts that used Python. 
 
 <div align="center">
 <img src="images/exampleGraph.png" width=50% height=50%>
 </div>
 
+
+
+### Joshua's Report:
+Functions  used to produce results in his report can be found in:
+*
+
+### Joel's Report:
+All .jl files and .py files written have headers described the module / script / set of functions and what they are used for. There are several plotting functions within separate modules in the directory that are not referenced below.
+Functions used to produce results in his report as well as folders with graphs can be found in:
+
+#### Section 2 - Efficient Implementation of Standard Contagion Network Algorithms
+* **sirModels.jl** - implementations of Gillespie algorithms both on and not on networks.
+* **sirNetworkMain.jl** - main script for the contagion network model. CN algorithm benchmarking and outputs of single realisations with increasing population size.
+* **BenchmarkingPyVsJl.jl** - script used for benchmarking Julia vs Python implementations of the Gillespie Direct Method on a well-mixed implicit network.
+* **ODEVerifySoln.jl** - script and functions used for verifying CN implementations against the SIR Model's ODE in the well-mixed network case.
+* **verifiedOD**E - folder with CN algorithm graphs against ODE solutions.
+* **Benchmarks** - folder with CN algorithm benchmarking graphs.
+* **juliaGraphs** - folder with sub folders of simulation realisations for different network cases (if network or wellMixed in the name it is for this section). 
+
+#### Section 3 - Development of Efficient Branching Process Algorithms
+* **branchingProcesses.jl** - implementations of branching process algorithms used to simulate TPM's branching process model. 
+
+#### Section 4 - Validation and Comparison of Branching Process Algorithms
+* **main_branchingProcess.jl** - script and functions (main function) used to create all branching process outputs. Benchmarking of branching process algorithms.
+* **BPVerifySolutions.jl** - module containing the primary function used to verify and compare branching process algorithms.
+* **verifiedBranch** - folder with BP algorithm graphs against geometric solutions and each other to verify them.
+* **Benchmarks** - folder with BP algorithm benchmarking graphs.
+* **juliaGraph**s - folder with sub folders of simulation realisations for different branching process cases (if branch in the name it is for this section).
+
+#### Section 5 - Branching Process Applications – NZ’s August 2021 COVID-19 Outbreak
+* **main_branchingProcess.jl** - functions for model (ensemble) simulation and postprocessing of outputs used by TPM.
+* **outbreakPostProcessing.jl** - functions used for post processing outputs, notably CSVs of model realisations. 
+* **August2020OutbreakFit** - folder with simulation outputs from matching the August 2020 COVID-19 Outbreak data. Including matching the model output from TPM's model.
+* **August2021Outbreak** - folder with all simulation outputs (including CSVs of model realisations - at least the ones that were small enough for GitHub) from simulation of this outbreak.
+
  <p align="right">(<a href="#top">back to top</a>)</p>
+
+### Built With (Python)
+
 
 
 
@@ -86,11 +124,6 @@ Which code was written by whom...
 * [ProgressMeter](https://github.com/timholy/ProgressMeter.jl)
 
 
-### Built With (Python)
-
-
-
-
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
@@ -98,8 +131,12 @@ Which code was written by whom...
 <!-- GETTING STARTED -->
 ## Getting Started
 
-This is an example of how you may give instructions on setting up your project locally.
 To get a local copy up and running follow these simple example steps.
+
+### Prerequisites (Python)
+* 
+
+
 
 ### Prerequisites (Julia)
 
@@ -108,11 +145,6 @@ To get a local copy up and running follow these simple example steps.
     ```sh
    Pkg.add("InsertPackageNameHere")
    ```
-
-### Prerequisites (Python)
-* 
-
-
 
 ### Installation
 
@@ -129,9 +161,11 @@ To get a local copy up and running follow these simple example steps.
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+For Joel's code, the files with 'main' in the name (e.g. main_branchingProcess.jl and sirNetworkMain.jl) contain the `main()` functions that call the vast majority of the other functions used to produce outputs within his report. It is recommended that these functions are looked at first when considering how to use and call different algorithms, models and produce simulation outputs.  
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+<!-- USAGE EXAMPLES Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources. 
+
+_For more examples, please refer to the [Documentation](https://example.com)_ -->
 
 
 <!-- CONTACT -->

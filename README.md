@@ -71,8 +71,7 @@ This project contains the code and algorithms used for the Joel Trent and Joshua
 
 
 ### Joshua's Report:
-Functions  used to produce results in his report can be found in:
-*
+Functions and scripts used to produce results in his report can be found in the **PythonNetworks** folder in the main directory.
 
 ### Joel's Report:
 All .jl files and .py files written have headers described the module / script / set of functions and what they are used for. There are several plotting functions within separate modules in the directory that are not referenced below.

@@ -1671,7 +1671,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
 
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
     StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
-    IDetect_tStep = StStep .* 0
+    IDetect_tStep = convert(SharedArray, initSIRArrays(tspan, time_step, numSims)[1])
 
     timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
     tspanNew = (tspan[1],tspan[2]+1)
@@ -1780,7 +1780,7 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
 
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
     StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
-    IDetect_tStep = StStep .* 0
+    IDetect_tStep = convert(SharedArray, initSIRArrays(tspan, time_step, numSims)[1])
 
     timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
     tspanNew = (tspan[1],tspan[2]+1)
@@ -5654,7 +5654,7 @@ function main()
     # augustOutbreakSim(1,[5,12,13],true,false)
     # augustOutbreakSim(1,5,true,true)
 
-    augustOutbreakSim(1,[5.9],true,false)
+    augustOutbreakSim(1,[4.1],true,false)
 
     # augustOutbreakSim(1, [5, 5.05])
 

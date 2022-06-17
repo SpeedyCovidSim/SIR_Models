@@ -440,7 +440,7 @@ module BranchVerifySoln
         return StStep, ItStep, RtStep
     end
 
-    function multipleSIRMeans(StStep::Array{}, ItStep::Array{}, RtStep::Array{})
+    function multipleSIRMeans(StStep, ItStep, RtStep)
         Smean = mean(StStep, dims = 2)
         Imean = mean(ItStep, dims = 2)
         Rmean = mean(RtStep, dims = 2)

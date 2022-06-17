@@ -10,11 +10,12 @@ Author: Joel Trent
 =#
 using Random, Conda, PyCall, LightGraphs, GraphPlot#, MetaGraphs
 using BenchmarkTools, Seaborn, DataFrames
-using ProgressMeter
+using ProgressMeter, Distributed, SharedArrays
+addprocs(Threads.nthreads()-2)
 
 # import required modules
-push!( LOAD_PATH, "./" )    #Set path to current
-using networkInitFunctions: initialiseNetwork!
+@everywhere push!( LOAD_PATH, joinpath(".","") )    #Set path to current
+@everywhere using networkInitFunctions: initialiseNetwork!
 #using sirModels: gillespieDirect_network!, gillespieFirstReact_network!
 using plotsPyPlot: plotSIRPyPlot, plotBenchmarks_network
 
@@ -1146,16 +1147,16 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
         # setup a loop that benchmarks each function for different N values
         for i::Int64 in 1:length(N)
 
-            directTimes = []
-            firstTimes = []
-            nextTimes = []
+            directTimes = SharedArray{Float64}(it_count[i])
+            firstTimes = SharedArray{Float64}(it_count[i])
+            nextTimes = SharedArray{Float64}(it_count[i])
 
             # Random.seed!(j)
             println("Network building started")
             time = @elapsed networks = [random_regular_graph(N[i], k[i]) for _ in 1:(num_networks[i])]
             println("Network building complete in $time")
 
-            Threads.@threads for j in 1:(it_count[i])
+            @sync @distributed for j in 1:(it_count[i])
                 Random.seed!(j)
                 # network = random_regular_graph(N[i], k[i])
                 network = copy(networks[rem(j,num_networks[i])+1])
@@ -1163,9 +1164,13 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
                 simType = "SIR_direct"
                 networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
                 time_dir = @elapsed model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
-                push!(directTimes, time_dir)
-                push!(time_df, [log10(time_dir), "Direct", k[i]])
+                directTimes[j] = time_dir
             end
+
+            for j in 1:(it_count[i])
+                push!(time_df, [log10(directTimes[j]), "Direct", k[i]])
+            end
+
             println("Direct simulation complete")
 
             # for j in 1:(it_count_first[i])
@@ -1176,12 +1181,16 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
             #     simType = "SIR_firstReact"
             #     networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
             #     time_fir = @elapsed model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
-            #     push!(firstTimes, time_fir)
-            #     push!(time_df, [log10(time_fir), "First Reaction", k[i]])
+            #     firstTimes[j] = time_fir
             # end
+            #
+            # for j in 1:(it_count_first[i])
+            #     push!(time_df, [log10(firstTimes[j]), "First Reaction", k[i]])
+            # end
+            #
             # println("First Reaction simulation complete")
 
-            Threads.@threads for j in 1:(it_count[i])
+            @sync @distributed for j in 1:(it_count[i])
                 Random.seed!(j)
                 # network = random_regular_graph(N[i], k[i])
                 network = copy(networks[rem(j,num_networks[i])+1])
@@ -1189,9 +1198,13 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
                 simType = "SIR_nextReact"
                 networkVertex_df, network_dict, stateTotals, isState, model! = initialiseNetwork!(network, N[i],infectionProp, simType, alpha, beta[i], gamma)
                 time_nex = @elapsed model!(t_max, network, alpha, beta[i], N[i], networkVertex_df, network_dict, stateTotals, isState)
-                push!(nextTimes, time_nex)
-                push!(time_df, [log10(time_nex), "Next Reaction", k[i]])
+                nextTimes[j] = time_nex
             end
+
+            for j in 1:(it_count[i])
+                push!(time_df, [log10(nextTimes[j]), "Next Reaction", k[i]])
+            end
+
             println("Next Reaction simulation complete")
 
             println("Completed iteration #$i")
@@ -1234,4 +1247,8 @@ function benchmarkNetwork(compare3, compare2, violin3, violin3_changeN, violin3_
     end
 end
 
-benchmarkNetwork(false, false, false, true, true, false)
+benchmarkNetwork(false, false, false, false, false, true)
+
+# REMOVE WORKER PROCESSORS WHEN FINISHED #######################################
+rmprocs(workers())
+################################################################################

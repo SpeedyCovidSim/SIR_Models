@@ -4,7 +4,7 @@ BPM simulations.
 
 Significantly, has the output and reload of CSV functions, that contain simulation
 realisations. Also has the modelReff function, that estimates the value of Reff
-after intervention, given model parameters. 
+after intervention, given model parameters.
 
 Author: Joel Trent
 =#
@@ -22,12 +22,12 @@ module outbreakPostProcessing
         outputCSVmodels, reloadCSVmodels, reloadCSV, removeNaNs, modelReff, Df_transpose,
         convertCSVtoConditioning
 
-    function Df_transpose(df)
-        #=
-        Given a DataFrame, return it's transpose
-        =#
-        return DataFrame([[names(df)]; collect.(eachrow(df))], [:column; Symbol.(axes(df, 1))])
-    end
+    # function Df_transpose(df)
+    #     #=
+    #     Given a DataFrame, return it's transpose
+    #     =#
+    #     return DataFrame([[names(df)]; collect.(eachrow(df))], [:column; Symbol.(axes(df, 1))])
+    # end
 
     function convertCSVtoConditioning(origPath, newPath, alreadyTransposed=false)
 

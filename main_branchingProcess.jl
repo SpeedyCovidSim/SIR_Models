@@ -18,13 +18,13 @@ Author: Joel Trent
 # if Ccandu (by Oliver Maclaren and Frankie Patten-Elliot) is not on your local
 # machine, comment out these lines. Note, conditioning will no longer work within
 # the outbreakPostProcessing function.
-push!( LOAD_PATH, "./" )
-include("TestConditionEnsemble.jl"); using ConditionEnsemble # both required for conditionEnsemble to work properly.
+# push!( LOAD_PATH, joinpath(".", "") )
+# include("TestConditionEnsemble.jl"); using ConditionEnsemble # both required for conditionEnsemble to work properly.
 # also has to be the first package imported. Must be in this order
 
 using BenchmarkTools
 using DataFrames
-using Distributions, Random, StatsBase, Statistics
+
 using LightGraphs, GraphPlot, NetworkLayout
 using PyPlot, Seaborn
 using ProgressMeter
@@ -33,14 +33,20 @@ using Dates
 using PlotlyJS
 using PyCall
 
+using Distributed, SharedArrays
+addprocs(Threads.nthreads()-2)
+@everywhere using Distributions, Random, StatsBase, Statistics
+
 # import required modules
-push!( LOAD_PATH, "./" )
+@everywhere push!( LOAD_PATH, joinpath(".", "") )
+push!( LOAD_PATH, joinpath(".", "") )
 using plotsPyPlot: plotBranchPyPlot, plotSimpleBranchPyPlot, plotCumulativeInfections,
     plotBenchmarksViolin
-using BranchVerifySoln
-using branchingProcesses
-using BPVerifySolutions
+@everywhere using BranchVerifySoln
+@everywhere using branchingProcesses
+@everywhere using BPVerifySolutions
 using outbreakPostProcessing
+@everywhere using outbreakPostProcessing: modelReff
 
 # set some globals
 global const PROGRESS__METER__DT = 0.2
@@ -53,7 +59,8 @@ global ALERT__CHANGE__DATE = Date("16-09-2021", dateformat"d-m-y")
 # import py functions
 py"""
 import sys
-sys.path.append("/Users/joeltrent/Documents/GitHub/SIR_Models")
+# sys.path.append("/Users/joeltrent/Documents/GitHub/SIR_Models")
+sys.path.append("C:\\Users\\joelt\\Documents\\GitHub\\SIR_Models")
 # from transpose import transposeCSV
 from SeabornDistplot import seabornDist, plotReffHist
 """
@@ -1661,41 +1668,43 @@ end
 
 function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxCases=20*10^3, p_test::Array{Float64,1}=[0.1,0.8], R_number=3, R_alert_scaling=0.2,
     t_onset_to_isol::Union{Array{Int64,1},Array{Float64,1}}=[2.2,1], initCases=1, num_detected_before_alert=1, alert_scaling_speed=5)
+
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+    StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
     IDetect_tStep = StStep .* 0
 
     timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
     tspanNew = (tspan[1],tspan[2]+1)
     dailyDetectCases, dailyICases, dailyRCases = initSIRArrays(tspanNew, 1, numSims)
+    dailyDetectCases, dailyICases, dailyRCases = convert(SharedArray, dailyDetectCases), convert(SharedArray, dailyICases), convert(SharedArray, dailyRCases)
+
     @assert length(dailyDetectCases[:,1]) == length(timesDaily)
 
-    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
-    population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
     i = 1
-    p = Progress(numSims,PROGRESS__METER__DT)
+    # p = Progress(numSims,PROGRESS__METER__DT)
 
     meanOffspring = zeros(numSims)
     meanRNumber = zeros(numSims)
 
-    establishedSims = BitArray(undef, numSims) .* false
+    establishedSims = SharedArray{Bool}(numSims)
     establishedSims .= true
 
-    time = @elapsed Threads.@threads for i = 1:numSims
+    time = @elapsed @sync @distributed for i = 1:numSims
 
-        models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCases,initCases,0], true);
-        models[Threads.threadid()].stochasticRi = true
-        models[Threads.threadid()].reproduction_number = R_number*1
-        models[Threads.threadid()].p_test = p_test[1]*1
-        models[Threads.threadid()].alert_pars.p_test = p_test[2]*1
-        models[Threads.threadid()].t_onset_to_isol = t_onset_to_isol[1]*1
-        models[Threads.threadid()].alert_pars.t_onset_to_isol = t_onset_to_isol[2]*1
-        models[Threads.threadid()].alert_pars.R_scaling = R_alert_scaling*1
-        models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
-        models[Threads.threadid()].alert_pars.alert_level_scaling_speed = alert_scaling_speed
+        model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCases,initCases,0], true);
+        model.stochasticRi = true
+        model.reproduction_number = R_number*1
+        model.p_test = p_test[1]*1
+        model.alert_pars.p_test = p_test[2]*1
+        model.t_onset_to_isol = t_onset_to_isol[1]*1
+        model.alert_pars.t_onset_to_isol = t_onset_to_isol[2]*1
+        model.alert_pars.R_scaling = R_alert_scaling*1
+        model.alert_pars.num_detected_before_alert = num_detected_before_alert*1
+        model.alert_pars.alert_level_scaling_speed = alert_scaling_speed
 
         # next React branching process with alert level
-        population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
-        t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+        population_df = initDataframe(model);
+        t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
 
         firstDetectIndex = findfirst(state_totals_all[:,4].==num_detected_before_alert)
 
@@ -1726,7 +1735,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
             establishedSims[i] = false
         end
 
-        next!(p)
+        # next!(p)
     end
 
     # dailyDetectCases = diff(hcat(convert.(Int64, zeros(length(timesDaily))), dailyDetectCases),dims=1)
@@ -1734,8 +1743,6 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
     dailyDetectCases = diff(dailyDetectCases,dims=1)
     dailyTotalCases = dailyICases .+ dailyRCases
     dailyTotalCases = diff(dailyTotalCases, dims=1)
-
-
 
     IcumCases = ItStep .+ RtStep
 
@@ -1757,7 +1764,7 @@ function baseOutbreakSim(tspan, time_step, times, numSims, detection_tspan, maxC
     return IcumCases[:,indexesToKeep], IDetect_tStep[:,indexesToKeep], observedIDetect, tDetect, dailyDetectCases[:,indexesToKeep], dailyTotalCases[:,indexesToKeep]
 end
 
-struct Ensemble
+@everywhere struct Ensemble
     p_test_ranges::Array
     p_test_sub_ranges::Array
     t_isol_ranges::Array
@@ -1772,25 +1779,29 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
     initCases=1, num_detected_before_alert=1)
 
     StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+    StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
     IDetect_tStep = StStep .* 0
 
     timesDaily = [i for i=tspan[1]-1:1:tspan[end]]
     tspanNew = (tspan[1],tspan[2]+1)
+
     dailyDetectCases, dailyICases, dailyRCases = initSIRArrays(tspanNew, 1, numSims)
+    dailyDetectCases, dailyICases, dailyRCases = convert(SharedArray, dailyDetectCases), convert(SharedArray, dailyICases), convert(SharedArray, dailyRCases)
+
     @assert length(dailyDetectCases[:,1]) == length(timesDaily)
 
-    models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
-    population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
-    initCases = [rand(ensemble.init_cases_range)*1 for i in 1:Threads.nthreads()];
+    # models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for i in 1:Threads.nthreads()]
+    # population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
+    # initCases = [rand(ensemble.init_cases_range)*1 for i in 1:Threads.nthreads()];
 
-    p = Progress(numSims,PROGRESS__METER__DT)
+    # p = Progress(numSims,PROGRESS__METER__DT)
 
-    meanOffspring = zeros(numSims)
+    meanOffspring = SharedArray{Float64}(numSims)
     meanRNumber = zeros(numSims)
 
-    alertIncrease = zeros(numSims)
+    alertIncrease = SharedArray{Float64}(numSims)
 
-    establishedSims = BitArray(undef, numSims) .* false
+    establishedSims = SharedArray{Bool}(numSims)
     establishedSims .= true
 
     model_array = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0], true) for _ in 1:numSims]
@@ -1798,71 +1809,73 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
     model_Reff_accepted = [false for _ in 1:Threads.nthreads()]
 
     i = 1
-    time = @elapsed Threads.@threads for i = 1:numSims
+    time = @elapsed @sync @distributed for i = 1:numSims
 
-        initCases[Threads.threadid()] = rand(ensemble.init_cases_range)*1
+        initCase = rand(ensemble.init_cases_range)*1
 
-        model_Reff_accepted[Threads.threadid()] = false
+        model_Reff_accepted = false
 
-        while !model_Reff_accepted[Threads.threadid()]
+        model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCase, initCase, 0], true);
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCases[Threads.threadid()],initCases[Threads.threadid()],0], true);
+        while !model_Reff_accepted
+
+            model = init_model_pars(tspan[1], tspan[end], 5*10^6, maxCases, [5*10^6-initCase, initCase, 0], true);
 
             # shorten recovery time to 21 days from 30. Weibull dist effectively 1 by this stage.
             # should make detecting cases more realistic immediately after intervention
-            models[Threads.threadid()].recovery_time = 21
+            model.recovery_time = 21
 
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].reproduction_number = rand(Uniform(ensemble.R_input_range...))
-            models[Threads.threadid()].p_test = rand(Uniform(ensemble.p_test_ranges[1]...))
-            models[Threads.threadid()].alert_pars.p_test = rand(Uniform(ensemble.p_test_ranges[2]...))
+            model.stochasticRi = true
+            model.reproduction_number = rand(Uniform(ensemble.R_input_range...))
+            model.p_test = rand(Uniform(ensemble.p_test_ranges[1]...))
+            model.alert_pars.p_test = rand(Uniform(ensemble.p_test_ranges[2]...))
 
             if ensemble.p_test_sub_ranges[2]>0.0
-                models[Threads.threadid()].alert_pars.p_test_sub = rand(Uniform(ensemble.p_test_sub_ranges...))
+                model.alert_pars.p_test_sub = rand(Uniform(ensemble.p_test_sub_ranges...))
             else
-                models[Threads.threadid()].alert_pars.p_test_sub = 0.0
+                model.alert_pars.p_test_sub = 0.0
             end
 
-            models[Threads.threadid()].t_onset_to_isol = rand(Uniform(ensemble.t_isol_ranges[1]...))
-            models[Threads.threadid()].alert_pars.t_onset_to_isol = min(rand(Uniform(ensemble.t_isol_ranges[2]...)), models[Threads.threadid()].t_onset_to_isol)
+            model.t_onset_to_isol = rand(Uniform(ensemble.t_isol_ranges[1]...))
+            model.alert_pars.t_onset_to_isol = min(rand(Uniform(ensemble.t_isol_ranges[2]...)), model.t_onset_to_isol)
 
-            models[Threads.threadid()].alert_pars.R_scaling = rand(Uniform(ensemble.alert_level_scaling_range...))
-            models[Threads.threadid()].alert_pars.num_detected_before_alert = num_detected_before_alert*1
-            models[Threads.threadid()].alert_pars.alert_level_scaling_speed = rand(Uniform(ensemble.alert_level_speed_range...))
+            model.alert_pars.R_scaling = rand(Uniform(ensemble.alert_level_scaling_range...))
+            model.alert_pars.num_detected_before_alert = num_detected_before_alert*1
+            model.alert_pars.alert_level_scaling_speed = rand(Uniform(ensemble.alert_level_speed_range...))
 
             for key in keys(ensemble.extra_alert_event)
                 if key == :k
-                    models[Threads.threadid()].reproduction_k = ensemble.extra_alert_event[key] * 1.0
+                    model.reproduction_k = ensemble.extra_alert_event[key] * 1.0
                 elseif key == :contact
-                    models[Threads.threadid()].alert_pars.p_contact = rand(Uniform(ensemble.extra_alert_event[key][:p_contact]...))
-                    models[Threads.threadid()].alert_pars.p_contact_time = rand(Uniform(ensemble.extra_alert_event[key][:time]...))
+                    model.alert_pars.p_contact = rand(Uniform(ensemble.extra_alert_event[key][:p_contact]...))
+                    model.alert_pars.p_contact_time = rand(Uniform(ensemble.extra_alert_event[key][:time]...))
                 else
                     alertIncrease[i] = rand(ensemble.extra_alert_event[key][:R_scaling_increase])
-                    push!(models[Threads.threadid()].alert_pars.extraALevents, AlertEvent(ensemble.extra_alert_event[key][:t_relative], models[Threads.threadid()].alert_pars.R_scaling * alertIncrease[i]))
+                    push!(model.alert_pars.extraALevents, AlertEvent(ensemble.extra_alert_event[key][:t_relative], model.alert_pars.R_scaling * alertIncrease[i]))
                 end
             end
 
             if USING__ALERT__MAX__VAL
-                if modelReff(models[Threads.threadid()]) < ALERT__REFF__MAX__VAL
-                    model_Reff_accepted[Threads.threadid()] = true
+                if modelReff(model) < ALERT__REFF__MAX__VAL
+                    model_Reff_accepted = true
                 end
             else
-                model_Reff_accepted[Threads.threadid()] = true
+                model_Reff_accepted = true
             end
 
         end
-        model_array[i] = deepcopy(models[Threads.threadid()])
+        model_array[i] = deepcopy(model)
 
         # next React branching process with alert level
-        population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
-        t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+        population_df = initDataframe(model);
+        t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
 
 
         # clean duplicate values of t which occur on the first recovery time.
         # breaks interpolation otherwise
-        if initCases[Threads.threadid()] > 1
-            firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+        if initCase > 1
+            firstDupe = findfirst(x->x==model.recovery_time,t)
+            lastDupe = findlast(x->x==model.recovery_time,t)
 
             t = vcat(t[1:firstDupe-1], t[lastDupe:end])
             state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
@@ -1890,18 +1903,18 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
                 IDetect_tStep[:,i] = singleLinearSpline(state_totals_all[:, 4], tnew, times)
                 dailyICases[:,i], dailyRCases[:,i], dailyDetectCases[:,i] = multipleLinearSplines(state_totals_all[:, 2:4], tnew, timesDaily)
 
-                timeToHitAlertLower = t_first_detect+models[Threads.threadid()].alert_pars.alert_level_scaling_speed+1
+                timeToHitAlertLower = t_first_detect+model.alert_pars.alert_level_scaling_speed+1
 
-                timeAfterHitAlertAllow = models[Threads.threadid()].t_max
+                timeAfterHitAlertAllow = model.t_max
 
                 if CHANGING__ALERT__LEVELS
-                    timeAfterHitAlertAllow = min(timeToHitAlertLower+models[Threads.threadid()].recovery_time+10+models[Threads.threadid()].alert_pars.alert_level_scaling_speed,  models[Threads.threadid()].t_max)
+                    timeAfterHitAlertAllow = min(timeToHitAlertLower+model.recovery_time+10+model.alert_pars.alert_level_scaling_speed,  model.t_max)
                 end
 
                 highAlert_df = filter(row -> row.parentID!=0 &&
                     row.time_infected > timeToHitAlertLower &&
                     row.active===false,
-                    population_dfs[Threads.threadid()][1:num_cases, :], view=true)
+                    population_df[1:num_cases, :], view=true)
 
                 meanOffspring[i] = mean(highAlert_df.num_offspring)
                 # meanOffspring[i] = nrow(highAlert_df)
@@ -1929,7 +1942,7 @@ function ensembleOutbreakSim(tspan, time_step, times, numSims, detection_tspan, 
             # println(findall(isnan.(dailyDetectCases[:,i])))
         end
 
-        next!(p)
+        # next!(p)
     end
 
     # dailyDetectCases = removeNaNs(dailyDetectCases, 2.0)
@@ -4014,38 +4027,37 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         numSims = convert(Int, round(10000/numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+        StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
 
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
         i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
+        # p = Progress(numSims,PROGRESS__METER__DT)
 
-        meanOffspring = zeros(numSims)
-        meanRNumber = zeros(numSims)
+        meanOffspring = SharedArray{Float64}(numSims)
+        meanRNumber = SharedArray{Float64}(numSims)
 
-        establishedSims = BitArray(undef, numSims) .* false
+        establishedSims = SharedArray{Bool}(numSims)
         establishedSims .= true
 
-        time = @elapsed Threads.@threads for i = 1:numSims
+        time = @elapsed @sync @distributed for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
-            models[Threads.threadid()].stochasticRi = true
-            models[Threads.threadid()].reproduction_number = 5
-            models[Threads.threadid()].p_test = 0.4
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
+            model = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
+            model.stochasticRi = true
+            model.reproduction_number = 5
+            model.p_test = 0.4
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
 
             # Simple branch, no infection times
-            population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
 
             if num_cases < 3
                 establishedSims[i] = false
             end
 
             # clean duplicate values of t which occur on the first recovery time
-            # firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            # lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+            # firstDupe = findfirst(x->x==model.recovery_time,t)
+            # lastDupe = findlast(x->x==model.recovery_time,t)
 
             # t = vcat(t[1:firstDupe-1], t[lastDupe:end])
             # state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
@@ -4053,15 +4065,18 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
 
-            inactive_df = filter(row -> row.parentID!=0, population_dfs[Threads.threadid()][1:num_cases, :], view=true)
+            inactive_df = filter(row -> row.parentID!=0, population_df[1:num_cases, :], view=true)
 
             meanOffspring[i] = mean(inactive_df.num_offspring)
             meanRNumber[i] = mean(inactive_df.reproduction_number)
 
-            next!(p)
+            # next!(p)
         end
 
-        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring))), for reproduction number of $(median(meanRNumber))")
+        meanOffspring_normal = zeros(numSims)
+        meanOffspring_normal .= meanOffspring
+
+        println("Mean actual offspring was $(mean(filter!(!isnan, meanOffspring_normal))), for reproduction number of $(median(meanRNumber))")
         println("Finished Simulation in $time seconds")
         x = ItStep .+ RtStep
 
@@ -4096,40 +4111,39 @@ function augustOutbreakSim(numSimsScaling::Union{Float64,Int64}, simRange, Displ
         numSims = convert(Int, round(10000/numSimsScaling))
 
         StStep, ItStep, RtStep = initSIRArrays(tspan, time_step, numSims)
+        StStep, ItStep, RtStep = convert(SharedArray, StStep), convert(SharedArray, ItStep), convert(SharedArray, RtStep)
 
-        establishedSims = BitArray(undef, numSims) .* false
+        establishedSims = SharedArray{Bool}(numSims)
         establishedSims .= true
 
-        models = [init_model_pars(tspan[1], tspan[end], 5*10^3, 5*10^3, [5*10^3-10,10,0]) for i in 1:Threads.nthreads()]
-        population_dfs = [initDataframe(models[1]) for i in 1:Threads.nthreads()];
         i = 1
-        p = Progress(numSims,PROGRESS__METER__DT)
-        time = @elapsed Threads.@threads for i = 1:numSims
+        # p = Progress(numSims,PROGRESS__METER__DT)
+        time = @elapsed @sync @distributed for i = 1:numSims
 
-            models[Threads.threadid()] = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
-            models[Threads.threadid()].stochasticRi = false
-            models[Threads.threadid()].reproduction_number = 5
-            models[Threads.threadid()].p_test = 0.4
-            # models[Threads.threadid()].sub_clin_prop = 0.0
-            # models[Threads.threadid()].reproduction_number = 1.0
+            model = init_model_pars(tspan[1], tspan[end], 5*10^6, 5*10^3, [5*10^6-1,1,0]);
+            model.stochasticRi = false
+            model.reproduction_number = 5
+            model.p_test = 0.4
+            # model.sub_clin_prop = 0.0
+            # model.reproduction_number = 1.0
 
-            population_dfs[Threads.threadid()] = initDataframe(models[Threads.threadid()]);
-            t, state_totals_all, num_cases = nextReact_branch!(population_dfs[Threads.threadid()], models[Threads.threadid()])
+            population_df = initDataframe(model);
+            t, state_totals_all, num_cases = nextReact_branch!(population_df, model)
 
             if num_cases < 3
                 establishedSims[i] = false
             end
 
             # clean duplicate values of t which occur on the first recovery time
-            # firstDupe = findfirst(x->x==models[Threads.threadid()].recovery_time,t)
-            # lastDupe = findlast(x->x==models[Threads.threadid()].recovery_time,t)
+            # firstDupe = findfirst(x->x==model.recovery_time,t)
+            # lastDupe = findlast(x->x==model.recovery_time,t)
 
             # t = vcat(t[1:firstDupe-1], t[lastDupe:end])
             # state_totals_all = vcat(state_totals_all[1:firstDupe-1, :], state_totals_all[lastDupe:end, :])
 
             # interpolate using linear splines
             StStep[:,i], ItStep[:,i], RtStep[:,i] = multipleLinearSplines(state_totals_all, t, times)
-            next!(p)
+            # next!(p)
         end
 
         println("Finished Simulation in $time seconds")
@@ -5626,8 +5640,8 @@ function main()
 
     compilationInit()
     # verifySolutions(1, collect(5:14))
-    verifySolutions(1, collect(1:23))
-    BPbenchmarking(1, [1,2,3])
+    # verifySolutions(1, collect(1:23))
+    # BPbenchmarking(1, [1,2,3])
     # verifySolutions(1, [8])
     # augustOutbreakPostProcess([2.73],true,true)
 
@@ -5640,6 +5654,8 @@ function main()
     # augustOutbreakSim(1,[5,12,13],true,false)
     # augustOutbreakSim(1,5,true,true)
 
+    augustOutbreakSim(1,[5.9],true,false)
+
     # augustOutbreakSim(1, [5, 5.05])
 
 
@@ -5647,7 +5663,7 @@ function main()
 
     # augustOutbreakSim(1, [1], true, false,[1])
 
-    augustOutbreakPostProcess([2.73],true,true)
+    # augustOutbreakPostProcess([2.73],true,true)
 
 
     # augustOutbreakSim(1, [5, 6, 7], true, true)
@@ -5905,3 +5921,7 @@ end
 # origPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/BP2021ensemble_cumulativecases_created5Sep_8Sep.csv";
 # newPath = "/Users/joeltrent/Documents/GitHub/SIR_Models/August2021Outbreak/CSVOutputs/config_8_created5Sep.timeseries.csv";
 # convertCSVtoConditioning(origPath, newPath);
+
+# REMOVE WORKER PROCESSORS WHEN FINISHED #######################################
+rmprocs(workers())
+################################################################################
